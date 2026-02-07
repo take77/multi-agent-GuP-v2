@@ -76,6 +76,7 @@ SETUP_ONLY=false
 OPEN_TERMINAL=false
 CLEAN_MODE=false
 KESSEN_MODE=false
+SHOGUN_NO_THINKING=false
 SHELL_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
@@ -96,6 +97,10 @@ while [[ $# -gt 0 ]]; do
             OPEN_TERMINAL=true
             shift
             ;;
+        --shogun-no-thinking)
+            SHOGUN_NO_THINKING=true
+            shift
+            ;;
         -shell|--shell)
             if [[ -n "$2" && "$2" != -* ]]; then
                 SHELL_OVERRIDE="$2"
@@ -114,7 +119,7 @@ while [[ $# -gt 0 ]]; do
             echo "オプション:"
             echo "  -c, --clean         キューとダッシュボードをリセットして起動（クリーンスタート）"
             echo "                      未指定時は前回の状態を維持して起動"
-            echo "  -k, --kessen        決戦の陣（全足軽をOpus Thinkingで起動）"
+            echo "  -k, --kessen        決戦の陣（全足軽をOpusで起動）"
             echo "                      未指定時は平時の陣（足軽1-4=Sonnet, 足軽5-8=Opus）"
             echo "  -s, --setup-only    tmuxセッションのセットアップのみ（Claude起動なし）"
             echo "  -t, --terminal      Windows Terminal で新しいタブを開く"
@@ -128,19 +133,20 @@ while [[ $# -gt 0 ]]; do
             echo "  ./shutsujin_departure.sh -s           # セットアップのみ（手動でClaude起動）"
             echo "  ./shutsujin_departure.sh -t           # 全エージェント起動 + ターミナルタブ展開"
             echo "  ./shutsujin_departure.sh -shell bash  # bash用プロンプトで起動"
-            echo "  ./shutsujin_departure.sh -k           # 決戦の陣（全足軽Opus Thinking）"
+            echo "  ./shutsujin_departure.sh -k           # 決戦の陣（全足軽Opus）"
             echo "  ./shutsujin_departure.sh -c -k         # クリーンスタート＋決戦の陣"
             echo "  ./shutsujin_departure.sh -shell zsh   # zsh用プロンプトで起動"
+            echo "  ./shutsujin_departure.sh --shogun-no-thinking  # 将軍のthinkingを無効化（中継特化）"
             echo ""
             echo "モデル構成:"
-            echo "  将軍:      Opus（thinking無効）"
-            echo "  家老:      Opus Thinking"
-            echo "  足軽1-4:   Sonnet Thinking"
-            echo "  足軽5-8:   Opus Thinking"
+            echo "  将軍:      Opus（デフォルト。--shogun-no-thinkingで無効化）"
+            echo "  家老:      Opus"
+            echo "  足軽1-4:   Sonnet"
+            echo "  足軽5-8:   Opus"
             echo ""
             echo "陣形:"
-            echo "  平時の陣（デフォルト）: 足軽1-4=Sonnet Thinking, 足軽5-8=Opus Thinking"
-            echo "  決戦の陣（--kessen）:   全足軽=Opus Thinking"
+            echo "  平時の陣（デフォルト）: 足軽1-4=Sonnet, 足軽5-8=Opus"
+            echo "  決戦の陣（--kessen）:   全足軽=Opus"
             echo ""
             echo "エイリアス:"
             echo "  csst  → cd /mnt/c/tools/multi-agent-shogun && ./shutsujin_departure.sh"
@@ -304,6 +310,9 @@ result: null
 EOF
     done
 
+    # ntfy inbox リセット
+    echo "inbox:" > ./queue/ntfy_inbox.yaml
+
     log_success "✅ 陣払い完了"
 else
     log_info "📜 前回の陣容を維持して出陣..."
@@ -466,9 +475,9 @@ tmux split-window -v
 PANE_LABELS=("karo" "ashigaru1" "ashigaru2" "ashigaru3" "ashigaru4" "ashigaru5" "ashigaru6" "ashigaru7" "ashigaru8")
 # ペインタイトル設定（tmuxタイトル用: モデル名付き）
 if [ "$KESSEN_MODE" = true ]; then
-    PANE_TITLES=("karo(Opus)" "ashigaru1(Opus)" "ashigaru2(Opus)" "ashigaru3(Opus)" "ashigaru4(Opus)" "ashigaru5(Opus)" "ashigaru6(Opus)" "ashigaru7(Opus)" "ashigaru8(Opus)")
+    PANE_TITLES=("Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus")
 else
-    PANE_TITLES=("karo(Opus)" "ashigaru1(Sonnet)" "ashigaru2(Sonnet)" "ashigaru3(Sonnet)" "ashigaru4(Sonnet)" "ashigaru5(Opus)" "ashigaru6(Opus)" "ashigaru7(Opus)" "ashigaru8(Opus)")
+    PANE_TITLES=("Opus" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus" "Opus" "Opus" "Opus")
 fi
 # 色設定（karo: 赤, ashigaru: 青）
 PANE_COLORS=("red" "blue" "blue" "blue" "blue" "blue" "blue" "blue" "blue")
@@ -477,9 +486,9 @@ AGENT_IDS=("karo" "ashigaru1" "ashigaru2" "ashigaru3" "ashigaru4" "ashigaru5" "a
 
 # モデル名設定（pane-border-format で常時表示するため）
 if [ "$KESSEN_MODE" = true ]; then
-    MODEL_NAMES=("Opus Thinking" "Opus Thinking" "Opus Thinking" "Opus Thinking" "Opus Thinking" "Opus Thinking" "Opus Thinking" "Opus Thinking" "Opus Thinking")
+    MODEL_NAMES=("Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus")
 else
-    MODEL_NAMES=("Opus Thinking" "Sonnet Thinking" "Sonnet Thinking" "Sonnet Thinking" "Sonnet Thinking" "Opus Thinking" "Opus Thinking" "Opus Thinking" "Opus Thinking")
+    MODEL_NAMES=("Opus" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus" "Opus" "Opus" "Opus")
 fi
 
 for i in {0..8}; do
@@ -487,13 +496,14 @@ for i in {0..8}; do
     tmux select-pane -t "multiagent:agents.${p}" -T "${PANE_TITLES[$i]}"
     tmux set-option -p -t "multiagent:agents.${p}" @agent_id "${AGENT_IDS[$i]}"
     tmux set-option -p -t "multiagent:agents.${p}" @model_name "${MODEL_NAMES[$i]}"
+    tmux set-option -p -t "multiagent:agents.${p}" @current_task ""
     PROMPT_STR=$(generate_prompt "${PANE_LABELS[$i]}" "${PANE_COLORS[$i]}" "$SHELL_SETTING")
     tmux send-keys -t "multiagent:agents.${p}" "cd \"$(pwd)\" && export PS1='${PROMPT_STR}' && clear" Enter
 done
 
-# pane-border-format でモデル名を常時表示（Claude Codeがペインタイトルを上書きしても消えない）
+# pane-border-format でモデル名を常時表示
 tmux set-option -t multiagent -w pane-border-status top
-tmux set-option -t multiagent -w pane-border-format '#{pane_index} #{@agent_id} (#{?#{==:#{@model_name},},unknown,#{@model_name}})'
+tmux set-option -t multiagent -w pane-border-format '#{@agent_id} (#{@model_name})'
 
 log_success "  └─ 家老・足軽の陣、構築完了"
 echo ""
@@ -512,43 +522,49 @@ if [ "$SETUP_ONLY" = false ]; then
 
     log_war "👑 全軍に Claude Code を召喚中..."
 
-    # 将軍
-    tmux send-keys -t shogun:main "MAX_THINKING_TOKENS=0 claude --model opus --dangerously-skip-permissions"
-    tmux send-keys -t shogun:main Enter
-    log_info "  └─ 将軍、召喚完了"
+    # 将軍: Opus（デフォルト）。--shogun-no-thinking で思考無効化
+    if [ "$SHOGUN_NO_THINKING" = true ]; then
+        tmux send-keys -t shogun:main "MAX_THINKING_TOKENS=0 claude --model opus --dangerously-skip-permissions"
+        tmux send-keys -t shogun:main Enter
+        log_info "  └─ 将軍（Opus / thinking無効）、召喚完了"
+    else
+        tmux send-keys -t shogun:main "claude --model opus --dangerously-skip-permissions"
+        tmux send-keys -t shogun:main Enter
+        log_info "  └─ 将軍（Opus / effort: high）、召喚完了"
+    fi
 
     # 少し待機（安定のため）
     sleep 1
 
-    # 家老（pane 0）: Opus Thinking
+    # 家老（pane 0）: Opus（Opusのデフォルトはhigh）
     p=$((PANE_BASE + 0))
     tmux send-keys -t "multiagent:agents.${p}" "claude --model opus --dangerously-skip-permissions"
     tmux send-keys -t "multiagent:agents.${p}" Enter
-    log_info "  └─ 家老（Opus Thinking）、召喚完了"
+    log_info "  └─ 家老（Opus / effort: high）、召喚完了"
 
     if [ "$KESSEN_MODE" = true ]; then
-        # 決戦の陣: 全足軽 Opus Thinking
+        # 決戦の陣: 全足軽 Opus（Opusのデフォルトはhigh）
         for i in {1..8}; do
             p=$((PANE_BASE + i))
             tmux send-keys -t "multiagent:agents.${p}" "claude --model opus --dangerously-skip-permissions"
             tmux send-keys -t "multiagent:agents.${p}" Enter
         done
-        log_info "  └─ 足軽1-8（Opus Thinking）、決戦の陣で召喚完了"
+        log_info "  └─ 足軽1-8（Opus / effort: high）、決戦の陣で召喚完了"
     else
-        # 平時の陣: 足軽1-4=Sonnet, 足軽5-8=Opus
+        # 平時の陣: 足軽1-4=Sonnet, 足軽5-8=Opus（effort: max）
         for i in {1..4}; do
             p=$((PANE_BASE + i))
             tmux send-keys -t "multiagent:agents.${p}" "claude --model sonnet --dangerously-skip-permissions"
             tmux send-keys -t "multiagent:agents.${p}" Enter
         done
-        log_info "  └─ 足軽1-4（Sonnet Thinking）、召喚完了"
+        log_info "  └─ 足軽1-4（Sonnet）、召喚完了"
 
         for i in {5..8}; do
             p=$((PANE_BASE + i))
             tmux send-keys -t "multiagent:agents.${p}" "claude --model opus --dangerously-skip-permissions"
             tmux send-keys -t "multiagent:agents.${p}" Enter
         done
-        log_info "  └─ 足軽5-8（Opus Thinking）、召喚完了"
+        log_info "  └─ 足軽5-8（Opus / effort: high）、召喚完了"
     fi
 
     if [ "$KESSEN_MODE" = true ]; then
@@ -667,6 +683,21 @@ NINJA_EOF
     log_success "✅ 全軍に指示書伝達完了"
     echo ""
 fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 6.7: ntfy入力リスナー起動
+# ═══════════════════════════════════════════════════════════════════════════════
+NTFY_TOPIC=$(grep 'ntfy_topic:' ./config/settings.yaml 2>/dev/null | awk '{print $2}' | tr -d '"')
+if [ -n "$NTFY_TOPIC" ]; then
+    pkill -f "ntfy_listener.sh" 2>/dev/null || true
+    [ ! -f ./queue/ntfy_inbox.yaml ] && echo "inbox:" > ./queue/ntfy_inbox.yaml
+    nohup bash "$SCRIPT_DIR/scripts/ntfy_listener.sh" &>/dev/null &
+    disown
+    log_info "📱 ntfy入力リスナー起動 (topic: $NTFY_TOPIC)"
+else
+    log_info "📱 ntfy未設定のためリスナーはスキップ"
+fi
+echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 7: 環境確認・完了メッセージ
