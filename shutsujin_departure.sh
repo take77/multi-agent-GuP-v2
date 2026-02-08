@@ -26,6 +26,14 @@ if [ -f "./config/settings.yaml" ]; then
     SHELL_SETTING=$(grep "^shell:" ./config/settings.yaml 2>/dev/null | awk '{print $2}' || echo "bash")
 fi
 
+# CLI Adapter読み込み（Multi-CLI Support）
+if [ -f "$SCRIPT_DIR/lib/cli_adapter.sh" ]; then
+    source "$SCRIPT_DIR/lib/cli_adapter.sh"
+    CLI_ADAPTER_LOADED=true
+else
+    CLI_ADAPTER_LOADED=false
+fi
+
 # 色付きログ関数（戦国風）
 log_info() {
     echo -e "\033[1;33m【報】\033[0m $1"
@@ -77,6 +85,7 @@ OPEN_TERMINAL=false
 CLEAN_MODE=false
 KESSEN_MODE=false
 SHOGUN_NO_THINKING=false
+SILENT_MODE=false
 SHELL_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
@@ -99,6 +108,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --shogun-no-thinking)
             SHOGUN_NO_THINKING=true
+            shift
+            ;;
+        -S|--silent)
+            SILENT_MODE=true
             shift
             ;;
         -shell|--shell)
@@ -125,6 +138,8 @@ while [[ $# -gt 0 ]]; do
             echo "  -t, --terminal      Windows Terminal で新しいタブを開く"
             echo "  -shell, --shell SH  シェルを指定（bash または zsh）"
             echo "                      未指定時は config/settings.yaml の設定を使用"
+            echo "  -S, --silent        サイレントモード（足軽の戦国echo表示を無効化・API節約）"
+            echo "                      未指定時はshoutモード（タスク完了時に戦国風echo表示）"
             echo "  -h, --help          このヘルプを表示"
             echo ""
             echo "例:"
@@ -137,6 +152,7 @@ while [[ $# -gt 0 ]]; do
             echo "  ./shutsujin_departure.sh -c -k         # クリーンスタート＋決戦の陣"
             echo "  ./shutsujin_departure.sh -shell zsh   # zsh用プロンプトで起動"
             echo "  ./shutsujin_departure.sh --shogun-no-thinking  # 将軍のthinkingを無効化（中継特化）"
+            echo "  ./shutsujin_departure.sh -S           # サイレントモード（echo表示なし）"
             echo ""
             echo "モデル構成:"
             echo "  将軍:      Opus（デフォルト。--shogun-no-thinkingで無効化）"
@@ -147,6 +163,10 @@ while [[ $# -gt 0 ]]; do
             echo "陣形:"
             echo "  平時の陣（デフォルト）: 足軽1-4=Sonnet, 足軽5-8=Opus"
             echo "  決戦の陣（--kessen）:   全足軽=Opus"
+            echo ""
+            echo "表示モード:"
+            echo "  shout（デフォルト）:  タスク完了時に戦国風echo表示"
+            echo "  silent（--silent）:   echo表示なし（API節約）"
             echo ""
             echo "エイリアス:"
             echo "  csst  → cd /mnt/c/tools/multi-agent-shogun && ./shutsujin_departure.sh"
@@ -281,6 +301,14 @@ fi
 # queue ディレクトリが存在しない場合は作成（初回起動時に必要）
 [ -d ./queue/reports ] || mkdir -p ./queue/reports
 [ -d ./queue/tasks ] || mkdir -p ./queue/tasks
+# inbox はLinux FSにシンボリックリンク（WSL2の/mnt/c/ではinotifywaitが動かないため）
+INBOX_LINUX_DIR="$HOME/.local/share/multi-agent-shogun/inbox"
+if [ ! -L ./queue/inbox ]; then
+    mkdir -p "$INBOX_LINUX_DIR"
+    [ -d ./queue/inbox ] && cp ./queue/inbox/*.yaml "$INBOX_LINUX_DIR/" 2>/dev/null && rm -rf ./queue/inbox
+    ln -sf "$INBOX_LINUX_DIR" ./queue/inbox
+    log_info "  └─ inbox → Linux FS ($INBOX_LINUX_DIR) にシンボリックリンク作成"
+fi
 
 if [ "$CLEAN_MODE" = true ]; then
     log_info "📜 前回の軍議記録を破棄中..."
@@ -312,6 +340,11 @@ EOF
 
     # ntfy inbox リセット
     echo "inbox:" > ./queue/ntfy_inbox.yaml
+
+    # agent inbox リセット
+    for agent in shogun karo ashigaru{1..8}; do
+        echo "messages:" > "./queue/inbox/${agent}.yaml"
+    done
 
     log_success "✅ 陣払い完了"
 else
@@ -452,6 +485,14 @@ if ! tmux new-session -d -s multiagent -n "agents" 2>/dev/null; then
     exit 1
 fi
 
+# DISPLAY_MODE: shout (default) or silent (--silent flag)
+if [ "$SILENT_MODE" = true ]; then
+    tmux set-environment -t multiagent DISPLAY_MODE "silent"
+    echo "  📢 表示モード: サイレント（echo表示なし）"
+else
+    tmux set-environment -t multiagent DISPLAY_MODE "shout"
+fi
+
 # 3x3グリッド作成（合計9ペイン）
 # ペイン番号は pane-base-index に依存（0 または 1）
 # 最初に3列に分割
@@ -485,10 +526,35 @@ PANE_COLORS=("red" "blue" "blue" "blue" "blue" "blue" "blue" "blue" "blue")
 AGENT_IDS=("karo" "ashigaru1" "ashigaru2" "ashigaru3" "ashigaru4" "ashigaru5" "ashigaru6" "ashigaru7" "ashigaru8")
 
 # モデル名設定（pane-border-format で常時表示するため）
+# デフォルト（Claude用）
 if [ "$KESSEN_MODE" = true ]; then
     MODEL_NAMES=("Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus")
 else
     MODEL_NAMES=("Opus" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus" "Opus" "Opus" "Opus")
+fi
+
+# CLI Adapter経由でモデル名を動的に上書き
+if [ "$CLI_ADAPTER_LOADED" = true ]; then
+    for i in {0..8}; do
+        _agent="${AGENT_IDS[$i]}"
+        _cli=$(get_cli_type "$_agent")
+        case "$_cli" in
+            codex)
+                # config.tomlからモデル名と推論レベルを取得
+                _codex_model=$(grep '^model ' ~/.codex/config.toml 2>/dev/null | head -1 | sed 's/.*= *"\(.*\)"/\1/')
+                _codex_effort=$(grep '^model_reasoning_effort' ~/.codex/config.toml 2>/dev/null | head -1 | sed 's/.*= *"\(.*\)"/\1/')
+                _codex_model=${_codex_model:-gpt-5.3-codex}
+                _codex_effort=${_codex_effort:-high}
+                MODEL_NAMES[$i]="${_codex_model}/${_codex_effort}"
+                ;;
+            copilot)
+                MODEL_NAMES[$i]="Copilot"
+                ;;
+            kimi)
+                MODEL_NAMES[$i]="Kimi"
+                ;;
+        esac
+    done
 fi
 
 for i in {0..8}; do
@@ -503,7 +569,7 @@ done
 
 # pane-border-format でモデル名を常時表示
 tmux set-option -t multiagent -w pane-border-status top
-tmux set-option -t multiagent -w pane-border-format '#{@agent_id} (#{@model_name})'
+tmux set-option -t multiagent -w pane-border-format '#{?pane_active,#[reverse],}#[bold]#{@agent_id}#[default] (#{@model_name}) #{@current_task}'
 
 log_success "  └─ 家老・足軽の陣、構築完了"
 echo ""
@@ -512,59 +578,96 @@ echo ""
 # STEP 6: Claude Code 起動（-s / --setup-only のときはスキップ）
 # ═══════════════════════════════════════════════════════════════════════════════
 if [ "$SETUP_ONLY" = false ]; then
-    # Claude Code CLI の存在チェック
-    if ! command -v claude &> /dev/null; then
-        log_info "⚠️  claude コマンドが見つかりません"
-        echo "  first_setup.sh を再実行してください:"
-        echo "    ./first_setup.sh"
-        exit 1
+    # CLI の存在チェック（Multi-CLI対応）
+    if [ "$CLI_ADAPTER_LOADED" = true ]; then
+        _default_cli=$(get_cli_type "")
+        if ! validate_cli_availability "$_default_cli"; then
+            exit 1
+        fi
+    else
+        if ! command -v claude &> /dev/null; then
+            log_info "⚠️  claude コマンドが見つかりません"
+            echo "  first_setup.sh を再実行してください:"
+            echo "    ./first_setup.sh"
+            exit 1
+        fi
     fi
 
     log_war "👑 全軍に Claude Code を召喚中..."
 
-    # 将軍: Opus（デフォルト）。--shogun-no-thinking で思考無効化
-    if [ "$SHOGUN_NO_THINKING" = true ]; then
-        tmux send-keys -t shogun:main "MAX_THINKING_TOKENS=0 claude --model opus --dangerously-skip-permissions"
+    # 将軍: CLI Adapter経由でコマンド構築
+    _shogun_cli_type="claude"
+    _shogun_cmd="claude --model opus --dangerously-skip-permissions"
+    if [ "$CLI_ADAPTER_LOADED" = true ]; then
+        _shogun_cli_type=$(get_cli_type "shogun")
+        _shogun_cmd=$(build_cli_command "shogun")
+    fi
+    tmux set-option -p -t "shogun:main" @agent_cli "$_shogun_cli_type"
+    if [ "$SHOGUN_NO_THINKING" = true ] && [ "$_shogun_cli_type" = "claude" ]; then
+        tmux send-keys -t shogun:main "MAX_THINKING_TOKENS=0 $_shogun_cmd"
         tmux send-keys -t shogun:main Enter
-        log_info "  └─ 将軍（Opus / thinking無効）、召喚完了"
+        log_info "  └─ 将軍（${_shogun_cli_type} / thinking無効）、召喚完了"
     else
-        tmux send-keys -t shogun:main "claude --model opus --dangerously-skip-permissions"
+        tmux send-keys -t shogun:main "$_shogun_cmd"
         tmux send-keys -t shogun:main Enter
-        log_info "  └─ 将軍（Opus / effort: high）、召喚完了"
+        log_info "  └─ 将軍（${_shogun_cli_type}）、召喚完了"
     fi
 
     # 少し待機（安定のため）
     sleep 1
 
-    # 家老（pane 0）: Opus（Opusのデフォルトはhigh）
+    # 家老（pane 0）: CLI Adapter経由でコマンド構築
     p=$((PANE_BASE + 0))
-    tmux send-keys -t "multiagent:agents.${p}" "claude --model opus --dangerously-skip-permissions"
+    _karo_cli_type="claude"
+    _karo_cmd="claude --model opus --dangerously-skip-permissions"
+    if [ "$CLI_ADAPTER_LOADED" = true ]; then
+        _karo_cli_type=$(get_cli_type "karo")
+        _karo_cmd=$(build_cli_command "karo")
+    fi
+    tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_karo_cli_type"
+    tmux send-keys -t "multiagent:agents.${p}" "$_karo_cmd"
     tmux send-keys -t "multiagent:agents.${p}" Enter
-    log_info "  └─ 家老（Opus / effort: high）、召喚完了"
+    log_info "  └─ 家老（${_karo_cli_type}）、召喚完了"
 
     if [ "$KESSEN_MODE" = true ]; then
-        # 決戦の陣: 全足軽 Opus（Opusのデフォルトはhigh）
+        # 決戦の陣: CLI Adapter経由（claudeはOpus強制）
         for i in {1..8}; do
             p=$((PANE_BASE + i))
-            tmux send-keys -t "multiagent:agents.${p}" "claude --model opus --dangerously-skip-permissions"
+            _ashi_cli_type="claude"
+            _ashi_cmd="claude --model opus --dangerously-skip-permissions"
+            if [ "$CLI_ADAPTER_LOADED" = true ]; then
+                _ashi_cli_type=$(get_cli_type "ashigaru${i}")
+                if [ "$_ashi_cli_type" = "claude" ]; then
+                    # 決戦モード: claudeは全員Opus強制
+                    _ashi_cmd="claude --model opus --dangerously-skip-permissions"
+                else
+                    _ashi_cmd=$(build_cli_command "ashigaru${i}")
+                fi
+            fi
+            tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_ashi_cli_type"
+            tmux send-keys -t "multiagent:agents.${p}" "$_ashi_cmd"
             tmux send-keys -t "multiagent:agents.${p}" Enter
         done
-        log_info "  └─ 足軽1-8（Opus / effort: high）、決戦の陣で召喚完了"
+        log_info "  └─ 足軽1-8（決戦の陣）、召喚完了"
     else
-        # 平時の陣: 足軽1-4=Sonnet, 足軽5-8=Opus（effort: max）
-        for i in {1..4}; do
+        # 平時の陣: CLI Adapter経由（デフォルト: 1-4=Sonnet, 5-8=Opus）
+        for i in {1..8}; do
             p=$((PANE_BASE + i))
-            tmux send-keys -t "multiagent:agents.${p}" "claude --model sonnet --dangerously-skip-permissions"
+            _ashi_cli_type="claude"
+            if [ $i -le 4 ]; then
+                _ashi_cmd="claude --model sonnet --dangerously-skip-permissions"
+            else
+                _ashi_cmd="claude --model opus --dangerously-skip-permissions"
+            fi
+            if [ "$CLI_ADAPTER_LOADED" = true ]; then
+                _ashi_cli_type=$(get_cli_type "ashigaru${i}")
+                _ashi_cmd=$(build_cli_command "ashigaru${i}")
+            fi
+            tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_ashi_cli_type"
+            tmux send-keys -t "multiagent:agents.${p}" "$_ashi_cmd"
             tmux send-keys -t "multiagent:agents.${p}" Enter
         done
-        log_info "  └─ 足軽1-4（Sonnet）、召喚完了"
-
-        for i in {5..8}; do
-            p=$((PANE_BASE + i))
-            tmux send-keys -t "multiagent:agents.${p}" "claude --model opus --dangerously-skip-permissions"
-            tmux send-keys -t "multiagent:agents.${p}" Enter
-        done
-        log_info "  └─ 足軽5-8（Opus / effort: high）、召喚完了"
+        log_info "  └─ 足軽1-8（平時の陣）、召喚完了"
     fi
 
     if [ "$KESSEN_MODE" = true ]; then
@@ -656,36 +759,53 @@ NINJA_EOF
         sleep 1
     done
 
-    # 将軍に指示書を読み込ませる
-    log_info "  └─ 将軍に指示書を伝達中..."
-    tmux send-keys -t shogun:main "instructions/shogun.md を読んで役割を理解せよ。"
-    sleep 0.5
-    tmux send-keys -t shogun:main Enter
+    # ═══════════════════════════════════════════════════════════════════
+    # STEP 6.6: inbox_watcher起動（全エージェント）
+    # ═══════════════════════════════════════════════════════════════════
+    log_info "📬 メールボックス監視を起動中..."
 
-    # 家老に指示書を読み込ませる
-    sleep 2
-    log_info "  └─ 家老に指示書を伝達中..."
-    tmux send-keys -t "multiagent:agents.${PANE_BASE}" "instructions/karo.md を読んで役割を理解せよ。"
-    sleep 0.5
-    tmux send-keys -t "multiagent:agents.${PANE_BASE}" Enter
-
-    # 足軽に指示書を読み込ませる（1-8）
-    sleep 2
-    log_info "  └─ 足軽に指示書を伝達中..."
-    for i in {1..8}; do
-        p=$((PANE_BASE + i))
-        tmux send-keys -t "multiagent:agents.${p}" "instructions/ashigaru.md を読んで役割を理解せよ。汝は足軽${i}号である。"
-        sleep 0.3
-        tmux send-keys -t "multiagent:agents.${p}" Enter
-        sleep 0.5
+    # inbox ディレクトリ初期化（シンボリックリンク先のLinux FSに作成）
+    mkdir -p "$SCRIPT_DIR/logs"
+    for agent in shogun karo ashigaru{1..8}; do
+        [ -f "$SCRIPT_DIR/queue/inbox/${agent}.yaml" ] || echo "messages:" > "$SCRIPT_DIR/queue/inbox/${agent}.yaml"
     done
 
-    log_success "✅ 全軍に指示書伝達完了"
+    # 既存のwatcherと孤児inotifywaitをkill
+    pkill -f "inbox_watcher.sh" 2>/dev/null || true
+    pkill -f "inotifywait.*queue/inbox" 2>/dev/null || true
+    sleep 1
+
+    # 将軍のwatcher（CLI種別を第3引数で渡す）
+    _shogun_watcher_cli=$(tmux show-options -p -t "shogun:main" -v @agent_cli 2>/dev/null || echo "claude")
+    nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" shogun "shogun:main" "$_shogun_watcher_cli" \
+        &>> "$SCRIPT_DIR/logs/inbox_watcher_shogun.log" &
+    disown
+
+    # 家老のwatcher
+    _karo_watcher_cli=$(tmux show-options -p -t "multiagent:agents.${PANE_BASE}" -v @agent_cli 2>/dev/null || echo "claude")
+    nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" karo "multiagent:agents.${PANE_BASE}" "$_karo_watcher_cli" \
+        &>> "$SCRIPT_DIR/logs/inbox_watcher_karo.log" &
+    disown
+
+    # 足軽のwatcher
+    for i in {1..8}; do
+        p=$((PANE_BASE + i))
+        _ashi_watcher_cli=$(tmux show-options -p -t "multiagent:agents.${p}" -v @agent_cli 2>/dev/null || echo "claude")
+        nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" "ashigaru${i}" "multiagent:agents.${p}" "$_ashi_watcher_cli" \
+            &>> "$SCRIPT_DIR/logs/inbox_watcher_ashigaru${i}.log" &
+        disown
+    done
+
+    log_success "  └─ 10エージェント分のinbox_watcher起動完了"
+
+    # STEP 6.7 は廃止 — CLAUDE.md Session Start (step 1: tmux agent_id) で各自が自律的に
+    # 自分のinstructions/*.mdを読み込む。検証済み (2026-02-08)。
+    log_info "📜 指示書読み込みは各エージェントが自律実行（CLAUDE.md Session Start）"
     echo ""
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 6.7: ntfy入力リスナー起動
+# STEP 6.8: ntfy入力リスナー起動
 # ═══════════════════════════════════════════════════════════════════════════════
 NTFY_TOPIC=$(grep 'ntfy_topic:' ./config/settings.yaml 2>/dev/null | awk '{print $2}' | tr -d '"')
 if [ -n "$NTFY_TOPIC" ]; then
