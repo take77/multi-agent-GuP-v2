@@ -63,7 +63,7 @@ Kimi CLI uses a single-axis approval model (simpler than Codex's two-axis sandbo
 - Timeout controls with error classification (retryable vs non-retryable)
 - Exponential backoff retry logic in KimiSoul engine
 
-**Shogun system usage**: Ashigaru run with `--yolo` for unattended operation.
+**Captain system usage**: Member run with `--yolo` for unattended operation.
 
 ## Memory / State Management
 
@@ -210,19 +210,19 @@ Created via CreateSubagent tool:
 | LaborMarket (subagent registry) | **Isolated** | **Shared** |
 | Approval system | Shared (via `approval.share()`) | Shared |
 
-### Comparison with Shogun System
+### Comparison with Captain System
 
-| Aspect | Shogun System | Kimi Agent Swarm |
+| Aspect | Captain System | Kimi Agent Swarm |
 |--------|--------------|-----------------|
 | Execution model | tmux panes (separate processes) | In-process (single Python process) |
-| Agent count | 10 (shogun + karo + 8 ashigaru) | Up to 100 (claimed) |
+| Agent count | 10 (captain + vice_captain + 8 member) | Up to 100 (claimed) |
 | Communication | File-based inbox (YAML + inotifywait) | In-memory LaborMarket registry |
 | Isolation | Full OS-level (separate tmux panes) | Python-level (separate KimiSoul instances) |
 | Recovery | /clear + CLAUDE.md auto-load | Checkpoint/DenwaRenji (time travel) |
 | CLI independence | Each agent runs own CLI instance | Single CLI, multiple internal agents |
-| Orchestration | Karo (manager agent) | Main agent auto-delegates |
+| Orchestration | Vice Captain (manager agent) | Main agent auto-delegates |
 
-**Key insight**: Kimi's Agent Swarm is complementary, not competing. It could run *inside* a single ashigaru's tmux pane, providing sub-delegation within that agent.
+**Key insight**: Kimi's Agent Swarm is complementary, not competing. It could run *inside* a single member's tmux pane, providing sub-delegation within that agent.
 
 ### Checkpoint / Time Travel (DenwaRenji)
 
@@ -234,11 +234,11 @@ Unique feature: AI can "send messages to its past self" to correct course. Inter
 2. **Session resume**: `--continue` to resume, `--session <id>` for specific sessions
 3. **Checkpoint system**: DenwaRenji allows state reversion
 
-### Shogun System Recovery (Kimi Ashigaru)
+### Captain System Recovery (Kimi Member)
 
 ```
 Step 1: AGENTS.md is auto-loaded (contains recovery procedure)
-Step 2: Read queue/tasks/ashigaru{N}.yaml → determine current task
+Step 2: Read queue/tasks/member{N}.yaml → determine current task
 Step 3: If task has "target_path:" → read that file
 Step 4: Resume work based on task status
 ```

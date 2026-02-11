@@ -1,61 +1,61 @@
 # Task Flow
 
-## Workflow: Shogun → Karo → Ashigaru
+## Workflow: Captain → Vice Captain → Member
 
 ```
-Lord: command → Shogun: write YAML → inbox_write → Karo: decompose → inbox_write → Ashigaru: execute → report YAML → inbox_write → Karo: update dashboard → Shogun: read dashboard
+Lord: command → Captain: write YAML → inbox_write → Vice Captain: decompose → inbox_write → Member: execute → report YAML → inbox_write → Vice Captain: update dashboard → Captain: read dashboard
 ```
 
-## Immediate Delegation Principle (Shogun)
+## Immediate Delegation Principle (Captain)
 
-**Delegate to Karo immediately and end your turn** so the Lord can input next command.
+**Delegate to Vice Captain immediately and end your turn** so the Lord can input next command.
 
 ```
-Lord: command → Shogun: write YAML → inbox_write → END TURN
+Lord: command → Captain: write YAML → inbox_write → END TURN
                                         ↓
                                   Lord: can input next
                                         ↓
-                              Karo/Ashigaru: work in background
+                              Vice Captain/Member: work in background
                                         ↓
                               dashboard.md updated as report
 ```
 
-## Event-Driven Wait Pattern (Karo)
+## Event-Driven Wait Pattern (Vice Captain)
 
 **After dispatching all subtasks: STOP.** Do not launch background monitors or sleep loops.
 
 ```
-Step 7: Dispatch cmd_N subtasks → inbox_write to ashigaru
+Step 7: Dispatch cmd_N subtasks → inbox_write to member
 Step 8: check_pending → if pending cmd_N+1, process it → then STOP
-  → Karo becomes idle (prompt waiting)
-Step 9: Ashigaru completes → inbox_write karo → watcher nudges karo
-  → Karo wakes, scans reports, acts
+  → Vice Captain becomes idle (prompt waiting)
+Step 9: Member completes → inbox_write vice_captain → watcher nudges vice_captain
+  → Vice Captain wakes, scans reports, acts
 ```
 
-**Why no background monitor**: inbox_watcher.sh detects ashigaru's inbox_write to karo and sends a nudge. This is true event-driven. No sleep, no polling, no CPU waste.
+**Why no background monitor**: inbox_watcher.sh detects member's inbox_write to vice_captain and sends a nudge. This is true event-driven. No sleep, no polling, no CPU waste.
 
-**Karo wakes via**: inbox nudge from ashigaru report, shogun new cmd, or system event. Nothing else.
+**Vice Captain wakes via**: inbox nudge from member report, captain new cmd, or system event. Nothing else.
 
 ## "Wake = Full Scan" Pattern
 
 Claude Code cannot "wait". Prompt-wait = stopped.
 
-1. Dispatch ashigaru
+1. Dispatch member
 2. Say "stopping here" and end processing
-3. Ashigaru wakes you via inbox
+3. Member wakes you via inbox
 4. Scan ALL report files (not just the reporting one)
 5. Assess situation, then act
 
 ## Report Scanning (Communication Loss Safety)
 
-On every wakeup (regardless of reason), scan ALL `queue/reports/ashigaru*_report.yaml`.
+On every wakeup (regardless of reason), scan ALL `queue/reports/member*_report.yaml`.
 Cross-reference with dashboard.md — process any reports not yet reflected.
 
-**Why**: Ashigaru inbox messages may be delayed. Report files are already written and scannable as a safety net.
+**Why**: Member inbox messages may be delayed. Report files are already written and scannable as a safety net.
 
 ## Foreground Block Prevention (24-min Freeze Lesson)
 
-**Karo blocking = entire army halts.** On 2026-02-06, foreground `sleep` during delivery checks froze karo for 24 minutes.
+**Vice Captain blocking = entire army halts.** On 2026-02-06, foreground `sleep` during delivery checks froze vice_captain for 24 minutes.
 
 **Rule: NEVER use `sleep` in foreground.** After dispatching tasks → stop and wait for inbox wakeup.
 
@@ -70,8 +70,8 @@ Cross-reference with dashboard.md — process any reports not yet reflected.
 
 ```
 ✅ Correct (event-driven):
-  cmd_008 dispatch → inbox_write ashigaru → stop (await inbox wakeup)
-  → ashigaru completes → inbox_write karo → karo wakes → process report
+  cmd_008 dispatch → inbox_write member → stop (await inbox wakeup)
+  → member completes → inbox_write vice_captain → vice_captain wakes → process report
 
 ❌ Wrong (polling):
   cmd_008 dispatch → sleep 30 → capture-pane → check status → sleep 30 ...

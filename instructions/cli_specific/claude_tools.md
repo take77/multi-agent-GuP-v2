@@ -60,24 +60,24 @@ Don't save: temporary task details (use YAML), file contents (just read them), i
 
 ## Model Switching
 
-For Karo: Dynamic model switching via `/model`:
+For Vice Captain: Dynamic model switching via `/model`:
 
 ```bash
-bash scripts/inbox_write.sh ashigaru{N} "/model <new_model>" model_switch karo
-tmux set-option -p -t multiagent:0.{N} @model_name '<DisplayName>'
+bash scripts/inbox_write.sh member{N} "/model <new_model>" model_switch vice_captain
+tmux set-option -p -t darjeeling:0.{N} @model_name '<DisplayName>'
 ```
 
-For Ashigaru: You don't switch models yourself. Karo manages this.
+For Member: You don't switch models yourself. Vice Captain manages this.
 
 ## /clear Protocol
 
-For Karo only: Send `/clear` to ashigaru for context reset:
+For Vice Captain only: Send `/clear` to member for context reset:
 
 ```bash
-bash scripts/inbox_write.sh ashigaru{N} "タスクYAMLを読んで作業開始せよ。" clear_command karo
+bash scripts/inbox_write.sh member{N} "タスクYAMLを読んで作業開始せよ。" clear_command vice_captain
 ```
 
-For Ashigaru: After `/clear`, follow CLAUDE.md /clear recovery procedure. Do NOT read instructions/ashigaru.md for the first task (cost saving).
+For Member: After `/clear`, follow CLAUDE.md /clear recovery procedure. Do NOT read instructions/member.md for the first task (cost saving).
 
 ## Compaction Recovery
 
@@ -85,6 +85,6 @@ All agents: Follow the Session Start / Recovery procedure in CLAUDE.md. Key step
 
 1. Identify self: `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'`
 2. `mcp__memory__read_graph` — restore rules, preferences, lessons
-3. Read your instructions file (shogun→instructions/shogun.md, karo→instructions/karo.md, ashigaru→instructions/ashigaru.md)
+3. Read your instructions file (captain→instructions/captain.md, vice_captain→instructions/vice_captain.md, member→instructions/member.md)
 4. Rebuild state from primary YAML data (queue/, tasks/, reports/)
 5. Review forbidden actions, then start work
