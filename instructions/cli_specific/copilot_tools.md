@@ -115,7 +115,7 @@ Available via `/model` command or `--model` flag:
 - Claude Sonnet 4
 - GPT-5
 
-For Ashigaru: Karo manages model switching via inbox_write with `type: model_switch`.
+For Member: Vice Captain manages model switching via inbox_write with `type: model_switch`.
 
 ## tmux Interaction
 
@@ -129,7 +129,7 @@ For Ashigaru: Karo manages model switching via inbox_write with `type: model_swi
 | Prompt detection | Unknown prompt format (not `❯`) |
 | Non-interactive pipe | Unconfirmed (`copilot -p` undocumented) |
 
-For the 将軍 system, tmux compatibility is a **high-risk area** requiring dedicated testing.
+For this system, tmux compatibility is a **high-risk area** requiring dedicated testing.
 
 ### Potential Workarounds
 - `!` prefix for shell commands may bypass TUI input issues
@@ -154,7 +154,7 @@ For the 将軍 system, tmux compatibility is a **high-risk area** requiring dedi
 
 Copilot CLI uses auto-compaction at 95% token limit. No `/clear` equivalent exists.
 
-For the 将軍 system, if Copilot CLI is integrated:
+For this system, if Copilot CLI is integrated:
 1. Auto-compaction handles most cases automatically
 2. `/compact` can be sent via send-keys if tmux integration works
 3. Session state preserved through compaction (unlike `/clear` which resets)

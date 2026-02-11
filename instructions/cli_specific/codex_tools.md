@@ -46,7 +46,7 @@ Codex uses a two-axis security model: **sandbox mode** (technical capabilities) 
 - `--full-auto`: Sets `--ask-for-approval on-request` + `--sandbox workspace-write` (recommended for unattended work)
 - `--dangerously-bypass-approvals-and-sandbox` / `--yolo`: Bypasses all approvals and sandboxing (unsafe, VM-only)
 
-**Shogun system usage**: Ashigaru run with `--full-auto` or `--yolo` depending on settings.yaml `cli.options.codex.approval_policy`.
+**Captain system usage**: Member run with `--full-auto` or `--yolo` depending on settings.yaml `cli.options.codex.approval_policy`.
 
 ## Memory / State Management
 
@@ -126,11 +126,11 @@ Codex handles compaction differently from Claude Code:
 2. **Manual**: Use `/compact` to explicitly trigger summarization
 3. **Recovery procedure**: After compaction or `/new`, the AGENTS.md is automatically re-read
 
-### Shogun System Recovery (Codex Ashigaru)
+### Captain System Recovery (Codex Member)
 
 ```
 Step 1: AGENTS.md is auto-loaded (contains recovery procedure)
-Step 2: Read queue/tasks/ashigaru{N}.yaml → determine current task
+Step 2: Read queue/tasks/member{N}.yaml → determine current task
 Step 3: If task has "target_path:" → read that file
 Step 4: Resume work based on task status
 ```
@@ -213,9 +213,9 @@ codex --model o4-mini                # Reasoning model
 
 Use `/model` to switch models during a session (includes reasoning effort setting when available).
 
-### Shogun System
+### Captain System
 
-Model is set by `build_cli_command()` in cli_adapter.sh based on settings.yaml. Karo cannot dynamically switch Codex models via inbox (no `/model` send-keys equivalent in exec mode).
+Model is set by `build_cli_command()` in cli_adapter.sh based on settings.yaml. Vice Captain cannot dynamically switch Codex models via inbox (no `/model` send-keys equivalent in exec mode).
 
 ## Limitations (vs Claude Code)
 

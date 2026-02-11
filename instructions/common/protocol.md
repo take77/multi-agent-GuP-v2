@@ -10,14 +10,14 @@ bash scripts/inbox_write.sh <target_agent> "<message>" <type> <from>
 
 Examples:
 ```bash
-# Shogun → Karo
-bash scripts/inbox_write.sh karo "cmd_048を書いた。実行せよ。" cmd_new shogun
+# Captain → Vice Captain
+bash scripts/inbox_write.sh vice_captain "cmd_048を書いた。実行せよ。" cmd_new captain
 
-# Ashigaru → Karo
-bash scripts/inbox_write.sh karo "足軽5号、任務完了。報告YAML確認されたし。" report_received ashigaru5
+# Member → Vice Captain
+bash scripts/inbox_write.sh vice_captain "隊員5号、任務完了。報告YAML確認されたし。" report_received member5
 
-# Karo → Ashigaru
-bash scripts/inbox_write.sh ashigaru3 "タスクYAMLを読んで作業開始せよ。" task_assigned karo
+# Vice Captain → Member
+bash scripts/inbox_write.sh member3 "タスクYAMLを読んで作業開始せよ。" task_assigned vice_captain
 ```
 
 Delivery is handled by `inbox_watcher.sh` (infrastructure layer).
@@ -36,7 +36,7 @@ Special cases (CLI commands sent directly via send-keys):
 - `type: clear_command` → sends `/clear` + Enter + content
 - `type: model_switch` → sends the /model command directly
 
-## Inbox Processing Protocol (karo/ashigaru)
+## Inbox Processing Protocol (vice_captain/member)
 
 When you receive `inboxN` (e.g. `inbox3`):
 1. `Read queue/inbox/{your_id}.yaml`
@@ -52,8 +52,8 @@ This is a safety net — even if the wake-up nudge was missed, messages are stil
 
 | Direction | Method | Reason |
 |-----------|--------|--------|
-| Ashigaru → Karo | Report YAML + inbox_write | File-based notification |
-| Karo → Shogun/Lord | dashboard.md update only | **inbox to shogun FORBIDDEN** — prevents interrupting Lord's input |
+| Member → Vice Captain | Report YAML + inbox_write | File-based notification |
+| Vice Captain → Captain/Lord | dashboard.md update only | **inbox to captain FORBIDDEN** — prevents interrupting Lord's input |
 | Top → Down | YAML + inbox_write | Standard wake-up |
 
 ## File Operation Rule
@@ -72,10 +72,10 @@ bash scripts/inbox_write.sh <target> "<message>" <type> <from>
 
 ### Report Notification Protocol
 
-After writing report YAML, notify Karo:
+After writing report YAML, notify Vice Captain:
 
 ```bash
-bash scripts/inbox_write.sh karo "足軽{N}号、任務完了でござる。報告書を確認されよ。" report_received ashigaru{N}
+bash scripts/inbox_write.sh vice_captain "隊員{N}号、任務完了しました。報告書を確認してください。" report_received member{N}
 ```
 
 That's it. No state checking, no retry, no delivery verification.
