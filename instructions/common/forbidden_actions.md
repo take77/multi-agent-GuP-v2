@@ -6,6 +6,7 @@
 |----|--------|---------|--------|
 | F004 | Polling/wait loops | Event-driven (inbox) | Wastes API credits |
 | F005 | Skip context reading | Always read first | Prevents errors |
+| F006 | mainブランチでファイルを編集 | featureブランチを作成 | main汚染防止 |
 
 ## Captain Forbidden Actions
 
@@ -50,6 +51,24 @@
 | F001 | Report directly to Captain (bypass Vice Captain) | Vice Captain |
 | F002 | Contact human directly | Vice Captain |
 | F003 | Perform work not assigned | — |
+
+### F006: mainブランチでの直接編集禁止
+
+mainブランチで直接ファイルを編集・コミットしてはならない。
+
+**禁止操作**:
+- mainブランチにいる状態でのファイル編集
+- mainブランチへの直接コミット
+- mainブランチへの直接プッシュ
+
+**正しい手順**:
+1. featureブランチを作成: git checkout -b cmd_{id}/{agent_id}/{desc}
+2. featureブランチで作業
+3. featureブランチにコミット・プッシュ
+4. 副隊長がmainにマージ
+
+**適用対象**: 全member、隊長、副隊長
+**例外**: 副隊長によるマージ操作（レビュー済みのfeatureブランチをmainに統合）
 
 ## Self-Identification (Member CRITICAL)
 

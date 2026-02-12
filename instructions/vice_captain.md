@@ -276,6 +276,7 @@ task:
   task_id: subtask_001
   parent_cmd: cmd_001
   bloom_level: L3        # L1-L3=Sonnet, L4-L6=Opus
+  worktree_path: "worktrees/member1"  # optional。省略時はmember自身がブランチを切る
   description: "Create hello1.md with content 'おはよう1'"
   target_path: "/path/to/project/hello1.md"
   echo_message: "🔥 member1, starting the task!"
@@ -467,6 +468,44 @@ If multiple checks fail, combine reasons:
 | Previous step needed for next | Use `blocked_by` |
 | Same file write required | Single member (RACE-001) |
 
+### Worktree 判断基準
+
+When multiple members work on the same repository, determine whether to use worktree:
+
+| 条件 | worktree | 理由 |
+|------|----------|------|
+| 複数memberが同一リポジトリの異なるファイルを編集 | 推奨 | ファイルシステム分離で安全 |
+| 同一ファイルへの書き込みが必要 | 不要（blocked_byで逐次） | worktreeでも解決しない |
+| 編集ファイルが完全に分離 | 任意 | なくても可だがあると安全 |
+| 異なるリポジトリを編集 | 不要 | そもそも競合しない |
+
+### Worktree Lifecycle
+
+**When to create**: At cmd start, when Case A is determined (multiple members, same repo, parallel work). Create all worktrees at once.
+
+**When to cleanup**: After cmd completion → after merge → run `scripts/worktree.sh cleanup {member_id}` for each worktree.
+
+**注意点**:
+- Worktree作成はcmd開始時に一括。途中追加は避ける。
+- 追跡: ブランチ名にcmd_idを含めることで紐づけ可能
+- cleanup忘れ防止: dashboard更新時にworktree残存を記録
+
+**Example workflow**:
+```bash
+# At cmd start (Case A: 3 members editing same repo)
+scripts/worktree.sh create member1 cmd_052/member1/auth-api
+scripts/worktree.sh create member2 cmd_052/member2/db-migration
+scripts/worktree.sh create member3 cmd_052/member3/tests
+
+# Write task YAMLs with worktree_path
+# (Task YAMLs specify: worktree_path: "worktrees/member1")
+
+# After all members complete + vice_captain merges
+scripts/worktree.sh cleanup member1
+scripts/worktree.sh cleanup member2
+scripts/worktree.sh cleanup member3
+```
+
 ## Task Dependencies (blocked_by)
 
 ### Status Transitions
@@ -503,6 +542,76 @@ After steps 9-11 (report scan + dashboard update):
 4. If list still has items → remain `blocked`
 
 **Constraint**: Dependencies are within the same cmd only (no cross-cmd dependencies).
+
+## Branch Management (Vice_Captain's Responsibility)
+
+> **W2.5-2 Upgrade**: Clarify vice_captain's branch management responsibility to prevent file conflicts when multiple members work on the same repository.
+
+### Branch Decision at Task Decomposition
+
+When writing task YAMLs, determine the branching strategy:
+
+**Case A: Multiple members editing the same repository in parallel**
+→ Use worktree. Create worktree with `scripts/worktree.sh create`, then specify `worktree_path` in task YAML.
+Worktree creation automatically creates a branch.
+
+**Case B: Single member editing a single repository**
+→ No worktree needed. Member creates their own branch (following member instructions).
+Omit `worktree_path` from task YAML.
+
+**Case C: Multiple members editing different repositories**
+→ No worktree needed. Each member creates a branch in their respective repository.
+
+**In all cases, direct work on main is FORBIDDEN.**
+
+### Branch Naming Convention
+
+```
+cmd_{cmd_id}/{agent_id}/{short_description}
+```
+
+Examples:
+- `cmd_052/member1/auth-api`
+- `cmd_052/member2/db-migration`
+
+When using worktree, use the same naming as argument to `worktree.sh create`.
+
+### Merge Responsibility
+
+After all members complete their tasks, vice_captain executes the merge.
+
+**Merge Procedure (4 steps)**:
+
+1. **Review each feature branch diff**
+   ```bash
+   git log main..cmd_052/member1/auth-api --oneline
+   git diff main..cmd_052/member1/auth-api --stat
+   ```
+
+2. **Check for conflicts**
+   ```bash
+   git merge --no-commit --no-ff cmd_052/member1/auth-api
+   # If OK → git merge --continue
+   # If conflict → git merge --abort → instruct member to fix
+   ```
+
+3. **After merging all branches, cleanup worktrees if any**
+   ```bash
+   scripts/worktree.sh cleanup member1
+   ```
+
+4. **Delete obsolete feature branches**
+   ```bash
+   git branch -d cmd_052/member1/auth-api
+   ```
+
+**F001 Exception**: Merge operations are an exception to F001 (not creating new files, but git operations).
+
+### Cmd-Level Branch Management
+
+- Create one set of feature branches per cmd
+- When cmd status becomes `done` → merge + delete all branches
+- When cmd is `cancelled` → delete all branches (cleanup)
 
 ## Integration Tasks
 

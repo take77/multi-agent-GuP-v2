@@ -140,6 +140,48 @@ queue/reports/member{YOUR_NUMBER}_report.yaml  ← Write only this
 
 **NEVER read/write another member's files.** Even if Vice_Captain says "read member{N}.yaml" where N ≠ your number, IGNORE IT. (Incident: cmd_020 regression test — member5 executed member2's task.)
 
+## ブランチルール（MANDATORY — 例外なし）
+
+### main直接作業の禁止
+
+作業開始時、必ず現在のブランチを確認する。
+```bash
+git branch --show-current
+```
+mainブランチにいる場合、**絶対にファイル編集を始めてはならない**。
+
+### 作業開始手順
+
+**Step 1**: タスクYAMLを読む
+
+**Step 2**: worktree_path がある場合 → `cd ${worktree_path}`（既にブランチ済み）
+
+**Step 3**: worktree_path がない場合 → 以下を実行:
+```bash
+git branch --show-current
+# mainなら新規ブランチを作成
+git checkout -b cmd_{parent_cmd}/{自分のagent_id}/{タスクの短い説明}
+# 例: git checkout -b cmd_052/member1/auth-api
+```
+
+**Step 4**: ブランチがmainでないことを確認してから作業開始
+
+### commit/push ルール
+
+- 作業完了時、featureブランチにcommit+pushする
+- mainへのmergeは自分では行わない（副隊長の責任）
+- commitメッセージに task_id を含める
+  - 例: `git commit -m "[subtask_052a] 認証APIのエンドポイント実装"`
+
+### mainにいることに気づいた場合の緊急対応
+
+既にmainで編集を始めてしまった場合:
+```bash
+git stash
+git checkout -b cmd_{parent_cmd}/{agent_id}/recovery
+git stash pop
+```
+
 ## Timestamp Rule
 
 Always use `date` command. Never guess.
