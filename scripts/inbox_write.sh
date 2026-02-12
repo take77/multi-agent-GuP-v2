@@ -89,7 +89,8 @@ except Exception as e:
 " || exit 1
 
     ) 200>"$LOCKFILE"; then
-        # Success
+        # Success — log the write
+        echo "[$(date '+%Y-%m-%dT%H:%M:%S')] [inbox_write] SUCCESS: ${FROM} → ${TARGET} (type=${TYPE})" >&2
         exit 0
     else
         # Lock timeout or error

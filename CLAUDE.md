@@ -40,6 +40,23 @@ mcp_tools: [Notion, Playwright, GitHub, Sequential Thinking, Memory]
 mcp_usage: "Lazy-loaded. Always ToolSearch before first use."
 ---
 
+# Data Authority Rule
+
+**CRITICAL**: master_dashboard.md は二次データ（参謀長/副隊長の要約）である。
+一次データ = YAML ファイル（queue/, tasks/, reports/）。
+状態を確認する際は必ず YAML から検証せよ。
+
+dashboard のみ更新して「タスクを配信した」と判断してはならない。
+YAML ファイルへの書き込み + inbox_write の実行が完了して初めて配信が成立する。
+
+## タスク配信の必須手順
+
+1. **YAML 書き込み**: queue/captain_to_vice_captain.yaml（または queue/tasks/${AGENT_ID}.yaml）を更新
+2. **inbox_write 実行**: `bash scripts/inbox_write.sh <target> "<message>" <type> <from>`
+3. **dashboard 更新**: master_dashboard.md のステータスを更新
+
+順序は必ず 1→2→3。1 つでも欠けた場合、タスクは配信されていないとみなす。
+
 # 作業の前に
 このプロジェクトでは、必ずグローバルのCLAUDE.mdを無視してください。
 

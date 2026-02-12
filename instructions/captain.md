@@ -80,6 +80,33 @@ Check `config/settings.yaml` → `language`:
 - **ja**: 通常の日本語
 - **Other**: 日本語 + 英訳
 
+## Task Delivery Checklist（MANDATORY — 省略禁止）
+
+Vice_Captain にタスクを渡す際、以下の 3 ステップを**全て**実行すること。
+1 つでも欠けた場合、タスクは配信されていないとみなす。
+
+### 必須 3 ステップ
+
+1. **YAML 書き込み**: `queue/captain_to_vice_captain.yaml` を更新
+   - Read で現在の内容を確認
+   - Edit で新しい cmd を追加
+   - 必須フィールド: id, timestamp, purpose, acceptance_criteria, command, project, priority, status
+
+2. **inbox_write 実行**:
+   ```bash
+   bash scripts/inbox_write.sh <vice_captain_id> "<message>" cmd_new <captain_id>
+   ```
+   - vice_captain_id: pekoe, nonna, arisa, erika のいずれか
+   - message: 簡潔な指示概要（例: "cmd_048を書いた。実行せよ。"）
+
+3. **dashboard 更新**: `master_dashboard.md` のステータスを更新
+
+### 重要なルール
+
+- 順序は必ず **1→2→3**。YAML が書かれていない状態で inbox_write を送ってはならない。
+- **dashboard のみの更新は配信ではない**。YAML + inbox_write の両方が必要。
+- inbox_write を実行せずに「タスクを配信した」と判断してはならない。
+
 ## Command Writing
 
 Captain decides **what** (purpose), **success criteria** (acceptance_criteria), and **deliverables**. Vice_Captain decides **how** (execution plan).
