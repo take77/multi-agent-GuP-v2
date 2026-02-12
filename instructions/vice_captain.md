@@ -77,6 +77,9 @@ workflow:
     action: scan_all_reports
     target: "queue/reports/member*_report.yaml"
     note: "Scan ALL reports, not just the one who woke you. Communication loss safety net."
+  - step: 10.5
+    action: validate_report_v2
+    note: "Check v2.0 mandatory fields. Reject incomplete reports. See Report Validation section."
   - step: 11
     action: update_dashboard
     target: dashboard.md
@@ -324,6 +327,124 @@ On every wakeup (regardless of reason), scan ALL `queue/reports/member*_report.y
 Cross-reference with dashboard.md — process any reports not yet reflected.
 
 **Why**: Member inbox messages may be delayed. Report files are already written and scannable as a safety net.
+
+## Report Validation (v2.0 — Step 10.5)
+
+> **Week 2-2 Upgrade**: Enforce mandatory fields to prevent "build success ≠ actual functionality" issues.
+
+**When**: After receiving member report (step 10), BEFORE updating dashboard (step 11).
+
+**Template reference**: `templates/report_v2.yaml.template`
+
+### Automated Validation Script
+
+Before manual checklist verification, run the automated validation script:
+
+```bash
+bash scripts/verify_report.sh queue/reports/member{N}_report.yaml
+```
+
+**Exit codes**:
+- `0` = Validation passed (all required fields present and valid)
+- `1` = Validation failed (script outputs specific error reasons)
+
+**When script exits 1**:
+1. Read script output (stdout) — contains specific error reasons
+2. Send rejection message to member with script output
+3. Set task status back to `assigned`
+4. Do NOT update dashboard.md
+
+**When script exits 0**:
+- Proceed to manual checklist verification (if needed for edge cases)
+- Otherwise, accept report and continue to step 11
+
+**Example usage**:
+```bash
+# Validate report
+if ! bash scripts/verify_report.sh queue/reports/member3_report.yaml > /tmp/verify_errors.txt 2>&1; then
+  # Failed — read errors
+  ERRORS=$(cat /tmp/verify_errors.txt)
+  # Send rejection
+  bash scripts/inbox_write.sh member3 "報告を受理できません。理由: ${ERRORS}。修正して再提出してください。" report_rejected vice_captain
+  # Update task status to assigned (Edit tool)
+  # Skip dashboard update
+else
+  # Passed — continue to step 11
+  echo "Report validation passed."
+fi
+```
+
+**Note**: The script checks for yq availability and falls back to grep/sed if unavailable. Both methods validate the same criteria.
+
+### Mandatory Field Checklist
+
+For each report with `status: done`, check ALL of the following (automated via verify_report.sh):
+
+| # | Field | Check | Rejection Reason |
+|---|-------|-------|------------------|
+| 1 | changed_files | Non-empty array | "変更ファイルリストが空です。何も変更していないのに完了報告はできません。" |
+| 2 | changed_files[].action | `created` / `modified` / `deleted` | "action フィールドが不正です。created, modified, deleted のいずれかを指定してください。" |
+| 3 | verification.build_result | `pass` (if status=done) | "ビルド失敗のため、完了報告を受理できません。エラーを修正してください。" |
+| 4 | verification.build_command | Non-empty string | "ビルドコマンドが記載されていません。実行したコマンドを記載してください。" |
+| 5 | verification.dev_server_check | `pass` / `fail` / `skipped` | "dev_server_check フィールドが不正です。pass, fail, skipped のいずれかを指定してください。" |
+| 6 | verification.dev_server_check | NOT `fail` (if status=done) | "開発サーバーでの動作確認が失敗しています。機能が正しく動作することを確認してください。" |
+| 7 | verification.error_console | `no_errors` / `has_warnings` / `has_errors` | "error_console フィールドが不正です。" |
+| 8 | verification.error_console | NOT `has_errors` (if status=done) | "コンソールエラーが発生しています。エラーを解消してください。" |
+| 9 | todo_scan.count | Integer >= 0 | "todo_scan.count が不正です。プロジェクト内の // TODO コメント数を記載してください。" |
+| 10 | todo_scan.new_todos | Array (empty OK) | "todo_scan.new_todos が存在しません。配列として記載してください（空でも可）。" |
+| 11 | skill_candidate.found | Boolean | "skill_candidate.found が存在しません。true または false を明示してください。" |
+
+**Notes**:
+- For `status: failed` — validation is relaxed (verification failures are acceptable)
+- For `status: blocked` — no validation (task not started yet)
+
+### Rejection Procedure
+
+If ANY check fails:
+
+1. **Do NOT update dashboard.md with this report**
+2. **Do NOT mark task as done**
+3. **Send rejection message via inbox_write**:
+
+```bash
+bash scripts/inbox_write.sh member{N} "報告を受理できません。理由: {rejection_reason}。修正して再提出してください。" report_rejected vice_captain
+```
+
+4. **Write rejection log to task YAML**:
+
+```yaml
+# Add to queue/tasks/member{N}.yaml
+rejection_history:
+  - timestamp: "2026-02-12T12:45:00"
+    reason: "ビルド失敗のため、完了報告を受理できません。"
+```
+
+5. **Set task status back to `assigned`** (member needs to fix and resubmit)
+
+### Acceptance Procedure
+
+If ALL checks pass:
+
+1. Proceed to step 11 (update dashboard.md)
+2. Process as usual (unblock dependent tasks, ntfy notification, etc.)
+
+### Example Rejection Messages
+
+| Scenario | Message to Member |
+|----------|-------------------|
+| Empty changed_files | "報告を受理できません。理由: 変更ファイルリストが空です。何も変更していないのに完了報告はできません。修正して再提出してください。" |
+| Build failed | "報告を受理できません。理由: ビルド失敗のため、完了報告を受理できません。エラーを修正してください。修正して再提出してください。" |
+| Dev server check failed | "報告を受理できません。理由: 開発サーバーでの動作確認が失敗しています。機能が正しく動作することを確認してください。修正して再提出してください。" |
+| Console errors | "報告を受理できません。理由: コンソールエラーが発生しています。エラーを解消してください。修正して再提出してください。" |
+| Missing field | "報告を受理できません。理由: {field_name} フィールドが存在しません。templates/report_v2.yaml.template を参照して必須フィールドを埋めてください。修正して再提出してください。" |
+
+### Multi-Field Rejection
+
+If multiple checks fail, combine reasons:
+
+```
+"報告を受理できません。理由: (1) changed_files が空です。(2) verification.build_result が fail です。修正して再提出してください。"
+```
 
 ## RACE-001: No Concurrent Writes
 

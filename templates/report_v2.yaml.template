@@ -1,0 +1,79 @@
+# ================================================================
+# Report v2.0 Template — Mandatory Fields for Task Completion
+# ================================================================
+# This template defines required fields for member completion reports.
+# Reports missing these fields will be REJECTED by vice_captain.
+#
+# Background:
+# GuP-v2 Week 2-2 upgrade addresses the issue where "build success"
+# was mistakenly considered "task complete," even when the feature
+# didn't actually work. This template enforces comprehensive reporting.
+#
+# Usage:
+# Copy this structure into queue/reports/member{N}_report.yaml
+# Fill ALL required fields before sending inbox_write to vice_captain.
+# ================================================================
+
+report:
+  # === Core Identification ===
+  worker_id: member{N}             # REQUIRED: Your agent ID (e.g., member1, pekoe)
+  task_id: subtask_XXX             # REQUIRED: Task ID from your task YAML
+  parent_cmd: cmd_XXX              # REQUIRED: Parent command ID
+  timestamp: "2026-02-12T12:00:00" # REQUIRED: Use `date "+%Y-%m-%dT%H:%M:%S"`
+  status: done                     # REQUIRED: done | failed | blocked
+
+  # === NEW: Changed Files (v2.0) ===
+  # List ALL files you created, modified, or deleted.
+  # Empty list is INVALID (if you changed nothing, why report done?).
+  changed_files:
+    - path: "src/components/ChatPane.tsx"
+      action: "modified"           # created | modified | deleted
+    - path: "src/hooks/useChat.ts"
+      action: "created"
+
+  # === NEW: Verification (v2.0) ===
+  # Proof that your deliverable actually works, not just "builds".
+  verification:
+    build_result: "pass"           # REQUIRED: pass | fail
+    build_command: "yarn build"    # REQUIRED: Exact command you ran
+    dev_server_check: "pass"       # REQUIRED: pass | fail | skipped
+    dev_server_url: "http://localhost:3000/workspace"  # URL if you tested
+    error_console: "no_errors"     # REQUIRED: no_errors | has_warnings | has_errors
+
+  # === NEW: TODO Scan (v2.0) ===
+  # Detect incomplete work left as TODO comments.
+  todo_scan:
+    count: 0                       # REQUIRED: Total // TODO count in the project
+    new_todos: []                  # REQUIRED: List of TODOs YOU added (empty if none)
+    # Example:
+    # new_todos:
+    #   - "src/utils/helper.ts:45 — TODO: Optimize performance"
+
+  # === Result Summary ===
+  result:
+    summary: "WBS 2.3節 完了しました"
+    files_modified:                # Optional: deprecated, use changed_files instead
+      - "/path/to/file"
+    notes: "Additional details"    # Optional: edge cases, assumptions, deviations
+
+  # === Skill Candidate ===
+  skill_candidate:
+    found: false                   # REQUIRED: true | false
+    # If true, also include:
+    name: null                     # e.g., "readme-improver"
+    description: null              # e.g., "Improve README for beginners"
+    reason: null                   # e.g., "Same pattern executed 3 times"
+
+# ================================================================
+# Acceptance Criteria (Vice_Captain Checks These)
+# ================================================================
+# ✅ All REQUIRED fields are present
+# ✅ changed_files is non-empty (at least 1 file)
+# ✅ verification.build_result is "pass" (if status=done)
+# ✅ verification.dev_server_check is NOT "fail" (if applicable)
+# ✅ todo_scan.count is 0 or explained in notes
+# ✅ skill_candidate.found is explicitly true/false
+#
+# ❌ If any check fails → vice_captain rejects the report
+#    → member receives inbox message to fix and resubmit
+# ================================================================
