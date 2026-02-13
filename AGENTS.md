@@ -1,10 +1,10 @@
 ---
 # multi-agent-GuP-v2 System Configuration
-version: "3.0"
-updated: "2026-02-07"
-description: "Codex CLI + tmux multi-agent parallel dev platform with sengoku military hierarchy"
+version: "1.0"
+updated: "2026-02-09"
+description: "Codex CLI + tmux multi-agent parallel development platform with Girls und Panzer military structure"
 
-hierarchy: "Commander (human) → Battalion Commander(anzu) → Chief of Staff(miho) → Squad Captains → Vice Captains → Members 1-5"
+hierarchy: "指揮官 (human) → 大隊長(anzu) → 参謀長(miho) → 各隊(隊長 → 副隊長 → 隊員1-5)"
 communication: "YAML files + inbox mailbox system (event-driven, NO polling)"
 
 tmux_sessions:
@@ -17,12 +17,12 @@ tmux_sessions:
 files:
   config: config/projects.yaml          # Project list (summary)
   projects: "projects/<id>.yaml"        # Project details (git-ignored, contains secrets)
-  context: "context/{project}.md"       # Project-specific notes for member
+  context: "context/{project}.md"       # Project-specific notes for members
   cmd_queue: queue/captain_to_vice_captain.yaml  # Captain → Vice Captain commands
   tasks: "queue/tasks/${AGENT_ID}.yaml" # Vice Captain → Member assignments (per-member)
   reports: "queue/reports/${AGENT_ID}_report.yaml" # Member → Vice Captain reports
   dashboard: dashboard.md              # Human-readable summary (secondary data)
-  ntfy_inbox: queue/ntfy_inbox.yaml    # Incoming ntfy messages from Lord's phone
+  ntfy_inbox: queue/ntfy_inbox.yaml    # Incoming ntfy messages from Commander's phone
 
 cmd_format:
   required_fields: [id, timestamp, purpose, acceptance_criteria, command, project, priority, status]
@@ -38,12 +38,31 @@ task_status_transitions:
 
 mcp_tools: [Notion, Playwright, GitHub, Sequential Thinking, Memory]
 mcp_usage: "Lazy-loaded. Always ToolSearch before first use."
-
-language:
-  ja: "通常の日本語のみ。「了解！」「承知しました」「任務完了です」"
-  other: "日本語 + translation in parens. 「了解！ (Roger!)」「任務完了です (Task completed!)」"
-  config: "config/settings.yaml → language field"
 ---
+
+# Data Authority Rule
+
+**CRITICAL**: master_dashboard.md は二次データ（参謀長/副隊長の要約）である。
+一次データ = YAML ファイル（queue/, tasks/, reports/）。
+状態を確認する際は必ず YAML から検証せよ。
+
+dashboard のみ更新して「タスクを配信した」と判断してはならない。
+YAML ファイルへの書き込み + inbox_write の実行が完了して初めて配信が成立する。
+
+## タスク配信の必須手順
+
+1. **YAML 書き込み**: queue/captain_to_vice_captain.yaml（または queue/tasks/${AGENT_ID}.yaml）を更新
+2. **inbox_write 実行**: `bash scripts/inbox_write.sh <target> "<message>" <type> <from>`
+3. **dashboard 更新**: master_dashboard.md のステータスを更新
+
+順序は必ず 1→2→3。1 つでも欠けた場合、タスクは配信されていないとみなす。
+
+# 作業の前に
+このプロジェクトでは、必ずグローバルのAGENTS.mdを無視してください。
+
+# ペルソナ
+
+各エージェントは `persona/${AGENT_ID}.md` の行動指針に従うこと。
 
 # Procedures
 
@@ -53,9 +72,15 @@ language:
 
 1. Identify self: `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'`
 2. `mcp__memory__read_graph` — restore rules, preferences, lessons
-3. **Read your instructions file**: battalion_commander→`instructions/battalion_commander.md`, captain→`instructions/captain.md`, vice_captain→`instructions/vice_captain.md`, member→`instructions/member.md`, chief_of_staff→`instructions/chief_of_staff.md`. **NEVER SKIP** — even if a conversation summary exists. Summaries do NOT preserve persona, speech style, or forbidden actions.
-4. Rebuild state from primary YAML data (queue/, tasks/, reports/)
-5. Review forbidden actions, then start work
+3. **Read persona file**: `persona/${AGENT_ID}.md` — load character personality, speech style, and behavioral guidelines. This defines WHO you are.
+   - battalion_commander (anzu) → `persona/anzu.md`
+   - chief_of_staff (miho) → `persona/miho.md`
+   - captain (darjeeling/katyusha/kay/maho) → `persona/{name}.md`
+   - vice_captain (pekoe/nonna/arisa/erika) → `persona/{name}.md`
+   - member → `persona/{name}.md`
+4. **Read your instructions file**: battalion_commander→`instructions/battalion_commander.md`, captain→`instructions/generated/codex-captain.md`, vice_captain→`instructions/generated/codex-vice_captain.md`, member→`instructions/generated/codex-member.md`, chief_of_staff→`instructions/chief_of_staff.md`. **NEVER SKIP** — even if a conversation summary exists. Summaries do NOT preserve persona, speech style, or forbidden actions. This defines WHAT you do.
+5. Rebuild state from primary YAML data (queue/, tasks/, reports/)
+6. Review forbidden actions, then start work
 
 **CRITICAL**: dashboard.md is secondary data (vice_captain's summary). Primary data = YAML files. Always verify from YAML.
 
@@ -64,9 +89,9 @@ language:
 Lightweight recovery using only AGENTS.md (auto-loaded). Do NOT read instructions/generated/codex-member.md (cost saving).
 
 ```
-Step 1: tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}' → member{N}
+Step 1: tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}' → ${AGENT_ID}
 Step 2: mcp__memory__read_graph (skip on failure — task exec still possible)
-Step 3: Read queue/tasks/member{N}.yaml → assigned=work, idle=wait
+Step 3: Read queue/tasks/${AGENT_ID}.yaml → assigned=work, idle=wait
 Step 4: If task has "project:" field → read context/{project}.md
         If task has "target_path:" → read that file
 Step 5: Start work
@@ -107,10 +132,20 @@ Delivery is handled by `inbox_watcher.sh` (infrastructure layer).
 
 Two layers:
 1. **Message persistence**: `inbox_write.sh` writes to `queue/inbox/{agent}.yaml` with flock. Guaranteed.
-2. **Wake-up signal**: `inbox_watcher.sh` detects file change via `inotifywait` → sends SHORT nudge via send-keys (timeout 5s)
+2. **Wake-up signal**: `inbox_watcher.sh` detects file change via `inotifywait` → wakes agent
+   - **優先度1**: Agent self-watch (agent's own `inotifywait` on its inbox) → no nudge needed
+   - **優先度2**: `tmux send-keys` — short nudge only (text and Enter sent separately, 0.3s gap)
 
 The nudge is minimal: `inboxN` (e.g. `inbox3` = 3 unread). That's it.
-**Agent reads the inbox file itself.** Watcher never sends message content via send-keys.
+**Agent reads the inbox file itself.** Message content never travels through tmux — only a short wake-up signal.
+
+**Escalation** (when nudge is not processed):
+
+| Elapsed | Action | Trigger |
+|---------|--------|---------|
+| 0〜2 min | Standard nudge | Normal delivery |
+| 2〜4 min | Escape×2 + nudge | Cursor position bug workaround |
+| 4 min+ | /clear sent (max once per 5 min) | Force session reset + YAML re-read |
 
 Special cases (CLI commands sent directly via send-keys):
 - `type: clear_command` → sends `/clear` + Enter + content
@@ -125,15 +160,30 @@ When you receive `inboxN` (e.g. `inbox3`):
 4. Update each processed entry: `read: true` (use Edit tool)
 5. Resume normal workflow
 
-**Also**: After completing ANY task, check your inbox for unread messages before going idle.
-This is a safety net — even if the wake-up nudge was missed, messages are still in the file.
+### MANDATORY Post-Task Inbox Check
+
+**After completing ANY task, BEFORE going idle:**
+1. Read `queue/inbox/{your_id}.yaml`
+2. If any entries have `read: false` → process them
+3. Only then go idle
+
+This is NOT optional. If you skip this and a redo message is waiting,
+you will be stuck idle until the escalation sends `/clear` (~4 min).
+
+## Redo Protocol
+
+When vice_captain determines a task needs to be redone:
+1. Write new task YAML with new task_id (version suffix, e.g., subtask_097d → subtask_097d2), add `redo_of` field
+2. Send `clear_command` type inbox message (NOT `task_assigned`)
+3. inbox_watcher delivers `/clear` to the agent → session reset
+4. Agent recovers via Session Start, reads new task YAML, starts fresh
 
 ## Report Flow (interrupt prevention)
 
 | Direction | Method | Reason |
 |-----------|--------|--------|
 | Member → Vice Captain | Report YAML + inbox_write | File-based notification |
-| Vice Captain → Captain/Lord | dashboard.md update only | **inbox to captain FORBIDDEN** — prevents interrupting Lord's input |
+| Vice Captain → Captain/Commander | dashboard.md update only | **inbox to captain FORBIDDEN** — prevents interrupting Commander's input |
 | Top → Down | YAML + inbox_write | Standard wake-up |
 
 ## File Operation Rule
@@ -157,11 +207,11 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 
 1. **Dashboard**: Vice Captain's responsibility. Captain reads it, never writes it.
 2. **Chain of command**: Captain → Vice Captain → Member. Never bypass Vice Captain.
-3. **Reports**: Check `queue/reports/member{N}_report.yaml` when waiting.
+3. **Reports**: Check `queue/reports/${AGENT_ID}_report.yaml` when waiting.
 4. **Vice Captain state**: Before sending commands, verify vice_captain isn't busy: `tmux capture-pane -t darjeeling:0.0 -p | tail -20`
 5. **Screenshots**: See `config/settings.yaml` → `screenshot.path`
 6. **Skill candidates**: Member reports include `skill_candidate:`. Vice Captain collects → dashboard. Captain approves → creates design doc.
-7. **Action Required Rule (CRITICAL)**: ALL items needing Lord's decision → dashboard.md 🚨要対応 section. ALWAYS. Even if also written elsewhere. Forgetting = Lord gets angry.
+7. **Action Required Rule (CRITICAL)**: ALL items needing Commander's decision → dashboard.md section. ALWAYS. Even if also written elsewhere. Forgetting = Commander gets angry.
 
 # Test Rules (all agents)
 
