@@ -400,10 +400,13 @@ load_adapter_with() {
 # validate_cli_availability テスト
 # =============================================================================
 
-@test "validate_cli_availability: claude → 0 (インストール済み)" {
-    command -v claude >/dev/null 2>&1 || skip "claude not installed (CI environment)"
+@test "validate_cli_availability: claude mock (PATH操作)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
-    run validate_cli_availability "claude"
+    # モックclaudeコマンドを作成
+    mkdir -p "${TEST_TMP}/bin"
+    echo '#!/bin/bash' > "${TEST_TMP}/bin/claude"
+    chmod +x "${TEST_TMP}/bin/claude"
+    PATH="${TEST_TMP}/bin:$PATH" run validate_cli_availability "claude"
     [ "$status" -eq 0 ]
 }
 
