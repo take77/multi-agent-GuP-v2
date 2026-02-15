@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
 
 setup() {
-  cd ~/Developments/Tools/multi-agent-GuP-v2/
+  PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
+  cd "$PROJECT_ROOT"
 }
 
 @test "config/settings.yaml に agent_teams セクションが存在すること" {
