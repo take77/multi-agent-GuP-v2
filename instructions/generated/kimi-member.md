@@ -593,6 +593,25 @@ Created via CreateSubagent tool:
 
 Unique feature: AI can "send messages to its past self" to correct course. Internal mechanism for error recovery within subagent execution.
 
+## /clear 後の軽量リカバリ（推奨手順）
+
+/clear 後は以下の最小手順で復帰する（instructions/member.md の再読は不要）:
+
+1. 自分の ID を確認: `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'`
+2. task YAML を確認: `Read queue/tasks/member{N}.yaml`
+   - `status: assigned` or `in_progress` → 作業再開
+   - `status: done` → 報告済みか確認。report 未送信なら report 作成 + inbox_write
+   - `status: blocked` → 依存タスク待ち。inbox を確認してから idle で待機
+   - `redo_of` フィールドあり → 前回タスクの redo。ゼロから再実施
+3. inbox を確認: `Read queue/inbox/member{N}.yaml` → 未読があれば処理
+4. Memory MCP を確認（利用可能な場合）
+5. project field があれば `context/{project}.md` を読む
+6. 作業開始
+
+**コスト**: 約 2,000 トークン（instructions/member.md の約 3,600 トークンを節約）
+
+2 回目以降のタスクで指示書の詳細が必要な場合のみ instructions/member.md を読む。
+
 ## Compaction Recovery
 
 1. **Context lifecycle**: Managed by KimiSoul engine with automatic compaction

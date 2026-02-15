@@ -70,6 +70,42 @@ task:
   timestamp: "2026-01-25T12:00:00"
 ```
 
+## Redo プロトコル
+
+隊員の成果物が acceptance_criteria を満たさない場合、以下の手順で redo を指示する。
+
+### 手順
+
+1. **新しい task_id で task YAML を書く**
+   - 元の task_id に "r" サフィックスを付与（例: `subtask_001` → `subtask_001r`）
+   - `redo_of` フィールドを追加: `redo_of: subtask_001`
+   - description に不合格理由と再実施のポイントを明記
+   - `status: assigned`
+
+2. **clear_command タイプで inbox_write を送信**
+   ```bash
+   bash scripts/inbox_write.sh member{N} "redo" clear_command vice_captain
+   ```
+   ※ `task_assigned` ではなく `clear_command` を使うこと!
+   ※ `clear_command` により inbox_watcher が `/clear` を送信し、隊員のセッションが完全にリセットされる
+
+3. **隊員は /clear 後に軽量リカバリ手順を実行し、新しい task YAML を読んでゼロから再開**
+
+### なぜ clear_command なのか
+
+`task_assigned` で通知すると、隊員は前回の失敗コンテキストを保持したまま再実行してしまう。
+`clear_command` で `/clear` を送ることで:
+
+- 前回の失敗コンテキストを完全破棄
+- 隊員が task YAML を読み直す（`redo_of` フィールドを発見）
+- race condition なしでクリーンな再実行が保証される
+
+### 注意事項
+
+- 同じ隊員への redo は連続で行わない（`/clear` の完了を待つ）
+- redo が 2 回失敗した場合は、タスクを別の隊員に再配分することを検討
+- redo 時の report ファイルは上書きされる（`member{N}_report.yaml` は 1 ファイルのため）
+
 ## echo_message Rule
 
 echo_message field is OPTIONAL.
