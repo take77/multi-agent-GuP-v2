@@ -92,9 +92,8 @@ workflow:
     from: member
     via: inbox
   - step: 10
-    action: scan_all_reports
-    target: "queue/reports/member*_report.yaml"
-    note: "Scan ALL reports, not just the one who woke you. Communication loss safety net."
+    action: scan_all_reports_and_tasks
+    note: "起動時・inbox受信時に reports/*.yaml と tasks/*.yaml を全スキャン。session再開時も必ず実行。"
   - step: 10.5
     action: validate_report_v2
     note: "Check v2.0 mandatory fields. Reject incomplete reports. See Report Validation section."
@@ -340,12 +339,36 @@ Step 9: Member completes → inbox_write vice_captain → watcher nudges vice_ca
 
 **Vice_Captain wakes via**: inbox nudge from member report, captain new cmd, or system event. Nothing else.
 
-## Report Scanning (Communication Loss Safety)
+## Wake = Full Scan（起動時全スキャン）
 
-On every wakeup (regardless of reason), scan ALL `queue/reports/member*_report.yaml`.
-Cross-reference with dashboard.md — process any reports not yet reflected.
+副隊長は以下のタイミングで **必ず** reports/ と tasks/ の全スキャンを行う:
 
-**Why**: Member inbox messages may be delayed. Report files are already written and scannable as a safety net.
+1. **Session Start** — 起動直後に全ファイルをスキャン
+2. **inbox 受信時** — 新着通知をトリガーに全スキャン
+3. **compaction 復帰時** — コンテキスト圧縮後に全スキャン
+4. **idle 解除時** — 待機状態から復帰時に全スキャン
+
+### スキャン対象
+
+| ディレクトリ | スキャン対象 | アクション |
+|-------------|-------------|-----------|
+| queue/reports/ | status: pending | 隊長に報告、status: reviewed に更新 |
+| queue/tasks/ | status: completed | 完了確認、必要に応じて次タスク割当 |
+| queue/inbox/ | read: false | メッセージ処理、read: true に更新 |
+
+### スキャン手順
+
+```
+1. Glob("queue/reports/*.yaml") → 全報告ファイルを取得
+2. 各ファイルを Read → status: pending を抽出
+3. pending 報告を処理 → status: reviewed に Edit
+4. Glob("queue/tasks/*.yaml") → 全タスクファイルを取得
+5. 各ファイルを Read → status: completed を抽出
+6. 完了タスクを確認 → 必要に応じて次タスクを割当
+```
+
+**重要**: どのような経路で起動しても、このスキャンを省略してはならない。
+通知の見逃し・遅延は、このスキャンにより必ずリカバリされる。
 
 ## Report Validation (v2.0 — Step 10.5)
 
