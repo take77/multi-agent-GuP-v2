@@ -102,6 +102,25 @@ Examples:
 
 Plain text with emoji. No box/罫線.
 
+## /clear 後の軽量リカバリ（推奨手順）
+
+/clear 後は以下の最小手順で復帰する（instructions/member.md の再読は不要）:
+
+1. 自分の ID を確認: `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'`
+2. task YAML を確認: `Read queue/tasks/member{N}.yaml`
+   - `status: assigned` or `in_progress` → 作業再開
+   - `status: done` → 報告済みか確認。report 未送信なら report 作成 + inbox_write
+   - `status: blocked` → 依存タスク待ち。inbox を確認してから idle で待機
+   - `redo_of` フィールドあり → 前回タスクの redo。ゼロから再実施
+3. inbox を確認: `Read queue/inbox/member{N}.yaml` → 未読があれば処理
+4. Memory MCP を確認（利用可能な場合）
+5. project field があれば `context/{project}.md` を読む
+6. 作業開始
+
+**コスト**: 約 2,000 トークン（instructions/member.md の約 3,600 トークンを節約）
+
+2 回目以降のタスクで指示書の詳細が必要な場合のみ instructions/member.md を読む。
+
 # Communication Protocol
 
 ## Mailbox System (inbox_write.sh)
@@ -280,8 +299,7 @@ date "+%Y-%m-%dT%H:%M:%S"    # For YAML (ISO 8601)
 |----|--------|---------|--------|
 | F004 | Polling/wait loops | Event-driven (inbox) | Wastes API credits |
 | F005 | Skip context reading | Always read first | Prevents errors |
-| F006 | skip_post_task_inbox_check | タスク完了後に inbox を確認せずに idle に入る | redo 指示を見逃し 4 分スタックする |
-| F007 | mainブランチでファイルを編集 | featureブランチを作成 | main汚染防止 |
+| F006 | mainブランチでファイルを編集 | featureブランチを作成 | main汚染防止 |
 
 ## Captain Forbidden Actions
 
@@ -327,7 +345,7 @@ date "+%Y-%m-%dT%H:%M:%S"    # For YAML (ISO 8601)
 | F002 | Contact human directly | Vice Captain |
 | F003 | Perform work not assigned | — |
 
-### F007: mainブランチでの直接編集禁止
+### F006: mainブランチでの直接編集禁止
 
 mainブランチで直接ファイルを編集・コミットしてはならない。
 
@@ -443,25 +461,6 @@ bash scripts/inbox_write.sh member{N} "タスクYAMLを読んで作業開始せ�
 ```
 
 For Member: After `/clear`, follow CLAUDE.md /clear recovery procedure. Do NOT read instructions/member.md for the first task (cost saving).
-
-## /clear 後の軽量リカバリ（推奨手順）
-
-/clear 後は以下の最小手順で復帰する（instructions/member.md の再読は不要）:
-
-1. 自分の ID を確認: `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'`
-2. task YAML を確認: `Read queue/tasks/member{N}.yaml`
-   - `status: assigned` or `in_progress` → 作業再開
-   - `status: done` → 報告済みか確認。report 未送信なら report 作成 + inbox_write
-   - `status: blocked` → 依存タスク待ち。inbox を確認してから idle で待機
-   - `redo_of` フィールドあり → 前回タスクの redo。ゼロから再実施
-3. inbox を確認: `Read queue/inbox/member{N}.yaml` → 未読があれば処理
-4. Memory MCP を確認（利用可能な場合）
-5. project field があれば `context/{project}.md` を読む
-6. 作業開始
-
-**コスト**: 約 2,000 トークン（instructions/member.md の約 3,600 トークンを節約）
-
-2 回目以降のタスクで指示書の詳細が必要な場合のみ instructions/member.md を読む。
 
 ## Compaction Recovery
 

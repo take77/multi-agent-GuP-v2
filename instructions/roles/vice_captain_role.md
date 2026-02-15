@@ -78,6 +78,84 @@ Format (when included): sengoku-style, 1-2 lines, emoji OK, no box/罫線.
 Personalize per member: number, role, task content.
 When DISPLAY_MODE=silent (tmux show-environment -t multiagent DISPLAY_MODE): omit echo_message entirely.
 
+## Redo プロトコル
+
+隊員の成果物が acceptance_criteria を満たさない場合、以下の手順で redo を指示する。
+
+### 手順
+
+1. **新しい task_id で task YAML を書く**
+   - 元の task_id に "r" サフィックスを付与（例: `subtask_001` → `subtask_001r`）
+   - `redo_of` フィールドを追加: `redo_of: subtask_001`
+   - description に不合格理由と再実施のポイントを明記
+   - `status: assigned`
+
+2. **clear_command タイプで inbox_write を送信**
+   ```bash
+   bash scripts/inbox_write.sh member{N} "redo" clear_command vice_captain
+   ```
+   ※ `task_assigned` ではなく `clear_command` を使うこと!
+   ※ `clear_command` により inbox_watcher が `/clear` を送信し、隊員のセッションが完全にリセットされる
+
+3. **隊員は /clear 後に軽量リカバリ手順を実行し、新しい task YAML を読んでゼロから再開**
+
+### なぜ clear_command なのか
+
+`task_assigned` で通知すると、隊員は前回の失敗コンテキストを保持したまま再実行してしまう。
+`clear_command` で `/clear` を送ることで:
+
+- 前回の失敗コンテキストを完全破棄
+- 隊員が task YAML を読み直す（`redo_of` フィールドを発見）
+- race condition なしでクリーンな再実行が保証される
+
+### 注意事項
+
+- 同じ隊員への redo は連続で行わない（`/clear` の完了を待つ）
+- redo が 2 回失敗した場合は、タスクを別の隊員に再配分することを検討
+- redo 時の report ファイルは上書きされる（`member{N}_report.yaml` は 1 ファイルのため）
+
+## "Wake = Full Scan" Pattern
+
+Claude Code cannot "wait". Prompt-wait = stopped.
+
+1. Dispatch member
+2. Say "stopping here" and end processing
+3. Member wakes you via inbox
+4. Scan ALL report files (not just the reporting one)
+5. Assess situation, then act
+
+## Wake = Full Scan（起動時全スキャン）
+
+副隊長は以下のタイミングで **必ず** reports/ と tasks/ の全スキャンを行う:
+
+1. **Session Start** — 起動直後に全ファイルをスキャン
+2. **inbox 受信時** — 新着通知をトリガーに全スキャン
+3. **compaction 復帰時** — コンテキスト圧縮後に全スキャン
+4. **idle 解除時** — 待機状態から復帰時に全スキャン
+
+### スキャン対象
+
+| ディレクトリ | スキャン対象 | アクション |
+|-------------|-------------|-----------|
+| queue/reports/ | status: pending | 隊長に報告、status: reviewed に更新 |
+| queue/tasks/ | status: completed | 完了確認、必要に応じて次タスク割当 |
+| queue/inbox/ | read: false | メッセージ処理、read: true に更新 |
+
+### スキャン手順
+
+```
+1. Glob("queue/reports/*.yaml") → 全報告ファイルを取得
+2. 各ファイルを Read → status: pending を抽出
+3. pending 報告を処理 → status: reviewed に Edit
+4. Glob("queue/tasks/*.yaml") → 全タスクファイルを取得
+5. 各ファイルを Read → status: completed を抽出
+6. completed タスクを処理 → 次タスク割当または blocked 解除
+7. inbox を Read → read: false を処理
+```
+
+**重要**: inbox だけでなく reports/ と tasks/ も必ずスキャンせよ。
+inbox 配信が遅延・欠落した場合でも、YAML ファイルは真実を保持している。
+
 ## Dashboard: Sole Responsibility
 
 Vice_captain is the **only** agent that updates dashboard.md. Neither captain nor member touch it.

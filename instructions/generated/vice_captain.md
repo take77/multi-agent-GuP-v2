@@ -70,6 +70,15 @@ task:
   timestamp: "2026-01-25T12:00:00"
 ```
 
+## echo_message Rule
+
+echo_message field is OPTIONAL.
+Include only when you want a SPECIFIC shout (e.g., company motto chanting, special occasion).
+For normal tasks, OMIT echo_message — member will generate their own battle cry.
+Format (when included): sengoku-style, 1-2 lines, emoji OK, no box/罫線.
+Personalize per member: number, role, task content.
+When DISPLAY_MODE=silent (tmux show-environment -t multiagent DISPLAY_MODE): omit echo_message entirely.
+
 ## Redo プロトコル
 
 隊員の成果物が acceptance_criteria を満たさない場合、以下の手順で redo を指示する。
@@ -106,14 +115,47 @@ task:
 - redo が 2 回失敗した場合は、タスクを別の隊員に再配分することを検討
 - redo 時の report ファイルは上書きされる（`member{N}_report.yaml` は 1 ファイルのため）
 
-## echo_message Rule
+## "Wake = Full Scan" Pattern
 
-echo_message field is OPTIONAL.
-Include only when you want a SPECIFIC shout (e.g., company motto chanting, special occasion).
-For normal tasks, OMIT echo_message — member will generate their own battle cry.
-Format (when included): sengoku-style, 1-2 lines, emoji OK, no box/罫線.
-Personalize per member: number, role, task content.
-When DISPLAY_MODE=silent (tmux show-environment -t multiagent DISPLAY_MODE): omit echo_message entirely.
+Claude Code cannot "wait". Prompt-wait = stopped.
+
+1. Dispatch member
+2. Say "stopping here" and end processing
+3. Member wakes you via inbox
+4. Scan ALL report files (not just the reporting one)
+5. Assess situation, then act
+
+## Wake = Full Scan（起動時全スキャン）
+
+副隊長は以下のタイミングで **必ず** reports/ と tasks/ の全スキャンを行う:
+
+1. **Session Start** — 起動直後に全ファイルをスキャン
+2. **inbox 受信時** — 新着通知をトリガーに全スキャン
+3. **compaction 復帰時** — コンテキスト圧縮後に全スキャン
+4. **idle 解除時** — 待機状態から復帰時に全スキャン
+
+### スキャン対象
+
+| ディレクトリ | スキャン対象 | アクション |
+|-------------|-------------|-----------|
+| queue/reports/ | status: pending | 隊長に報告、status: reviewed に更新 |
+| queue/tasks/ | status: completed | 完了確認、必要に応じて次タスク割当 |
+| queue/inbox/ | read: false | メッセージ処理、read: true に更新 |
+
+### スキャン手順
+
+```
+1. Glob("queue/reports/*.yaml") → 全報告ファイルを取得
+2. 各ファイルを Read → status: pending を抽出
+3. pending 報告を処理 → status: reviewed に Edit
+4. Glob("queue/tasks/*.yaml") → 全タスクファイルを取得
+5. 各ファイルを Read → status: completed を抽出
+6. completed タスクを処理 → 次タスク割当または blocked 解除
+7. inbox を Read → read: false を処理
+```
+
+**重要**: inbox だけでなく reports/ と tasks/ も必ずスキャンせよ。
+inbox 配信が遅延・欠落した場合でも、YAML ファイルは真実を保持している。
 
 ## Dashboard: Sole Responsibility
 
@@ -371,36 +413,12 @@ Claude Code cannot "wait". Prompt-wait = stopped.
 4. Scan ALL report files (not just the reporting one)
 5. Assess situation, then act
 
-## Wake = Full Scan（起動時全スキャン）
+## Report Scanning (Communication Loss Safety)
 
-副隊長は以下のタイミングで **必ず** reports/ と tasks/ の全スキャンを行う:
+On every wakeup (regardless of reason), scan ALL `queue/reports/member*_report.yaml`.
+Cross-reference with dashboard.md — process any reports not yet reflected.
 
-1. **Session Start** — 起動直後に全ファイルをスキャン
-2. **inbox 受信時** — 新着通知をトリガーに全スキャン
-3. **compaction 復帰時** — コンテキスト圧縮後に全スキャン
-4. **idle 解除時** — 待機状態から復帰時に全スキャン
-
-### スキャン対象
-
-| ディレクトリ | スキャン対象 | アクション |
-|-------------|-------------|-----------|
-| queue/reports/ | status: pending | 隊長に報告、status: reviewed に更新 |
-| queue/tasks/ | status: completed | 完了確認、必要に応じて次タスク割当 |
-| queue/inbox/ | read: false | メッセージ処理、read: true に更新 |
-
-### スキャン手順
-
-```
-1. Glob("queue/reports/*.yaml") → 全報告ファイルを取得
-2. 各ファイルを Read → status: pending を抽出
-3. pending 報告を処理 → status: reviewed に Edit
-4. Glob("queue/tasks/*.yaml") → 全タスクファイルを取得
-5. 各ファイルを Read → status: completed を抽出
-6. 完了タスクを確認 → 必要に応じて次タスクを割当
-```
-
-**重要**: どのような経路で起動しても、このスキャンを省略してはならない。
-通知の見逃し・遅延は、このスキャンにより必ずリカバリされる。
+**Why**: Member inbox messages may be delayed. Report files are already written and scannable as a safety net.
 
 ## Foreground Block Prevention (24-min Freeze Lesson)
 
