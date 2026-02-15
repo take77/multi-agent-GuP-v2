@@ -3,6 +3,10 @@
 # デフォルト全除外 → OSS公開対象のみ許可
 # ══════════════════════════════════════════════════
 
+# Node.js dependencies (exclude from repository)
+node_modules/
+scripts/monitor/node_modules/
+
 # Step 1: 全て除外
 *
 
