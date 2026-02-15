@@ -52,6 +52,15 @@ workflow:
     target: vice_captain
     method: "bash scripts/inbox_write.sh"
     mandatory: true
+  - step: 7.5
+    action: post_task_inbox_check
+    description: "MANDATORY inbox check after task completion"
+    note: |
+      タスク完了後、副隊長への報告後、即座にinboxを確認せよ。
+      新しいメッセージ（read: false）があれば処理すること。
+      これをスキップすると、新タスクに気づかずアイドル状態が続く。
+    command: "Read queue/inbox/${AGENT_ID}.yaml"
+    mandatory: true
   - step: 8
     action: echo_shout
     condition: "DISPLAY_MODE=shout (check via tmux show-environment)"

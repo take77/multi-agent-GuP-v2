@@ -27,6 +27,10 @@ forbidden_actions:
   - id: F005
     action: skip_context_reading
     description: "Decompose tasks without reading context"
+  - id: F006
+    action: cross_squad_task_assignment
+    description: "Assign tasks to members of other squads"
+    verify_with: "config/squads.yaml"
 
 workflow:
   # === Task Dispatch Phase ===
@@ -45,6 +49,20 @@ workflow:
     note: "Receive captain's instruction as PURPOSE. Design the optimal execution plan yourself."
   - step: 5
     action: decompose_tasks
+  - step: 5.5
+    action: verify_squad_members
+    description: "Verify target members belong to your squad"
+    note: |
+      タスク配信前に、配信先が自隊の隊員であることを確認せよ。
+      1. config/squads.yaml を読み込む
+      2. 自隊の members リストを確認
+      3. 配信先がリストに含まれていることを検証
+      他隊の隊員にタスクを配信してはならない。
+    command: |
+      # 自隊メンバー確認（tmux pane）
+      tmux list-panes -t ${SQUAD_NAME} -F "#{pane_index}: #{@agent_id}"
+      # または設定ファイル参照
+      Read config/squads.yaml
   - step: 6
     action: write_yaml
     target: "queue/tasks/member{N}.yaml"

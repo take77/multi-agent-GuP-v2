@@ -367,7 +367,22 @@ send_cli_command() {
 # Check if the agent has an active inotifywait on its inbox.
 # If yes, the agent will self-wake — no nudge needed.
 agent_has_self_watch() {
-    pgrep -f "inotifywait.*inbox/${AGENT_ID}.yaml" >/dev/null 2>&1
+    # Get our own inotifywait PID (child of this script)
+    local my_inotify_pid
+    my_inotify_pid=$(pgrep -P $$ -f "inotifywait" 2>/dev/null | head -1 || echo "")
+
+    # Get all inotifywait PIDs watching this inbox
+    local all_pids
+    all_pids=$(pgrep -f "inotifywait.*inbox/${AGENT_ID}.yaml" 2>/dev/null || echo "")
+
+    # Check if any PID is NOT our own
+    for pid in $all_pids; do
+        if [ -n "$my_inotify_pid" ] && [ "$pid" = "$my_inotify_pid" ]; then
+            continue  # Skip our own process
+        fi
+        return 0  # Found external self-watch
+    done
+    return 1  # No external self-watch found
 }
 
 # ─── Agent busy detection ───
