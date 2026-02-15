@@ -1,9 +1,10 @@
 #!/usr/bin/env bats
 
 @test "start.ts が存在する" {
-  skip "未実装 — cmd_027で実装予定"
+  [ -f scripts/monitor/start.ts ]
 }
 
 @test "TypeScript コンパイルが通る" {
-  skip "未実装 — cmd_027で実装予定"
+  cd scripts/monitor/
+  npx tsc --noEmit
 }
