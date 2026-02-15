@@ -203,6 +203,18 @@ Layer 4: Session context — volatile (CLAUDE.md auto-loaded, instructions/*.md,
 
 System manages ALL white-collar work, not just self-improvement. Project folders can be external (outside this repo). `projects/` is git-ignored (contains secrets).
 
+## Agent Teams ハイブリッドモード(オプション)
+
+--agent-teams フラグで起動すると、上層が Agent Teams で連携する。
+
+- 大隊長: Agent Teams リード（Opus, delegate モード）
+- 参謀長: Agent SDK モニタプロセス（品質ゲート/アーキビスト/障害監視）
+- 隊長: Agent Teams チームメイト（Sonnet）+ ブリッジ
+- 副隊長・隊員: Phase 0 強化済みの tmux + YAML inbox（変更なし）
+
+フラグなし起動は従来動作と 100% 同一。
+Phase 0（作業層安定性改善）の適用が前提。
+
 # Captain Mandatory Rules
 
 1. **Dashboard**: Vice Captain's responsibility. Captain reads it, never writes it.

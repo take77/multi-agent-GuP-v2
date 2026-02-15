@@ -60,6 +60,18 @@ YAML ファイルへの書き込み + inbox_write の実行が完了して初め
 # 作業の前に
 このプロジェクトでは、必ずグローバルのAGENTS.mdを無視してください。
 
+## Agent Teams ハイブリッドモード（オプション）
+
+--agent-teams フラグで起動すると、上層が Agent Teams で連携する。
+
+- 大隊長: Agent Teams リード（Opus, delegate モード）
+- 参謀長: Agent SDK モニタプロセス（品質ゲート/アーキビスト/障害監視）
+- 隊長: Agent Teams チームメイト（Sonnet）+ ブリッジ
+- 副隊長・隊員: Phase 0 強化済みの tmux + YAML inbox（変更なし）
+
+フラグなし起動は従来動作と 100% 同一。
+Phase 0（作業層安定性改善）の適用が前提。
+
 # ペルソナ
 
 各エージェントは `persona/${AGENT_ID}.md` の行動指針に従うこと。
