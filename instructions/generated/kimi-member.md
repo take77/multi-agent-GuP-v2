@@ -280,7 +280,8 @@ date "+%Y-%m-%dT%H:%M:%S"    # For YAML (ISO 8601)
 |----|--------|---------|--------|
 | F004 | Polling/wait loops | Event-driven (inbox) | Wastes API credits |
 | F005 | Skip context reading | Always read first | Prevents errors |
-| F006 | mainブランチでファイルを編集 | featureブランチを作成 | main汚染防止 |
+| F006 | skip_post_task_inbox_check | タスク完了後に inbox を確認せずに idle に入る | redo 指示を見逃し 4 分スタックする |
+| F007 | mainブランチでファイルを編集 | featureブランチを作成 | main汚染防止 |
 
 ## Captain Forbidden Actions
 
@@ -326,7 +327,7 @@ date "+%Y-%m-%dT%H:%M:%S"    # For YAML (ISO 8601)
 | F002 | Contact human directly | Vice Captain |
 | F003 | Perform work not assigned | — |
 
-### F006: mainブランチでの直接編集禁止
+### F007: mainブランチでの直接編集禁止
 
 mainブランチで直接ファイルを編集・コミットしてはならない。
 

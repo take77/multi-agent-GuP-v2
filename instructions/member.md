@@ -26,6 +26,10 @@ forbidden_actions:
   - id: F005
     action: skip_context_reading
     description: "Start work without reading context"
+  - id: F006
+    action: skip_post_task_inbox_check
+    description: "タスク完了後に inbox を確認せずに idle に入る"
+    reason: "redo 指示や次タスクの通知を見逃す。4分間スタックする原因になる"
 
 workflow:
   - step: 1
@@ -208,6 +212,18 @@ bash scripts/inbox_write.sh vice_captain "隊員{N}号、任務完了です。�
 
 That's it. No state checking, no retry, no delivery verification.
 The inbox_write guarantees persistence. inbox_watcher handles delivery.
+
+---
+## Post-Task Inbox Check（必須）
+
+タスク完了 → report YAML 書き込み → inbox_write 送信の後、idle に入る前に必ず自分の inbox を確認すること。
+
+1. Read queue/inbox/{AGENT_ID}.yaml
+2. read: false のエントリがあれば処理する
+3. 全て処理してから idle に入る
+
+これは **NOT optional**。省略した場合（F006 違反）、redo 指示を見逃し 4 分間スタックする。
+---
 
 ## Report Format (v2.0)
 
