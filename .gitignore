@@ -134,6 +134,7 @@
 !instructions/
 !instructions/agent_teams/
 !instructions/agent_teams/.gitkeep
+!instructions/agent_teams/*.md
 
 !logs/
 !logs/bridge/
