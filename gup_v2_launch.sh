@@ -108,6 +108,7 @@ SILENT_MODE=false
 SHELL_OVERRIDE=""
 CLUSTER_MODE=""  # "" = 従来モード, "darjeeling" = ダージリン隊のみ, "all" = 全クラスタ
 COMMAND_SERVER_MODE=false  # --command: 司令部サーバーのみ起動
+AGENT_TEAMS_MODE=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -166,6 +167,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --command           司令部サーバーのみ起動（大隊長+参謀長の2ペイン）"
             echo "                      デフォルトtmuxサーバーにcommandセッションとして起動"
             echo "  --all-clusters      全クラスタ起動（将来用、現在はスタブ）"
+            echo "  --agent-teams       Agent Teams モード有効化（Phase 0適用が前提）"
+            echo "                      参謀長モニタプロセスを起動し、YAML↔Agent Teams双方向連携を有効化"
             echo "  -h, --help          このヘルプを表示"
             echo ""
             echo "例:"
@@ -216,6 +219,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --command)
             COMMAND_SERVER_MODE=true
+            shift
+            ;;
+        --agent-teams)
+            AGENT_TEAMS_MODE=true
             shift
             ;;
         *)
@@ -338,6 +345,11 @@ launch_squad_cluster() {
         tmux set-option -p -t "${CLUSTER_ID}:agents.${p}" @agent_role "$agent_role"
         tmux set-option -p -t "${CLUSTER_ID}:agents.${p}" @cluster_id "$CLUSTER_ID"
         tmux set-option -p -t "${CLUSTER_ID}:agents.${p}" @current_task ""
+
+        # Agent Teams モード設定（--agent-teams 指定時のみ）
+        if [ "$AGENT_TEAMS_MODE" = true ]; then
+            tmux set-environment -t "${CLUSTER_ID}:agents.${p}" GUP_BRIDGE_MODE 1
+        fi
 
         # モデル設定（隊長・副隊長=Opus, 隊員=Sonnet）
         local model_name="Sonnet"
@@ -784,6 +796,49 @@ if ! command -v tmux &> /dev/null; then
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# STEP 4.5: Agent Teams 環境チェック（--agent-teams 指定時のみ）
+# ═══════════════════════════════════════════════════════════════════════════════
+if [ "$AGENT_TEAMS_MODE" = true ]; then
+    log_info "🔍 Agent Teams 環境チェック中..."
+
+    AGENT_TEAMS_READY=true
+
+    # (1) CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 環境変数チェック
+    if [ -z "${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-}" ]; then
+        log_war "  ⚠️  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 環境変数が未設定"
+        AGENT_TEAMS_READY=false
+    else
+        log_success "  ✅ CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 環境変数: 設定済み"
+    fi
+
+    # (2) Phase 0 適用チェック（scripts/check_inbox_on_stop.sh の存在確認）
+    if [ ! -f "$SCRIPT_DIR/scripts/check_inbox_on_stop.sh" ]; then
+        log_war "  ⚠️  Phase 0 未適用: scripts/check_inbox_on_stop.sh が見つかりません"
+        AGENT_TEAMS_READY=false
+    else
+        log_success "  ✅ Phase 0 適用済み: scripts/check_inbox_on_stop.sh 確認"
+    fi
+
+    # (3) Node.js 存在チェック
+    if ! command -v node >/dev/null 2>&1; then
+        log_war "  ⚠️  Node.js が見つかりません（参謀長モニタ起動不可）"
+        AGENT_TEAMS_READY=false
+    else
+        NODE_VERSION=$(node --version 2>/dev/null)
+        log_success "  ✅ Node.js 確認: $NODE_VERSION"
+    fi
+
+    # 全チェック失敗時はフォールバック
+    if [ "$AGENT_TEAMS_READY" = false ]; then
+        log_war "  ⚠️  Agent Teams 環境チェック失敗 → AGENT_TEAMS_MODE=false にフォールバック"
+        AGENT_TEAMS_MODE=false
+    else
+        log_success "  ✅ Agent Teams 環境チェック完了"
+    fi
+    echo ""
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # STEP 5: 司令部（command）セッション作成（大隊長 + 参謀長の2ペイン）
 # ═══════════════════════════════════════════════════════════════════════════════
 log_war "👑 司令部を構築中..."
@@ -812,6 +867,32 @@ MIHO_PROMPT=$(generate_prompt "参謀長" "cyan" "$SHELL_SETTING")
 tmux send-keys -t command:main.1 "cd \"$(pwd)\" && export PS1='${MIHO_PROMPT}' && clear" Enter
 
 echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 5.5: Agent Teams 設定追加（--agent-teams 指定時のみ）
+# ═══════════════════════════════════════════════════════════════════════════════
+if [ "$AGENT_TEAMS_MODE" = true ]; then
+    log_info "🔗 Agent Teams モード設定中..."
+
+    # (1) tmux 環境変数設定
+    tmux set-environment -t command GUP_AGENT_TEAMS_ACTIVE 1
+    log_success "  ✅ GUP_AGENT_TEAMS_ACTIVE=1 設定完了"
+
+    # (2) 参謀長モニタプロセスをバックグラウンド起動
+    if [ -d "$SCRIPT_DIR/scripts/monitor" ] && [ -f "$SCRIPT_DIR/scripts/monitor/start.ts" ]; then
+        cd "$SCRIPT_DIR/scripts/monitor"
+        npx tsx start.ts >> "$SCRIPT_DIR/logs/monitor.log" 2>&1 &
+        MONITOR_PID=$!
+        cd "$SCRIPT_DIR"
+
+        tmux set-environment -t command GUP_MONITOR_PID "$MONITOR_PID"
+        log_success "  ✅ 参謀長モニタプロセス起動完了（PID: $MONITOR_PID）"
+    else
+        log_war "  ⚠️  scripts/monitor/start.ts が見つかりません（モニタ起動スキップ）"
+    fi
+
+    echo ""
+fi
 
 # pane-base-index を取得（1 の環境ではペインは 1,2,... になる）
 PANE_BASE=$(tmux show-options -gv pane-base-index 2>/dev/null || echo 0)
