@@ -1,5 +1,6 @@
 #!/usr/bin/env bats
 
 @test "ヘルプに --agent-teams が表示される" {
-  skip "未実装 — cmd_028で実装予定"
+  cd ~/Developments/Tools/multi-agent-GuP-v2/
+  ./gup_v2_launch.sh -h | grep -q "\-\-agent-teams"
 }
