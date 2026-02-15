@@ -71,6 +71,7 @@ scripts/monitor/node_modules/
 # Config (sample files only, no secrets)
 !config/
 !config/ntfy_auth.env.sample
+!config/settings.yaml
 
 # Templates
 !templates/
@@ -89,6 +90,8 @@ scripts/monitor/node_modules/
 !scripts/build_instructions.sh
 !scripts/check_inbox_on_stop.sh
 !scripts/watcher_supervisor.sh
+!scripts/bridge_relay.sh
+!scripts/fallback_to_tmux.sh
 
 
 # SayTask (sample template only, not actual data)
@@ -153,3 +156,8 @@ scripts/monitor/node_modules/
 # Test infrastructure (cmd_024)
 !tests/
 !tests/**
+
+# Queue HQ (cmd_032)
+!queue/
+!queue/hq/
+!queue/hq/**
