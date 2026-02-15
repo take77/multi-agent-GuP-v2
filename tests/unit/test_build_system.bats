@@ -59,104 +59,104 @@ setup() {
 # ファイル生成テスト — Claude
 # =============================================================================
 
-@test "claude: shogun.md generated" {
-    [ -f "$OUTPUT_DIR/shogun.md" ]
+@test "claude: captain.md generated" {
+    [ -f "$OUTPUT_DIR/captain.md" ]
 }
 
-@test "claude: karo.md generated" {
-    [ -f "$OUTPUT_DIR/karo.md" ]
+@test "claude: vice_captain.md generated" {
+    [ -f "$OUTPUT_DIR/vice_captain.md" ]
 }
 
-@test "claude: ashigaru.md generated" {
-    [ -f "$OUTPUT_DIR/ashigaru.md" ]
+@test "claude: member.md generated" {
+    [ -f "$OUTPUT_DIR/member.md" ]
 }
 
 # =============================================================================
 # ファイル生成テスト — Codex
 # =============================================================================
 
-@test "codex: codex-shogun.md generated" {
-    [ -f "$OUTPUT_DIR/codex-shogun.md" ]
+@test "codex: codex-captain.md generated" {
+    [ -f "$OUTPUT_DIR/codex-captain.md" ]
 }
 
-@test "codex: codex-karo.md generated" {
-    [ -f "$OUTPUT_DIR/codex-karo.md" ]
+@test "codex: codex-vice_captain.md generated" {
+    [ -f "$OUTPUT_DIR/codex-vice_captain.md" ]
 }
 
-@test "codex: codex-ashigaru.md generated" {
-    [ -f "$OUTPUT_DIR/codex-ashigaru.md" ]
+@test "codex: codex-member.md generated" {
+    [ -f "$OUTPUT_DIR/codex-member.md" ]
 }
 
 # =============================================================================
 # ファイル生成テスト — Copilot (Phase 2+3 受入基準)
 # =============================================================================
 
-@test "copilot: copilot-shogun.md generated [Phase 2+3]" {
-    [ -f "$OUTPUT_DIR/copilot-shogun.md" ]
+@test "copilot: copilot-captain.md generated [Phase 2+3]" {
+    [ -f "$OUTPUT_DIR/copilot-captain.md" ]
 }
 
-@test "copilot: copilot-karo.md generated [Phase 2+3]" {
-    [ -f "$OUTPUT_DIR/copilot-karo.md" ]
+@test "copilot: copilot-vice_captain.md generated [Phase 2+3]" {
+    [ -f "$OUTPUT_DIR/copilot-vice_captain.md" ]
 }
 
-@test "copilot: copilot-ashigaru.md generated [Phase 2+3]" {
-    [ -f "$OUTPUT_DIR/copilot-ashigaru.md" ]
+@test "copilot: copilot-member.md generated [Phase 2+3]" {
+    [ -f "$OUTPUT_DIR/copilot-member.md" ]
 }
 
 # =============================================================================
 # 内容検証テスト — 空でないこと
 # =============================================================================
 
-@test "content: shogun.md is not empty" {
-    [ -s "$OUTPUT_DIR/shogun.md" ]
+@test "content: captain.md is not empty" {
+    [ -s "$OUTPUT_DIR/captain.md" ]
 }
 
-@test "content: karo.md is not empty" {
-    [ -s "$OUTPUT_DIR/karo.md" ]
+@test "content: vice_captain.md is not empty" {
+    [ -s "$OUTPUT_DIR/vice_captain.md" ]
 }
 
-@test "content: ashigaru.md is not empty" {
-    [ -s "$OUTPUT_DIR/ashigaru.md" ]
+@test "content: member.md is not empty" {
+    [ -s "$OUTPUT_DIR/member.md" ]
 }
 
-@test "content: codex-shogun.md is not empty" {
-    [ -s "$OUTPUT_DIR/codex-shogun.md" ]
+@test "content: codex-captain.md is not empty" {
+    [ -s "$OUTPUT_DIR/codex-captain.md" ]
 }
 
-@test "content: codex-karo.md is not empty" {
-    [ -s "$OUTPUT_DIR/codex-karo.md" ]
+@test "content: codex-vice_captain.md is not empty" {
+    [ -s "$OUTPUT_DIR/codex-vice_captain.md" ]
 }
 
-@test "content: codex-ashigaru.md is not empty" {
-    [ -s "$OUTPUT_DIR/codex-ashigaru.md" ]
+@test "content: codex-member.md is not empty" {
+    [ -s "$OUTPUT_DIR/codex-member.md" ]
 }
 
 # =============================================================================
 # 内容検証テスト — ロール名含有
 # =============================================================================
 
-@test "content: shogun.md contains shogun role reference" {
-    grep -qi "shogun\|将軍" "$OUTPUT_DIR/shogun.md"
+@test "content: captain.md contains captain role reference" {
+    grep -qi "captain\|隊長" "$OUTPUT_DIR/captain.md"
 }
 
-@test "content: karo.md contains karo role reference" {
-    grep -qi "karo\|家老" "$OUTPUT_DIR/karo.md"
+@test "content: vice_captain.md contains vice_captain role reference" {
+    grep -qi "vice_captain\|副隊長" "$OUTPUT_DIR/vice_captain.md"
 }
 
-@test "content: ashigaru.md contains ashigaru role reference" {
-    grep -qi "ashigaru\|足軽" "$OUTPUT_DIR/ashigaru.md"
+@test "content: member.md contains member role reference" {
+    grep -qi "member\|隊員" "$OUTPUT_DIR/member.md"
 }
 
-@test "content: codex-shogun.md contains shogun role reference" {
-    grep -qi "shogun\|将軍" "$OUTPUT_DIR/codex-shogun.md"
+@test "content: codex-captain.md contains captain role reference" {
+    grep -qi "captain\|隊長" "$OUTPUT_DIR/codex-captain.md"
 }
 
-@test "content: codex-karo.md contains karo role reference" {
-    grep -qi "karo\|家老" "$OUTPUT_DIR/codex-karo.md"
+@test "content: codex-vice_captain.md contains vice_captain role reference" {
+    grep -qi "vice_captain\|副隊長" "$OUTPUT_DIR/codex-vice_captain.md"
 }
 
-@test "content: codex-ashigaru.md contains ashigaru role reference" {
-    grep -qi "ashigaru\|足軽" "$OUTPUT_DIR/codex-ashigaru.md"
+@test "content: codex-member.md contains member role reference" {
+    grep -qi "member\|隊員" "$OUTPUT_DIR/codex-member.md"
 }
 
 # =============================================================================
@@ -165,15 +165,15 @@ setup() {
 
 @test "content: claude files contain Claude-specific tools" {
     # Claude Code固有ツール: Read, Write, Edit, Bash等
-    grep -qi "claude\|Read\|Write\|Edit\|Bash" "$OUTPUT_DIR/shogun.md"
+    grep -qi "claude\|Read\|Write\|Edit\|Bash" "$OUTPUT_DIR/captain.md"
 }
 
 @test "content: codex files contain Codex-specific content" {
-    grep -qi "codex\|AGENTS.md\|Codex" "$OUTPUT_DIR/codex-shogun.md"
+    grep -qi "codex\|AGENTS.md\|Codex" "$OUTPUT_DIR/codex-captain.md"
 }
 
 @test "content: copilot files contain Copilot-specific content [Phase 2+3]" {
-    grep -qi "copilot\|Copilot" "$OUTPUT_DIR/copilot-shogun.md"
+    grep -qi "copilot\|Copilot" "$OUTPUT_DIR/copilot-captain.md"
 }
 
 # =============================================================================

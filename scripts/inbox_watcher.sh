@@ -59,9 +59,60 @@ fi
 # Time-based escalation: track how long unread messages have been waiting
 FIRST_UNREAD_SEEN=${FIRST_UNREAD_SEEN:-0}
 LAST_CLEAR_TS=${LAST_CLEAR_TS:-0}
-ESCALATE_PHASE1=${ESCALATE_PHASE1:-120}
-ESCALATE_PHASE2=${ESCALATE_PHASE2:-240}
-ESCALATE_COOLDOWN=${ESCALATE_COOLDOWN:-300}
+
+# ─── Load settings from config/settings.yaml ───
+# Falls back to defaults if file doesn't exist or parsing fails
+load_settings_from_yaml() {
+    local settings_file="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/config/settings.yaml"
+
+    if [ -f "$settings_file" ]; then
+        local yaml_values
+        yaml_values=$(python3 -c "
+import yaml
+import sys
+
+try:
+    with open('$settings_file', 'r') as f:
+        data = yaml.safe_load(f) or {}
+
+    esc = data.get('escalation', {}) or {}
+    print(f\"ESCALATE_PHASE1={esc.get('phase1_sec', 60)}\")
+    print(f\"ESCALATE_PHASE2={esc.get('phase2_sec', 120)}\")
+    print(f\"ESCALATE_COOLDOWN={esc.get('cooldown_sec', 240)}\")
+    print(f\"INOTIFY_TIMEOUT={esc.get('inotify_timeout_sec', 30)}\")
+except Exception as e:
+    print(f'# settings.yaml parse error: {e}', file=sys.stderr)
+    print('ESCALATE_PHASE1=60')
+    print('ESCALATE_PHASE2=120')
+    print('ESCALATE_COOLDOWN=240')
+    print('INOTIFY_TIMEOUT=30')
+" 2>/dev/null)
+
+        if [ -n "$yaml_values" ]; then
+            eval "$yaml_values"
+            echo "[$(date)] [inbox_watcher] Loaded settings from $settings_file: phase1=${ESCALATE_PHASE1}s, phase2=${ESCALATE_PHASE2}s, cooldown=${ESCALATE_COOLDOWN}s" >&2
+            return 0
+        fi
+    fi
+
+    # Fallback defaults (matching settings.yaml defaults)
+    ESCALATE_PHASE1=60
+    ESCALATE_PHASE2=120
+    ESCALATE_COOLDOWN=240
+    INOTIFY_TIMEOUT=30
+    echo "[$(date)] [inbox_watcher] Using default escalation settings (no settings.yaml)" >&2
+}
+
+# Load settings (can be overridden by environment variables)
+if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
+    load_settings_from_yaml
+fi
+
+# Allow environment variable overrides
+ESCALATE_PHASE1=${ESCALATE_PHASE1:-60}
+ESCALATE_PHASE2=${ESCALATE_PHASE2:-120}
+ESCALATE_COOLDOWN=${ESCALATE_COOLDOWN:-240}
+INOTIFY_TIMEOUT=${INOTIFY_TIMEOUT:-30}
 
 # ─── Phase feature flags (cmd_107 Phase 1/2/3) ───
 # ASW_PHASE:
@@ -316,7 +367,22 @@ send_cli_command() {
 # Check if the agent has an active inotifywait on its inbox.
 # If yes, the agent will self-wake — no nudge needed.
 agent_has_self_watch() {
-    pgrep -f "inotifywait.*inbox/${AGENT_ID}.yaml" >/dev/null 2>&1
+    # Get our own inotifywait PID (child of this script)
+    local my_inotify_pid
+    my_inotify_pid=$(pgrep -P $$ -f "inotifywait" 2>/dev/null | head -1 || echo "")
+
+    # Get all inotifywait PIDs watching this inbox
+    local all_pids
+    all_pids=$(pgrep -f "inotifywait.*inbox/${AGENT_ID}.yaml" 2>/dev/null || echo "")
+
+    # Check if any PID is NOT our own
+    for pid in $all_pids; do
+        if [ -n "$my_inotify_pid" ] && [ "$pid" = "$my_inotify_pid" ]; then
+            continue  # Skip our own process
+        fi
+        return 0  # Found external self-watch
+    done
+    return 1  # No external self-watch found
 }
 
 # ─── Agent busy detection ───
@@ -546,9 +612,10 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
 process_unread_once
 
 # ─── Main loop: event-driven via inotifywait ───
-# Timeout 30s: WSL2 /mnt/c/ can miss inotify events.
+# Timeout configured via config/settings.yaml (default 30s).
+# WSL2 /mnt/c/ can miss inotify events.
 # Shorter timeout = faster escalation retry for stuck agents.
-INOTIFY_TIMEOUT=30
+# INOTIFY_TIMEOUT is loaded from settings.yaml or defaults to 30
 
 while true; do
     # Block until file is modified OR timeout (safety net for WSL2)

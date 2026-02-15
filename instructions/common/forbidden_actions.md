@@ -6,6 +6,7 @@
 |----|--------|---------|--------|
 | F004 | Polling/wait loops | Event-driven (inbox) | Wastes API credits |
 | F005 | Skip context reading | Always read first | Prevents errors |
+| F006 | mainブランチでファイルを編集 | featureブランチを作成 | main汚染防止 |
 
 ## Captain Forbidden Actions
 
@@ -14,6 +15,26 @@
 | F001 | Execute tasks yourself (read/write files) | Vice Captain |
 | F002 | Command Member directly (bypass Vice Captain) | Vice Captain |
 | F003 | Use Task agents | inbox_write |
+
+### Captain F001 Details
+
+**Prohibited operations** (F001 violation):
+- **File operations**: Read/Write/Edit on project files (except `queue/captain_to_vice_captain.yaml`, `saytask/*.yaml`, `master_dashboard.md`)
+- **Implementation commands**: `bash` execution of development commands (`yarn`, `npm`, `pip`, `python`, `node`, `cargo`, `go`, etc.)
+- **Code work**: Code generation, modification, debugging, review comments (text-level opinions are allowed)
+
+**Allowed operations**:
+- **Task management YAML**: `queue/captain_to_vice_captain.yaml`, `saytask/tasks.yaml`, `saytask/streaks.yaml`, `saytask/counter.yaml` (read/write)
+- **Dashboard**: `master_dashboard.md` (read/write)
+- **Communication scripts**: `bash scripts/inbox_write.sh`, `bash scripts/ntfy.sh`
+- **Config/Context**: `config/`, `context/`, `projects/` (read-only)
+
+**When Vice_Captain doesn't respond** (3 correct actions):
+1. **Wait for auto-escalation**: `inbox_watcher.sh` runs 3-stage escalation (Stage 1: 0-60s nudge → Stage 2: 60-120s forced nudge → Stage 3: 120-240s `/clear` reset). Do NOT start working yourself.
+2. **Reassign to another Vice_Captain**: Update cmd `status: reassigned` → Create new cmd for different Vice_Captain → Send inbox_write
+3. **Request superior intervention**: Report to Chief_of_Staff or Battalion_Commander via dashboard.md 🚨要対応 section
+
+**NEVER execute tasks yourself.** That's what escalation exists for. Doing so breaks the chain of command and violates F001.
 
 ## Vice Captain Forbidden Actions
 
@@ -30,6 +51,24 @@
 | F001 | Report directly to Captain (bypass Vice Captain) | Vice Captain |
 | F002 | Contact human directly | Vice Captain |
 | F003 | Perform work not assigned | — |
+
+### F006: mainブランチでの直接編集禁止
+
+mainブランチで直接ファイルを編集・コミットしてはならない。
+
+**禁止操作**:
+- mainブランチにいる状態でのファイル編集
+- mainブランチへの直接コミット
+- mainブランチへの直接プッシュ
+
+**正しい手順**:
+1. featureブランチを作成: git checkout -b cmd_{id}/{agent_id}/{desc}
+2. featureブランチで作業
+3. featureブランチにコミット・プッシュ
+4. 副隊長がmainにマージ
+
+**適用対象**: 全member、隊長、副隊長
+**例外**: 副隊長によるマージ操作（レビュー済みのfeatureブランチをmainに統合）
 
 ## Self-Identification (Member CRITICAL)
 

@@ -27,6 +27,10 @@ forbidden_actions:
   - id: F005
     action: skip_context_reading
     description: "Decompose tasks without reading context"
+  - id: F006
+    action: cross_squad_task_assignment
+    description: "Assign tasks to members of other squads"
+    verify_with: "config/squads.yaml"
 
 workflow:
   # === Task Dispatch Phase ===
@@ -45,6 +49,20 @@ workflow:
     note: "Receive captain's instruction as PURPOSE. Design the optimal execution plan yourself."
   - step: 5
     action: decompose_tasks
+  - step: 5.5
+    action: verify_squad_members
+    description: "Verify target members belong to your squad"
+    note: |
+      タスク配信前に、配信先が自隊の隊員であることを確認せよ。
+      1. config/squads.yaml を読み込む
+      2. 自隊の members リストを確認
+      3. 配信先がリストに含まれていることを検証
+      他隊の隊員にタスクを配信してはならない。
+    command: |
+      # 自隊メンバー確認（tmux pane）
+      tmux list-panes -t ${SQUAD_NAME} -F "#{pane_index}: #{@agent_id}"
+      # または設定ファイル参照
+      Read config/squads.yaml
   - step: 6
     action: write_yaml
     target: "queue/tasks/member{N}.yaml"
@@ -77,6 +95,9 @@ workflow:
     action: scan_all_reports
     target: "queue/reports/member*_report.yaml"
     note: "Scan ALL reports, not just the one who woke you. Communication loss safety net."
+  - step: 10.5
+    action: validate_report_v2
+    note: "Check v2.0 mandatory fields. Reject incomplete reports. See Report Validation section."
   - step: 11
     action: update_dashboard
     target: dashboard.md
@@ -273,6 +294,7 @@ task:
   task_id: subtask_001
   parent_cmd: cmd_001
   bloom_level: L3        # L1-L3=Sonnet, L4-L6=Opus
+  worktree_path: "worktrees/member1"  # optional。省略時はmember自身がブランチを切る
   description: "Create hello1.md with content 'おはよう1'"
   target_path: "/path/to/project/hello1.md"
   echo_message: "🔥 member1, starting the task!"
@@ -325,6 +347,124 @@ Cross-reference with dashboard.md — process any reports not yet reflected.
 
 **Why**: Member inbox messages may be delayed. Report files are already written and scannable as a safety net.
 
+## Report Validation (v2.0 — Step 10.5)
+
+> **Week 2-2 Upgrade**: Enforce mandatory fields to prevent "build success ≠ actual functionality" issues.
+
+**When**: After receiving member report (step 10), BEFORE updating dashboard (step 11).
+
+**Template reference**: `templates/report_v2.yaml.template`
+
+### Automated Validation Script
+
+Before manual checklist verification, run the automated validation script:
+
+```bash
+bash scripts/verify_report.sh queue/reports/member{N}_report.yaml
+```
+
+**Exit codes**:
+- `0` = Validation passed (all required fields present and valid)
+- `1` = Validation failed (script outputs specific error reasons)
+
+**When script exits 1**:
+1. Read script output (stdout) — contains specific error reasons
+2. Send rejection message to member with script output
+3. Set task status back to `assigned`
+4. Do NOT update dashboard.md
+
+**When script exits 0**:
+- Proceed to manual checklist verification (if needed for edge cases)
+- Otherwise, accept report and continue to step 11
+
+**Example usage**:
+```bash
+# Validate report
+if ! bash scripts/verify_report.sh queue/reports/member3_report.yaml > /tmp/verify_errors.txt 2>&1; then
+  # Failed — read errors
+  ERRORS=$(cat /tmp/verify_errors.txt)
+  # Send rejection
+  bash scripts/inbox_write.sh member3 "報告を受理できません。理由: ${ERRORS}。修正して再提出してください。" report_rejected vice_captain
+  # Update task status to assigned (Edit tool)
+  # Skip dashboard update
+else
+  # Passed — continue to step 11
+  echo "Report validation passed."
+fi
+```
+
+**Note**: The script checks for yq availability and falls back to grep/sed if unavailable. Both methods validate the same criteria.
+
+### Mandatory Field Checklist
+
+For each report with `status: done`, check ALL of the following (automated via verify_report.sh):
+
+| # | Field | Check | Rejection Reason |
+|---|-------|-------|------------------|
+| 1 | changed_files | Non-empty array | "変更ファイルリストが空です。何も変更していないのに完了報告はできません。" |
+| 2 | changed_files[].action | `created` / `modified` / `deleted` | "action フィールドが不正です。created, modified, deleted のいずれかを指定してください。" |
+| 3 | verification.build_result | `pass` (if status=done) | "ビルド失敗のため、完了報告を受理できません。エラーを修正してください。" |
+| 4 | verification.build_command | Non-empty string | "ビルドコマンドが記載されていません。実行したコマンドを記載してください。" |
+| 5 | verification.dev_server_check | `pass` / `fail` / `skipped` | "dev_server_check フィールドが不正です。pass, fail, skipped のいずれかを指定してください。" |
+| 6 | verification.dev_server_check | NOT `fail` (if status=done) | "開発サーバーでの動作確認が失敗しています。機能が正しく動作することを確認してください。" |
+| 7 | verification.error_console | `no_errors` / `has_warnings` / `has_errors` | "error_console フィールドが不正です。" |
+| 8 | verification.error_console | NOT `has_errors` (if status=done) | "コンソールエラーが発生しています。エラーを解消してください。" |
+| 9 | todo_scan.count | Integer >= 0 | "todo_scan.count が不正です。プロジェクト内の // TODO コメント数を記載してください。" |
+| 10 | todo_scan.new_todos | Array (empty OK) | "todo_scan.new_todos が存在しません。配列として記載してください（空でも可）。" |
+| 11 | skill_candidate.found | Boolean | "skill_candidate.found が存在しません。true または false を明示してください。" |
+
+**Notes**:
+- For `status: failed` — validation is relaxed (verification failures are acceptable)
+- For `status: blocked` — no validation (task not started yet)
+
+### Rejection Procedure
+
+If ANY check fails:
+
+1. **Do NOT update dashboard.md with this report**
+2. **Do NOT mark task as done**
+3. **Send rejection message via inbox_write**:
+
+```bash
+bash scripts/inbox_write.sh member{N} "報告を受理できません。理由: {rejection_reason}。修正して再提出してください。" report_rejected vice_captain
+```
+
+4. **Write rejection log to task YAML**:
+
+```yaml
+# Add to queue/tasks/member{N}.yaml
+rejection_history:
+  - timestamp: "2026-02-12T12:45:00"
+    reason: "ビルド失敗のため、完了報告を受理できません。"
+```
+
+5. **Set task status back to `assigned`** (member needs to fix and resubmit)
+
+### Acceptance Procedure
+
+If ALL checks pass:
+
+1. Proceed to step 11 (update dashboard.md)
+2. Process as usual (unblock dependent tasks, ntfy notification, etc.)
+
+### Example Rejection Messages
+
+| Scenario | Message to Member |
+|----------|-------------------|
+| Empty changed_files | "報告を受理できません。理由: 変更ファイルリストが空です。何も変更していないのに完了報告はできません。修正して再提出してください。" |
+| Build failed | "報告を受理できません。理由: ビルド失敗のため、完了報告を受理できません。エラーを修正してください。修正して再提出してください。" |
+| Dev server check failed | "報告を受理できません。理由: 開発サーバーでの動作確認が失敗しています。機能が正しく動作することを確認してください。修正して再提出してください。" |
+| Console errors | "報告を受理できません。理由: コンソールエラーが発生しています。エラーを解消してください。修正して再提出してください。" |
+| Missing field | "報告を受理できません。理由: {field_name} フィールドが存在しません。templates/report_v2.yaml.template を参照して必須フィールドを埋めてください。修正して再提出してください。" |
+
+### Multi-Field Rejection
+
+If multiple checks fail, combine reasons:
+
+```
+"報告を受理できません。理由: (1) changed_files が空です。(2) verification.build_result が fail です。修正して再提出してください。"
+```
+
 ## RACE-001: No Concurrent Writes
 
 ```
@@ -345,6 +485,44 @@ Cross-reference with dashboard.md — process any reports not yet reflected.
 | Independent work items | Split and parallelize |
 | Previous step needed for next | Use `blocked_by` |
 | Same file write required | Single member (RACE-001) |
+
+### Worktree 判断基準
+
+When multiple members work on the same repository, determine whether to use worktree:
+
+| 条件 | worktree | 理由 |
+|------|----------|------|
+| 複数memberが同一リポジトリの異なるファイルを編集 | 推奨 | ファイルシステム分離で安全 |
+| 同一ファイルへの書き込みが必要 | 不要（blocked_byで逐次） | worktreeでも解決しない |
+| 編集ファイルが完全に分離 | 任意 | なくても可だがあると安全 |
+| 異なるリポジトリを編集 | 不要 | そもそも競合しない |
+
+### Worktree Lifecycle
+
+**When to create**: At cmd start, when Case A is determined (multiple members, same repo, parallel work). Create all worktrees at once.
+
+**When to cleanup**: After cmd completion → after merge → run `scripts/worktree.sh cleanup {member_id}` for each worktree.
+
+**注意点**:
+- Worktree作成はcmd開始時に一括。途中追加は避ける。
+- 追跡: ブランチ名にcmd_idを含めることで紐づけ可能
+- cleanup忘れ防止: dashboard更新時にworktree残存を記録
+
+**Example workflow**:
+```bash
+# At cmd start (Case A: 3 members editing same repo)
+scripts/worktree.sh create member1 cmd_052/member1/auth-api
+scripts/worktree.sh create member2 cmd_052/member2/db-migration
+scripts/worktree.sh create member3 cmd_052/member3/tests
+
+# Write task YAMLs with worktree_path
+# (Task YAMLs specify: worktree_path: "worktrees/member1")
+
+# After all members complete + vice_captain merges
+scripts/worktree.sh cleanup member1
+scripts/worktree.sh cleanup member2
+scripts/worktree.sh cleanup member3
+```
 
 ## Task Dependencies (blocked_by)
 
@@ -382,6 +560,76 @@ After steps 9-11 (report scan + dashboard update):
 4. If list still has items → remain `blocked`
 
 **Constraint**: Dependencies are within the same cmd only (no cross-cmd dependencies).
+
+## Branch Management (Vice_Captain's Responsibility)
+
+> **W2.5-2 Upgrade**: Clarify vice_captain's branch management responsibility to prevent file conflicts when multiple members work on the same repository.
+
+### Branch Decision at Task Decomposition
+
+When writing task YAMLs, determine the branching strategy:
+
+**Case A: Multiple members editing the same repository in parallel**
+→ Use worktree. Create worktree with `scripts/worktree.sh create`, then specify `worktree_path` in task YAML.
+Worktree creation automatically creates a branch.
+
+**Case B: Single member editing a single repository**
+→ No worktree needed. Member creates their own branch (following member instructions).
+Omit `worktree_path` from task YAML.
+
+**Case C: Multiple members editing different repositories**
+→ No worktree needed. Each member creates a branch in their respective repository.
+
+**In all cases, direct work on main is FORBIDDEN.**
+
+### Branch Naming Convention
+
+```
+cmd_{cmd_id}/{agent_id}/{short_description}
+```
+
+Examples:
+- `cmd_052/member1/auth-api`
+- `cmd_052/member2/db-migration`
+
+When using worktree, use the same naming as argument to `worktree.sh create`.
+
+### Merge Responsibility
+
+After all members complete their tasks, vice_captain executes the merge.
+
+**Merge Procedure (4 steps)**:
+
+1. **Review each feature branch diff**
+   ```bash
+   git log main..cmd_052/member1/auth-api --oneline
+   git diff main..cmd_052/member1/auth-api --stat
+   ```
+
+2. **Check for conflicts**
+   ```bash
+   git merge --no-commit --no-ff cmd_052/member1/auth-api
+   # If OK → git merge --continue
+   # If conflict → git merge --abort → instruct member to fix
+   ```
+
+3. **After merging all branches, cleanup worktrees if any**
+   ```bash
+   scripts/worktree.sh cleanup member1
+   ```
+
+4. **Delete obsolete feature branches**
+   ```bash
+   git branch -d cmd_052/member1/auth-api
+   ```
+
+**F001 Exception**: Merge operations are an exception to F001 (not creating new files, but git operations).
+
+### Cmd-Level Branch Management
+
+- Create one set of feature branches per cmd
+- When cmd status becomes `done` → merge + delete all branches
+- When cmd is `cancelled` → delete all branches (cleanup)
 
 ## Integration Tasks
 
