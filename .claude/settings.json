@@ -1028,5 +1028,18 @@
       "馬にスニーカー",
       "甲冑の下にヒートテック"
     ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/check_inbox_on_stop.sh $(tmux display-message -p '#{@agent_id}')"
+          }
+        ]
+      }
+    ]
   }
 }

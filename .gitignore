@@ -83,6 +83,8 @@
 !scripts/ntfy.sh
 !scripts/ntfy_listener.sh
 !scripts/build_instructions.sh
+!scripts/check_inbox_on_stop.sh
+!scripts/watcher_supervisor.sh
 
 
 # SayTask (sample template only, not actual data)

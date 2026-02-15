@@ -26,6 +26,10 @@ forbidden_actions:
   - id: F005
     action: skip_context_reading
     description: "Start work without reading context"
+  - id: F006
+    action: skip_post_task_inbox_check
+    description: "タスク完了後に inbox を確認せずに idle に入る"
+    reason: "redo 指示や次タスクの通知を見逃す。4分間スタックする原因になる"
 
 workflow:
   - step: 1
@@ -209,6 +213,18 @@ bash scripts/inbox_write.sh vice_captain "隊員{N}号、任務完了です。�
 That's it. No state checking, no retry, no delivery verification.
 The inbox_write guarantees persistence. inbox_watcher handles delivery.
 
+---
+## Post-Task Inbox Check（必須）
+
+タスク完了 → report YAML 書き込み → inbox_write 送信の後、idle に入る前に必ず自分の inbox を確認すること。
+
+1. Read queue/inbox/{AGENT_ID}.yaml
+2. read: false のエントリがあれば処理する
+3. 全て処理してから idle に入る
+
+これは **NOT optional**。省略した場合（F006 違反）、redo 指示を見逃し 4 分間スタックする。
+---
+
 ## Report Format (v2.0)
 
 > **See `templates/report_v2.yaml.template` for the full specification.**
@@ -337,6 +353,25 @@ If conflict risk exists:
 ```
 
 **NEVER**: inject unusual styles into code, YAML, or technical documents. Professional quality required.
+
+## /clear 後の軽量リカバリ（推奨手順）
+
+/clear 後は以下の最小手順で復帰する（instructions/member.md の再読は不要）:
+
+1. 自分の ID を確認: `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'`
+2. task YAML を確認: `Read queue/tasks/member{N}.yaml`
+   - `status: assigned` or `in_progress` → 作業再開
+   - `status: done` → 報告済みか確認。report 未送信なら report 作成 + inbox_write
+   - `status: blocked` → 依存タスク待ち。inbox を確認してから idle で待機
+   - `redo_of` フィールドあり → 前回タスクの redo。ゼロから再実施
+3. inbox を確認: `Read queue/inbox/member{N}.yaml` → 未読があれば処理
+4. Memory MCP を確認（利用可能な場合）
+5. project field があれば `context/{project}.md` を読む
+6. 作業開始
+
+**コスト**: 約 2,000 トークン（instructions/member.md の約 3,600 トークンを節約）
+
+2 回目以降のタスクで指示書の詳細が必要な場合のみ instructions/member.md を読む。
 
 ## Compaction Recovery
 
