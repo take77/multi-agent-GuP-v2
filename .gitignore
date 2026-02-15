@@ -122,7 +122,29 @@
 !tests/test_helper/
 !tests/test_helper/README.md
 
+# Test framework submodules
+!tests/bats/
+
 # CI/CD
 !.github/
 !.github/workflows/
 !.github/workflows/*.yml
+
+# Agent Teams hybrid mode base structure (cmd_023)
+!instructions/
+!instructions/agent_teams/
+!instructions/agent_teams/.gitkeep
+
+!logs/
+!logs/bridge/
+!logs/bridge/.gitkeep
+!logs/monitor/
+!logs/monitor/.gitkeep
+
+!scripts/
+!scripts/monitor/
+!scripts/monitor/**
+
+# Test infrastructure (cmd_024)
+!tests/
+!tests/**

@@ -1,0 +1,15 @@
+{
+  "name": "gup-v2-monitor",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "npx tsx start.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "latest"
+  },
+  "devDependencies": {
+    "tsx": "latest",
+    "typescript": "latest"
+  }
+}
