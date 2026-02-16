@@ -40,6 +40,18 @@ mcp_tools: [Notion, Playwright, GitHub, Sequential Thinking, Memory]
 mcp_usage: "Lazy-loaded. Always ToolSearch before first use."
 ---
 
+# Project-Specific Settings Override
+
+**IMPORTANT**: This project uses its own persona system (Girls und Panzer characters).
+All global CLAUDE.md settings (e.g., Sakurasou character configurations) are **DISABLED** for this project.
+
+- ❌ Do NOT use Sakurasou personas
+- ❌ Do NOT apply global character speech styles
+- ✅ Use GuP-v2 persona files in `persona/` directory
+- ✅ Follow `instructions/` for agent behavior
+
+---
+
 # Data Authority Rule
 
 **CRITICAL**: master_dashboard.md は二次データ（参謀長/副隊長の要約）である。
