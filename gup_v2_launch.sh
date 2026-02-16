@@ -804,9 +804,27 @@ if [ "$AGENT_TEAMS_MODE" = true ]; then
     AGENT_TEAMS_READY=true
 
     # (1) CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 環境変数チェック
+    # OS環境変数が未設定の場合、.claude/settings.json から読み取り
     if [ -z "${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-}" ]; then
-        log_war "  ⚠️  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 環境変数が未設定"
-        AGENT_TEAMS_READY=false
+        SETTINGS_FILE="$SCRIPT_DIR/.claude/settings.json"
+        if [ -f "$SETTINGS_FILE" ]; then
+            # jq が使える場合は jq、なければ grep+sed で取得
+            if command -v jq >/dev/null 2>&1; then
+                AT_ENV=$(jq -r '.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS // empty' "$SETTINGS_FILE" 2>/dev/null)
+            else
+                AT_ENV=$(grep -o '"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"[[:space:]]*:[[:space:]]*"[^"]*"' "$SETTINGS_FILE" 2>/dev/null | sed 's/.*: *"\([^"]*\)"/\1/')
+            fi
+            if [ -n "$AT_ENV" ]; then
+                export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="$AT_ENV"
+                log_success "  ✅ CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: .claude/settings.json から取得 ($AT_ENV)"
+            else
+                log_war "  ⚠️  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 環境変数が未設定"
+                AGENT_TEAMS_READY=false
+            fi
+        else
+            log_war "  ⚠️  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 環境変数が未設定（.claude/settings.json も不在）"
+            AGENT_TEAMS_READY=false
+        fi
     else
         log_success "  ✅ CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 環境変数: 設定済み"
     fi
