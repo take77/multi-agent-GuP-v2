@@ -57,6 +57,7 @@ scripts/monitor/node_modules/
 !lib/
 !lib/cli_adapter.sh
 !lib/ntfy_auth.sh
+!lib/launch_common.sh
 
 # Multi-CLI: Codex auto-load file
 !AGENTS.md
@@ -66,6 +67,8 @@ scripts/monitor/node_modules/
 !first_setup.sh
 !setup.sh
 !install.bat
+!gup_v2_launch.sh
+!gup_v2_launch_hybrid.sh
 
 # Development tooling
 !Makefile

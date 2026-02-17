@@ -1,19 +1,27 @@
 #!/bin/bash
-# 🏯 multi-agent-GuP-v2 発進スクリプト（毎日の起動用）
-# Daily Deployment Script for Multi-Agent Orchestration System
+# 🏯 multi-agent-GuP-v2 発進スクリプト（Agent Teams ハイブリッドモード専用）
+# Agent Teams Hybrid Mode Launcher — gup_v2_launch.sh から分離された実験的機能専用ランチャー
 #
 # 使用方法:
-#   ./gup_v2_launch.sh           # 全エージェント起動（前回の状態を維持）
-#   ./gup_v2_launch.sh -c        # キューをリセットして起動（クリーンスタート）
-#   ./gup_v2_launch.sh -s        # セットアップのみ（Claude起動なし）
-#   ./gup_v2_launch.sh -h        # ヘルプ表示
+#   ./gup_v2_launch_hybrid.sh           # 全エージェント起動（Agent Teams モード）
+#   ./gup_v2_launch_hybrid.sh -c        # キューをリセットして起動（クリーンスタート）
+#   ./gup_v2_launch_hybrid.sh -s        # セットアップのみ（Claude起動なし）
+#   ./gup_v2_launch_hybrid.sh -h        # ヘルプ表示
+#
+# 注意: このスクリプトは常に Agent Teams モードで動作します。
+#       YAML-only モードは gup_v2_launch.sh を使用してください。
 
 set -e
 
 # スクリプトのディレクトリを取得
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/lib/launch_common.sh"
 cd "$SCRIPT_DIR"
+
+# 共通関数ライブラリ読み込み（launch_squad_cluster等の共通関数）
+source "$SCRIPT_DIR/lib/launch_common.sh"
+
+# このスクリプトは常に Agent Teams モード
+AGENT_TEAMS_MODE=true
 
 # 言語設定を読み取り（デフォルト: ja）
 LANG_SETTING="ja"
@@ -47,7 +55,6 @@ SILENT_MODE=false
 SHELL_OVERRIDE=""
 CLUSTER_MODE=""  # "" = 従来モード, "darjeeling" = ダージリン隊のみ, "all" = 全クラスタ
 COMMAND_SERVER_MODE=false  # --command: 司令部サーバーのみ起動
-AGENT_TEAMS_MODE=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -86,9 +93,12 @@ while [[ $# -gt 0 ]]; do
             ;;
         -h|--help)
             echo ""
-            echo "🏯 multi-agent-captain 発進スクリプト"
+            echo "🏯 multi-agent-captain 発進スクリプト（Agent Teams ハイブリッドモード専用）"
             echo ""
-            echo "使用方法: ./gup_v2_launch.sh [オプション]"
+            echo "使用方法: ./gup_v2_launch_hybrid.sh [オプション]"
+            echo ""
+            echo "このスクリプトは常に Agent Teams モードで動作します。"
+            echo "YAML-only モードは ./gup_v2_launch.sh を使用してください。"
             echo ""
             echo "オプション:"
             echo "  -c, --clean         キューとダッシュボードをリセットして起動（クリーンスタート）"
@@ -101,45 +111,15 @@ while [[ $# -gt 0 ]]; do
             echo "                      未指定時は config/settings.yaml の設定を使用"
             echo "  -S, --silent        サイレントモード（隊員のecho表示を無効化・API節約）"
             echo "                      未指定時はshoutモード（タスク完了時にecho表示）"
-            echo "  --cluster <name>    指定クラスタのみ起動（例: --cluster darjeeling, --cluster katyusha）"
-            echo "                      デフォルトtmuxサーバーに統合されたセッションとして起動"
+            echo "  --cluster <name>    指定クラスタのみ起動（例: --cluster darjeeling）"
             echo "  --command           司令部サーバーのみ起動（大隊長+参謀長の2ペイン）"
-            echo "                      デフォルトtmuxサーバーにcommandセッションとして起動"
-            echo "  --all-clusters      全クラスタ起動（将来用、現在はスタブ）"
-            echo "  --agent-teams       Agent Teams モード有効化（Phase 0適用が前提）"
-            echo "                      参謀長モニタプロセスを起動し、YAML↔Agent Teams双方向連携を有効化"
+            echo "  --all-clusters      全クラスタ起動"
             echo "  -h, --help          このヘルプを表示"
             echo ""
             echo "例:"
-            echo "  ./gup_v2_launch.sh              # 前回の状態を維持して発進"
-            echo "  ./gup_v2_launch.sh -c           # クリーンスタート（キューリセット）"
-            echo "  ./gup_v2_launch.sh -s           # セットアップのみ（手動でClaude起動）"
-            echo "  ./gup_v2_launch.sh -t           # 全エージェント起動 + ターミナルタブ展開"
-            echo "  ./gup_v2_launch.sh -shell bash  # bash用プロンプトで起動"
-            echo "  ./gup_v2_launch.sh -k           # 決戦モード（全隊員Opus）"
-            echo "  ./gup_v2_launch.sh -c -k         # クリーンスタート＋決戦モード"
-            echo "  ./gup_v2_launch.sh -shell zsh   # zsh用プロンプトで起動"
-            echo "  ./gup_v2_launch.sh --captain-no-thinking  # 大隊長のthinkingを無効化（中継特化）"
-            echo "  ./gup_v2_launch.sh -S           # サイレントモード（echo表示なし）"
-            echo ""
-            echo "モデル構成:"
-            echo "  大隊長/参謀長: Opus（--captain-no-thinkingで大隊長のthinking無効化）"
-            echo "  隊長/副隊長:   Opus"
-            echo "  隊員1-4:   Sonnet"
-            echo "  隊員5-8:   Opus"
-            echo ""
-            echo "隊形:"
-            echo "  平時の隊（デフォルト）: 隊員1-4=Sonnet, 隊員5-8=Opus"
-            echo "  決戦モード（--kessen）:   全隊員=Opus"
-            echo ""
-            echo "表示モード:"
-            echo "  shout（デフォルト）:  タスク完了時にecho表示"
-            echo "  silent（--silent）:   echo表示なし（API節約）"
-            echo ""
-            echo "エイリアス:"
-            echo "  csst  → cd /mnt/c/tools/multi-agent-captain && ./gup_v2_launch.sh"
-            echo "  css   → tmux attach-session -t command"
-            echo "  csm   → tmux attach -t darjeeling"
+            echo "  ./gup_v2_launch_hybrid.sh        # Agent Teams モードで全エージェント起動"
+            echo "  ./gup_v2_launch_hybrid.sh -c     # クリーンスタート"
+            echo "  ./gup_v2_launch_hybrid.sh -s     # セットアップのみ（手動でClaude起動）"
             echo ""
             exit 0
             ;;
@@ -161,13 +141,13 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --agent-teams)
-            echo "⚠️  Agent Teams モードは gup_v2_launch_hybrid.sh を使用してください"
-            echo "  ./gup_v2_launch_hybrid.sh $*"
+            echo "⚠️  このスクリプトは既に Agent Teams モードで動作しています。"
+            echo "    YAML-only モードには ./gup_v2_launch.sh を使用してください。"
             exit 1
             ;;
         *)
             echo "不明なオプション: $1"
-            echo "./gup_v2_launch.sh -h でヘルプを表示"
+            echo "./gup_v2_launch_hybrid.sh -h でヘルプを表示"
             exit 1
             ;;
     esac
@@ -189,53 +169,11 @@ fi
 check_dependencies
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ダージリン隊クラスタ起動関数
+# 発進バナー表示
 # ═══════════════════════════════════════════════════════════════════════════════
-launch_darjeeling_cluster() {
-    launch_squad_cluster "darjeeling" "🫖" "ダージリン隊" \
-        "darjeeling,pekoe,hana,rosehip,marie,oshida,andou" \
-        "ダージリン,オレンジペコ,五十鈴華,ローズヒップ,マリー,押田,安藤" \
-        "captain,vice_captain,member,member,member,member,member" \
-        "magenta,red,blue,blue,blue,blue,blue"
-}
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# カチューシャ隊クラスタ起動関数
-# ═══════════════════════════════════════════════════════════════════════════════
-launch_katyusha_cluster() {
-    launch_squad_cluster "katyusha" "🪆" "カチューシャ隊" \
-        "katyusha,nonna,klara,mako,erwin,caesar,saori" \
-        "カチューシャ,ノンナ,クラーラ,冷泉麻子,エルヴィン,カエサル,武部沙織" \
-        "captain,vice_captain,member,member,member,member,member" \
-        "magenta,red,blue,blue,blue,blue,blue"
-}
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ケイ隊クラスタ起動関数
-# ═══════════════════════════════════════════════════════════════════════════════
-launch_kay_cluster() {
-    launch_squad_cluster "kay" "🦅" "ケイ隊" \
-        "kay,arisa,naomi,anchovy,pepperoni,carpaccio,yukari" \
-        "ケイ,アリサ,ナオミ,アンチョビ,ペパロニ,カルパッチョ,秋山優花里" \
-        "captain,vice_captain,member,member,member,member,member" \
-        "magenta,red,blue,blue,blue,blue,blue"
-}
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 西住まほ隊クラスタ起動関数
-# ═══════════════════════════════════════════════════════════════════════════════
-launch_maho_cluster() {
-    launch_squad_cluster "maho" "🖤" "西住まほ隊" \
-        "maho,erika,mika,aki,mikko,kinuyo,fukuda" \
-        "西住まほ,逸見エリカ,ミカ,アキ,ミッコ,西絹代,福田" \
-        "captain,vice_captain,member,member,member,member,member" \
-        "magenta,red,blue,blue,blue,blue,blue"
-}
-
-# バナー表示実行
 show_battle_cry
 
-echo -e "  \033[1;33mパンツァー・フォー！隊立てを開始します\033[0m (Setting up the battlefield)"
+echo -e "  \033[1;33mパンツァー・フォー！隊立てを開始します\033[0m (Agent Teams ハイブリッドモード)"
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -256,34 +194,74 @@ if [ -n "$CLUSTER_MODE" ]; then
         darjeeling)
             log_info "🫖 クラスタモード: ダージリン隊のみ起動"
             check_dependencies
-            launch_darjeeling_cluster
+            launch_squad_cluster "darjeeling" "🫖" "ダージリン隊" \
+                "darjeeling,pekoe,hana,rosehip,marie,oshida,andou" \
+                "ダージリン,オレンジペコ,五十鈴華,ローズヒップ,マリー,押田,安藤" \
+                "captain,vice_captain,member,member,member,member,member" \
+                "magenta,red,blue,blue,blue,blue,blue" \
+                true
             exit 0
             ;;
         katyusha)
             log_info "🪆 クラスタモード: カチューシャ隊のみ起動"
             check_dependencies
-            launch_katyusha_cluster
+            launch_squad_cluster "katyusha" "🪆" "カチューシャ隊" \
+                "katyusha,nonna,klara,mako,erwin,caesar,saori" \
+                "カチューシャ,ノンナ,クラーラ,冷泉麻子,エルヴィン,カエサル,武部沙織" \
+                "captain,vice_captain,member,member,member,member,member" \
+                "magenta,red,blue,blue,blue,blue,blue" \
+                true
             exit 0
             ;;
         kay)
             log_info "🦅 クラスタモード: ケイ隊のみ起動"
             check_dependencies
-            launch_kay_cluster
+            launch_squad_cluster "kay" "🦅" "ケイ隊" \
+                "kay,arisa,naomi,anchovy,pepperoni,carpaccio,yukari" \
+                "ケイ,アリサ,ナオミ,アンチョビ,ペパロニ,カルパッチョ,秋山優花里" \
+                "captain,vice_captain,member,member,member,member,member" \
+                "magenta,red,blue,blue,blue,blue,blue" \
+                true
             exit 0
             ;;
         maho)
             log_info "🖤 クラスタモード: 西住まほ隊のみ起動"
             check_dependencies
-            launch_maho_cluster
+            launch_squad_cluster "maho" "🖤" "西住まほ隊" \
+                "maho,erika,mika,aki,mikko,kinuyo,fukuda" \
+                "西住まほ,逸見エリカ,ミカ,アキ,ミッコ,西絹代,福田" \
+                "captain,vice_captain,member,member,member,member,member" \
+                "magenta,red,blue,blue,blue,blue,blue" \
+                true
             exit 0
             ;;
         all)
             log_info "🌐 クラスタモード: 全クラスタ起動"
             check_dependencies
-            launch_darjeeling_cluster
-            launch_katyusha_cluster
-            launch_kay_cluster
-            launch_maho_cluster
+            launch_squad_cluster "darjeeling" "🫖" "ダージリン隊" \
+                "darjeeling,pekoe,hana,rosehip,marie,oshida,andou" \
+                "ダージリン,オレンジペコ,五十鈴華,ローズヒップ,マリー,押田,安藤" \
+                "captain,vice_captain,member,member,member,member,member" \
+                "magenta,red,blue,blue,blue,blue,blue" \
+                true
+            launch_squad_cluster "katyusha" "🪆" "カチューシャ隊" \
+                "katyusha,nonna,klara,mako,erwin,caesar,saori" \
+                "カチューシャ,ノンナ,クラーラ,冷泉麻子,エルヴィン,カエサル,武部沙織" \
+                "captain,vice_captain,member,member,member,member,member" \
+                "magenta,red,blue,blue,blue,blue,blue" \
+                true
+            launch_squad_cluster "kay" "🦅" "ケイ隊" \
+                "kay,arisa,naomi,anchovy,pepperoni,carpaccio,yukari" \
+                "ケイ,アリサ,ナオミ,アンチョビ,ペパロニ,カルパッチョ,秋山優花里" \
+                "captain,vice_captain,member,member,member,member,member" \
+                "magenta,red,blue,blue,blue,blue,blue" \
+                true
+            launch_squad_cluster "maho" "🖤" "西住まほ隊" \
+                "maho,erika,mika,aki,mikko,kinuyo,fukuda" \
+                "西住まほ,逸見エリカ,ミカ,アキ,ミッコ,西絹代,福田" \
+                "captain,vice_captain,member,member,member,member,member" \
+                "magenta,red,blue,blue,blue,blue,blue" \
+                true
             exit 0
             ;;
         *)
@@ -315,7 +293,6 @@ if [ "$CLEAN_MODE" = true ]; then
         fi
     fi
 
-    # 既存の dashboard.md 判定の後に追加
     if [ -f "./queue/captain_to_vice_captain.yaml" ]; then
         if grep -q "id: cmd_" "./queue/captain_to_vice_captain.yaml" 2>/dev/null; then
             NEED_BACKUP=true
@@ -347,6 +324,16 @@ if [ ! -L ./queue/inbox ]; then
     ln -sf "$INBOX_LINUX_DIR" ./queue/inbox
     log_info "  └─ inbox → Linux FS ($INBOX_LINUX_DIR) にシンボリックリンク作成"
 fi
+
+# Agent Teams ハイブリッド用: クラスタキューディレクトリを事前作成
+log_info "📁 クラスタキューディレクトリを作成中..."
+for cluster in darjeeling katyusha kay maho; do
+    mkdir -p "$SCRIPT_DIR/clusters/$cluster/queue/tasks"
+    mkdir -p "$SCRIPT_DIR/clusters/$cluster/queue/reports"
+    mkdir -p "$SCRIPT_DIR/clusters/$cluster/queue/briefings"
+    mkdir -p "$SCRIPT_DIR/clusters/$cluster/queue/inbox"
+    log_info "  └─ clusters/$cluster/queue/ 作成完了"
+done
 
 if [ "$CLEAN_MODE" = true ]; then
     log_info "📜 前回の作戦記録を破棄中..."
@@ -406,7 +393,6 @@ if [ "$CLEAN_MODE" = true ]; then
     TIMESTAMP=$(date "+%Y-%m-%d %H:%M")
 
     if [ "$LANG_SETTING" = "ja" ]; then
-        # 日本語のみ
         cat > ./dashboard.md << EOF
 # 📊 戦況報告
 最終更新: ${TIMESTAMP}
@@ -434,7 +420,6 @@ if [ "$CLEAN_MODE" = true ]; then
 なし
 EOF
     else
-        # 日本語 + 翻訳併記
         cat > ./dashboard.md << EOF
 # 📊 戦況報告 (Battle Status Report)
 最終更新 (Last Updated): ${TIMESTAMP}
@@ -487,73 +472,68 @@ if ! command -v tmux &> /dev/null; then
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 4.5: Agent Teams 環境チェック（--agent-teams 指定時のみ）
+# STEP 4.5（HYBRID-ONLY）: Agent Teams 環境チェック
+# ─── フォールバックなし — 失敗時はエラー終了（明示的に失敗させる）
 # ═══════════════════════════════════════════════════════════════════════════════
-if [ "$AGENT_TEAMS_MODE" = true ]; then
-    log_info "🔍 Agent Teams 環境チェック中..."
+log_info "🔍 Agent Teams 環境チェック中..."
 
-    AGENT_TEAMS_READY=true
-
-    # (1) CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 環境変数チェック
-    # OS環境変数が未設定の場合、.claude/settings.json から読み取り
-    if [ -z "${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-}" ]; then
-        SETTINGS_FILE="$SCRIPT_DIR/.claude/settings.json"
-        if [ -f "$SETTINGS_FILE" ]; then
-            # jq が使える場合は jq、なければ grep+sed で取得
-            if command -v jq >/dev/null 2>&1; then
-                AT_ENV=$(jq -r '.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS // empty' "$SETTINGS_FILE" 2>/dev/null)
-            else
-                AT_ENV=$(grep -o '"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"[[:space:]]*:[[:space:]]*"[^"]*"' "$SETTINGS_FILE" 2>/dev/null | sed 's/.*: *"\([^"]*\)"/\1/')
-            fi
-            if [ -n "$AT_ENV" ]; then
-                export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="$AT_ENV"
-                log_success "  ✅ CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: .claude/settings.json から取得 ($AT_ENV)"
-            else
-                log_war "  ⚠️  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 環境変数が未設定"
-                AGENT_TEAMS_READY=false
-            fi
+# (1) CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 環境変数チェック
+# OS環境変数が未設定の場合、.claude/settings.json から読み取り
+if [ -z "${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-}" ]; then
+    SETTINGS_FILE="$SCRIPT_DIR/.claude/settings.json"
+    if [ -f "$SETTINGS_FILE" ]; then
+        # jq が使える場合は jq、なければ grep+sed で取得
+        if command -v jq >/dev/null 2>&1; then
+            AT_ENV=$(jq -r '.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS // empty' "$SETTINGS_FILE" 2>/dev/null)
         else
-            log_war "  ⚠️  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 環境変数が未設定（.claude/settings.json も不在）"
-            AGENT_TEAMS_READY=false
+            AT_ENV=$(grep -o '"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"[[:space:]]*:[[:space:]]*"[^"]*"' "$SETTINGS_FILE" 2>/dev/null | sed 's/.*: *"\([^"]*\)"/\1/')
+        fi
+        if [ -n "$AT_ENV" ]; then
+            export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="$AT_ENV"
+            log_success "  ✅ CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: .claude/settings.json から取得 ($AT_ENV)"
+        else
+            log_war "  ❌ CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS が未設定です"
+            log_war "     .claude/settings.json の env セクションに設定するか、環境変数として export してください"
+            exit 1
         fi
     else
-        log_success "  ✅ CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 環境変数: 設定済み"
+        log_war "  ❌ CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS が未設定です（.claude/settings.json も不在）"
+        log_war "     export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 を実行するか"
+        log_war "     .claude/settings.json に設定してください"
+        exit 1
     fi
-
-    # (2) Phase 0 適用チェック（scripts/check_inbox_on_stop.sh の存在確認）
-    if [ ! -f "$SCRIPT_DIR/scripts/check_inbox_on_stop.sh" ]; then
-        log_war "  ⚠️  Phase 0 未適用: scripts/check_inbox_on_stop.sh が見つかりません"
-        AGENT_TEAMS_READY=false
-    else
-        log_success "  ✅ Phase 0 適用済み: scripts/check_inbox_on_stop.sh 確認"
-    fi
-
-    # (3) Node.js 存在チェック
-    if ! command -v node >/dev/null 2>&1; then
-        log_war "  ⚠️  Node.js が見つかりません（参謀長モニタ起動不可）"
-        AGENT_TEAMS_READY=false
-    else
-        NODE_VERSION=$(node --version 2>/dev/null)
-        log_success "  ✅ Node.js 確認: $NODE_VERSION"
-    fi
-
-    # 全チェック失敗時はフォールバック
-    if [ "$AGENT_TEAMS_READY" = false ]; then
-        log_war "  ⚠️  Agent Teams 環境チェック失敗 → AGENT_TEAMS_MODE=false にフォールバック"
-        AGENT_TEAMS_MODE=false
-    else
-        log_success "  ✅ Agent Teams 環境チェック完了"
-    fi
-    echo ""
+else
+    log_success "  ✅ CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 環境変数: 設定済み"
 fi
+
+# (2) Phase 0 適用チェック（scripts/check_inbox_on_stop.sh の存在確認）
+if [ ! -f "$SCRIPT_DIR/scripts/check_inbox_on_stop.sh" ]; then
+    log_war "  ❌ Phase 0 未適用: scripts/check_inbox_on_stop.sh が見つかりません"
+    log_war "     Agent Teams ハイブリッドモードには Phase 0 の適用が必須です"
+    exit 1
+else
+    log_success "  ✅ Phase 0 適用済み: scripts/check_inbox_on_stop.sh 確認"
+fi
+
+# (3) Node.js 存在チェック（参謀長モニタプロセス用）
+if ! command -v node >/dev/null 2>&1; then
+    log_war "  ❌ Node.js が見つかりません（参謀長モニタ起動不可）"
+    log_war "     Node.js をインストールしてください: https://nodejs.org/"
+    exit 1
+else
+    NODE_VERSION=$(node --version 2>/dev/null)
+    log_success "  ✅ Node.js 確認: $NODE_VERSION"
+fi
+
+log_success "  ✅ Agent Teams 環境チェック完了"
+echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 5: 司令部（command）セッション作成（大隊長 + 参謀長の2ペイン）
 # ═══════════════════════════════════════════════════════════════════════════════
 log_war "👑 司令部を構築中..."
 
-# command セッションがなければ作る（-s 時もここで必ず command が存在するようにする）
-# window 0 のみ作成し -n main で名前付け（第二 window にするとアタッチ時に空ペインが開くため 1 window に限定）
+# command セッションがなければ作る
 if ! tmux has-session -t command 2>/dev/null; then
     tmux new-session -d -s command -n main
 fi
@@ -578,30 +558,32 @@ tmux send-keys -t command:main.1 "cd \"$(pwd)\" && export PS1='${MIHO_PROMPT}' &
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 5.5: Agent Teams 設定追加（--agent-teams 指定時のみ）
+# STEP 5.5（HYBRID-ONLY）: Agent Teams 設定
 # ═══════════════════════════════════════════════════════════════════════════════
-if [ "$AGENT_TEAMS_MODE" = true ]; then
-    log_info "🔗 Agent Teams モード設定中..."
+log_info "🔗 Agent Teams モード設定中..."
 
-    # (1) tmux 環境変数設定
-    tmux set-environment -t command GUP_AGENT_TEAMS_ACTIVE 1
-    log_success "  ✅ GUP_AGENT_TEAMS_ACTIVE=1 設定完了"
+# (1) tmux セッション環境変数設定
+tmux set-environment -t command GUP_AGENT_TEAMS_ACTIVE 1
+log_success "  ✅ GUP_AGENT_TEAMS_ACTIVE=1 設定完了"
 
-    # (2) 参謀長モニタプロセスをバックグラウンド起動
-    if [ -d "$SCRIPT_DIR/scripts/monitor" ] && [ -f "$SCRIPT_DIR/scripts/monitor/start.ts" ]; then
-        cd "$SCRIPT_DIR/scripts/monitor"
-        npx tsx start.ts >> "$SCRIPT_DIR/logs/monitor.log" 2>&1 &
-        MONITOR_PID=$!
-        cd "$SCRIPT_DIR"
+tmux set-environment -t command CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 1
+log_success "  ✅ CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 設定完了"
 
-        tmux set-environment -t command GUP_MONITOR_PID "$MONITOR_PID"
-        log_success "  ✅ 参謀長モニタプロセス起動完了（PID: $MONITOR_PID）"
-    else
-        log_war "  ⚠️  scripts/monitor/start.ts が見つかりません（モニタ起動スキップ）"
-    fi
+# (2) 参謀長モニタプロセスをバックグラウンド起動
+if [ -d "$SCRIPT_DIR/scripts/monitor" ] && [ -f "$SCRIPT_DIR/scripts/monitor/start.ts" ]; then
+    mkdir -p "$SCRIPT_DIR/logs"
+    cd "$SCRIPT_DIR/scripts/monitor"
+    npx tsx start.ts >> "$SCRIPT_DIR/logs/monitor.log" 2>&1 &
+    MONITOR_PID=$!
+    cd "$SCRIPT_DIR"
 
-    echo ""
+    tmux set-environment -t command GUP_MONITOR_PID "$MONITOR_PID"
+    log_success "  ✅ 参謀長モニタプロセス起動完了（PID: $MONITOR_PID）"
+else
+    log_war "  ⚠️  scripts/monitor/start.ts が見つかりません（モニタ起動スキップ）"
 fi
+
+echo ""
 
 # pane-base-index を取得（1 の環境ではペインは 1,2,... になる）
 PANE_BASE=$(tmux show-options -gv pane-base-index 2>/dev/null || echo 0)
@@ -627,6 +609,23 @@ if [ "$SETUP_ONLY" = false ]; then
 
     log_war "👑 全軍に Claude Code を召喚中..."
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # STEP 6（HYBRID修正）: Claude 起動前にペインシェルへ環境変数を注入
+    # Agent Teams 機能を有効にするため、CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS と
+    # GUP_AGENT_TEAMS_ACTIVE を各ペインのシェル環境に注入する
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # 大隊長（anzu）ペイン: 環境変数注入
+    tmux send-keys -t "command:main.${PANE_BASE}" \
+        "export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 GUP_AGENT_TEAMS_ACTIVE=1" Enter
+    log_info "  └─ 大隊長ペインに Agent Teams 環境変数を注入完了"
+
+    # 参謀長（miho）ペイン: 環境変数注入
+    _miho_pane=$((PANE_BASE + 1))
+    tmux send-keys -t "command:main.${_miho_pane}" \
+        "export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 GUP_AGENT_TEAMS_ACTIVE=1" Enter
+    log_info "  └─ 参謀長ペインに Agent Teams 環境変数を注入完了"
+
     # 大隊長（anzu）: CLI Adapter経由でコマンド構築
     _anzu_cli_type="claude"
     _anzu_cmd="claude --model opus --dangerously-skip-permissions"
@@ -634,7 +633,6 @@ if [ "$SETUP_ONLY" = false ]; then
         _anzu_cli_type=$(get_cli_type "anzu")
         _anzu_cmd=$(build_cli_command "anzu")
     fi
-    # 大隊長（anzu）ペインに明示的に送信（.${PANE_BASE}でpane-base-index対応）
     tmux set-option -p -t "command:main.${PANE_BASE}" @agent_cli "$_anzu_cli_type"
     if [ "$CAPTAIN_NO_THINKING" = true ] && [ "$_anzu_cli_type" = "claude" ]; then
         tmux send-keys -t "command:main.${PANE_BASE}" "MAX_THINKING_TOKENS=0 $_anzu_cmd"
@@ -655,8 +653,6 @@ if [ "$SETUP_ONLY" = false ]; then
         _miho_cli_type=$(get_cli_type "miho")
         _miho_cmd=$(build_cli_command "miho")
     fi
-    # 参謀長ペインに明示的に送信（PANE_BASE+1でpane-base-index対応）
-    _miho_pane=$((PANE_BASE + 1))
     tmux set-option -p -t "command:main.${_miho_pane}" @agent_cli "$_miho_cli_type"
     tmux send-keys -t "command:main.${_miho_pane}" "$_miho_cmd"
     sleep 0.3
@@ -689,9 +685,9 @@ if [ "$SETUP_ONLY" = false ]; then
         sleep 1
     done
 
-    # ═══════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════
     # STEP 6.6: watcher_supervisor起動（全エージェント自動検出・管理）
-    # ═══════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════
     log_info "📬 メールボックス監視を起動中..."
 
     # inbox ディレクトリ初期化（シンボリックリンク先のLinux FSに作成）
@@ -710,29 +706,51 @@ if [ "$SETUP_ONLY" = false ]; then
     pkill -f "inotifywait.*queue/inbox" 2>/dev/null || true
     sleep 1
 
-    # STEP 6.7 は廃止 — CLAUDE.md Session Start (step 1: tmux agent_id) で各自が自律的に
-    # 自分のinstructions/*.mdを読み込む。検証済み (2026-02-08)。
     log_info "📜 指示書読み込みは各エージェントが自律実行（CLAUDE.md Session Start）"
     echo ""
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # STEP 6.7.5: 各隊クラスタ起動（デフォルト起動時）
+    # STEP 6.7.5（HYBRID修正）: 各隊クラスタ起動（agent_teams_mode=true を渡す）
+    # ─── 各クラスタで以下が有効化される:
+    #   - 隊長ペインの Claude 起動スキップ（Agent Teams が制御するため）
+    #   - GUP_BRIDGE_MODE=1 のシェル注入
+    #   - クラスタキューディレクトリ作成
     # ═══════════════════════════════════════════════════════════════════════════
     log_war "🫖 ダージリン隊クラスタも起動中..."
-    launch_darjeeling_cluster
+    launch_squad_cluster "darjeeling" "🫖" "ダージリン隊" \
+        "darjeeling,pekoe,hana,rosehip,marie,oshida,andou" \
+        "ダージリン,オレンジペコ,五十鈴華,ローズヒップ,マリー,押田,安藤" \
+        "captain,vice_captain,member,member,member,member,member" \
+        "magenta,red,blue,blue,blue,blue,blue" \
+        true
+
     log_war "🪆 カチューシャ隊クラスタも起動中..."
-    launch_katyusha_cluster
+    launch_squad_cluster "katyusha" "🪆" "カチューシャ隊" \
+        "katyusha,nonna,klara,mako,erwin,caesar,saori" \
+        "カチューシャ,ノンナ,クラーラ,冷泉麻子,エルヴィン,カエサル,武部沙織" \
+        "captain,vice_captain,member,member,member,member,member" \
+        "magenta,red,blue,blue,blue,blue,blue" \
+        true
+
     log_war "🦅 ケイ隊クラスタも起動中..."
-    launch_kay_cluster
+    launch_squad_cluster "kay" "🦅" "ケイ隊" \
+        "kay,arisa,naomi,anchovy,pepperoni,carpaccio,yukari" \
+        "ケイ,アリサ,ナオミ,アンチョビ,ペパロニ,カルパッチョ,秋山優花里" \
+        "captain,vice_captain,member,member,member,member,member" \
+        "magenta,red,blue,blue,blue,blue,blue" \
+        true
+
     log_war "🖤 西住まほ隊クラスタも起動中..."
-    launch_maho_cluster
+    launch_squad_cluster "maho" "🖤" "西住まほ隊" \
+        "maho,erika,mika,aki,mikko,kinuyo,fukuda" \
+        "西住まほ,逸見エリカ,ミカ,アキ,ミッコ,西絹代,福田" \
+        "captain,vice_captain,member,member,member,member,member" \
+        "magenta,red,blue,blue,blue,blue,blue" \
+        true
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # STEP 6.6: watcher_supervisor起動（全隊のClaude Code起動完了後）
+    # STEP 6.6: watcher_supervisor起動（全クラスタのClaude Code起動完了後）
     # ═══════════════════════════════════════════════════════════════════════════
-    # NOTE: 以前はクラスタ起動前にwatcher_supervisorを起動していたが、
-    # inbox_watcherがClaude Code起動前にペインにアクセスし、競合が発生していた。
-    # 全クラスタのClaude Code起動完了後にwatcher_supervisorを起動することで解決。
     log_info "📬 メールボックス監視を起動中..."
     echo "[STEP 6.6] Starting watcher_supervisor (after all clusters ready)..."
     nohup bash "$SCRIPT_DIR/scripts/watcher_supervisor.sh" \
@@ -767,18 +785,19 @@ echo "  └───────────────────────
 tmux list-sessions | sed 's/^/     /'
 echo ""
 echo "  ┌──────────────────────────────────────────────────────────┐"
-echo "  │  📋 布隊図 (Formation)                                   │"
+echo "  │  📋 布隊図 (Formation) — Agent Teams ハイブリッドモード  │"
 echo "  └──────────────────────────────────────────────────────────┘"
 echo ""
 echo "     【commandセッション】司令部（2ペイン）"
 echo "     ┌──────────────────┬──────────────────┐"
 echo "     │ anzu (大隊長)    │ miho (参謀長)    │"
+echo "     │ [Agent Teams]    │ [Agent Teams]    │"
 echo "     └──────────────────┴──────────────────┘"
 echo ""
 echo "     【darjeelingセッション】ダージリン隊（7ペイン）"
 echo "     ┌──────────┬──────────┐"
 echo "     │darjeeling│  marie   │"
-echo "     │ (隊長)   │ (隊員3)  │"
+echo "     │(隊長=AT) │ (隊員3)  │"
 echo "     ├──────────┤──────────┤"
 echo "     │  pekoe   │ oshida   │"
 echo "     │(副隊長)  │ (隊員4)  │"
@@ -791,11 +810,14 @@ echo "     │ (隊員2)             │"
 echo "     └─────────────────────┘"
 echo ""
 echo "     ※ katyusha / kay / maho 隊も同一レイアウト（7ペイン×4隊）"
+echo "     ※ 隊長ペインは Agent Teams モードで動作（Claude直接起動なし）"
+echo "     ※ 副隊長・隊員は通常の Claude Code 起動"
 echo ""
 
 echo ""
 echo "  ╔══════════════════════════════════════════════════════════╗"
-echo "  ║  🏯 発進準備完了！パンツァー・フォー！                              ║"
+echo "  ║  🏯 発進準備完了！パンツァー・フォー！                   ║"
+echo "  ║  🔗 Agent Teams ハイブリッドモード 有効                  ║"
 echo "  ╚══════════════════════════════════════════════════════════╝"
 echo ""
 
@@ -804,15 +826,9 @@ if [ "$SETUP_ONLY" = true ]; then
     echo ""
     echo "  手動でClaude Codeを起動するには:"
     echo "  ┌──────────────────────────────────────────────────────────┐"
-    echo "  │  # 隊長を召喚                                            │"
+    echo "  │  # 大隊長を召喚（Agent Teams 環境変数を事前に export）   │"
     echo "  │  tmux send-keys -t command:main \\                         │"
     echo "  │    'claude --dangerously-skip-permissions' Enter         │"
-    echo "  │                                                          │"
-    echo "  │  # 副隊長・隊員を一斉召喚                                  │"
-    echo "  │  for p in \$(seq $PANE_BASE $((PANE_BASE+8))); do                                 │"
-    echo "  │      tmux send-keys -t darjeeling:agents.\$p \\            │"
-    echo "  │      'claude --dangerously-skip-permissions' Enter       │"
-    echo "  │  done                                                    │"
     echo "  └──────────────────────────────────────────────────────────┘"
     echo ""
 fi

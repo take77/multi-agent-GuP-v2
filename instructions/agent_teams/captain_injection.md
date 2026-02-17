@@ -25,8 +25,8 @@ Use `scripts/bridge_relay.sh` for message conversion.
 Lead (Agent Teams) → Captain (you) → Vice Captain (tmux) → Members (tmux)
 ```
 
-- Write tasks to `clusters/{cluster_id}/queue/tasks/vice_captain.yaml`
-- Wait for Vice Captain's report in `clusters/{cluster_id}/queue/reports/vice_captain_report.yaml`
+- Use `scripts/bridge_relay.sh down` to convert tasks to YAML (writes to `clusters/{cluster_id}/queue/captain_to_vice_captain.yaml`)
+- Check completion status in the same YAML file (Vice Captain updates `status: done`)
 - Forward results to Lead via TeammateTool.write()
 
 ### 4. Read Your Instructions
@@ -36,7 +36,7 @@ On SessionStart, read:
 
 ### 5. Communication
 - **To Lead**: Use TeammateTool.write() (Agent Teams API)
-- **To Vice Captain**: Write YAML to queue/tasks/vice_captain.yaml
+- **To Vice Captain**: Write YAML via `scripts/bridge_relay.sh down` (writes to `clusters/{cluster_id}/queue/captain_to_vice_captain.yaml`)
 - **Never bypass** the Vice Captain. All work goes through them.
 
 ## Forbidden Actions
