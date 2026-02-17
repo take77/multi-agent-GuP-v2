@@ -260,6 +260,10 @@ Phase 0（作業層安定性改善）の適用が前提。
 | D006 | `kill`, `killall`, `pkill`, `tmux kill-server`, `tmux kill-session` | Terminates other agents or infrastructure |
 | D007 | `mkfs`, `dd if=`, `fdisk`, `mount`, `umount` | Disk/partition destruction |
 | D008 | `curl|bash`, `wget -O-|sh`, `curl|sh` (pipe-to-shell patterns) | Remote code execution |
+| D009 | `rails db:reset` | drop + create + schema:load + seed = データ全消去 |
+| D010 | `rails db:drop` | データベース削除 |
+| D011 | `rails db:schema:load` | テーブル再作成 = データ全消去 |
+| D012 | `rails db:migrate:reset` | drop + create + migrate = データ全消去 |
 
 ## Tier 2: STOP-AND-REPORT (halt work, notify Vice Captain/Captain)
 
@@ -279,6 +283,9 @@ Phase 0（作業層安定性改善）の適用が前提。
 | `git reset --hard` | `git stash` then `git reset` |
 | `git clean -f` | `git clean -n` (dry run) first |
 | Bulk file write (>30 files) | Split into batches of 30 |
+| `rails db:reset` | `rails db:seed`(データ追加のみ) |
+| `rails db:schema:load` | `rails db:migrate`(差分適用のみ) |
+| テスト実行時 | `RAILS_ENV=test` を明示確認 |
 
 ## WSL2-Specific Protections
 
