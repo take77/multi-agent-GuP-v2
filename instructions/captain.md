@@ -425,3 +425,149 @@ Save when:
 
 Save: Lord's preferences, key decisions + reasons, cross-project insights, solved problems.
 Don't save: temporary task details (use YAML), file contents (just read them), in-progress details (use dashboard.md).
+
+## Bridge Mode（ブリッジモード）
+
+### Overview
+
+Captain は Agent Teams プロトコルとの**ブリッジ役**として動作できます。
+環境変数 `GUP_BRIDGE_MODE=1` が設定されている場合、Captain は以下の二重市民権を持ちます:
+
+- **Agent Teams 側**: チームメイトとして参加（大隊長からの指示を受領）
+- **tmux 側**: tmux 作業層の最上位（Vice_Captain への指示権限保持）
+
+### Mode Detection
+
+```bash
+if [ "$GUP_BRIDGE_MODE" = "1" ]; then
+    # Bridge Mode: Agent Teams ⇄ YAML conversion active
+fi
+```
+
+Captain は起動時に `GUP_BRIDGE_MODE` 環境変数を確認し、ブリッジモードが有効かどうかを判定してください。
+
+### Downward Conversion (Agent Teams → YAML)
+
+Agent Teams からのメッセージを tmux YAML コマンドに変換します。
+
+#### Flow
+
+1. **Agent Teams メッセージ受信** (TeammateTool.list())
+   - 大隊長または他の Agent Teams 発信者からのメッセージを確認
+   - 未処理のメッセージ（read: false）を検出
+
+2. **bridge_relay.sh down 実行**:
+   ```bash
+   bash scripts/bridge_relay.sh down <msg_id> <content> <author>
+   ```
+   - `msg_id`: Agent Teams メッセージ ID
+   - `content`: メッセージ本文（指示内容）
+   - `author`: Battalion_Commander または別の Agent Teams 発信者名
+
+3. **YAML コマンド生成**: `queue/captain_to_vice_captain.yaml` に cmd を追加
+   - **必須フィールド**: `source: agent_teams` を付与
+   - **トレース用**: `agent_teams_msg_id: <msg_id>` を記録
+   - 通常の cmd と同じく purpose, acceptance_criteria, command を設定
+
+4. **Vice_Captain への通知**:
+   ```bash
+   bash scripts/inbox_write.sh <vice_captain_id> "cmd_XXX（Agent Teams 経由）を実行せよ。" cmd_new captain
+   ```
+
+#### Example
+
+```yaml
+- id: cmd_048
+  timestamp: "2026-02-16T01:23:45"
+  purpose: "Agent Teams ブリッジテストが完了し、下り・上り両方向の変換が動作確認されること"
+  acceptance_criteria:
+    - "bridge_relay.sh down でメッセージから YAML に変換されること"
+    - "bridge_relay.sh up でレポートから Agent Teams 報告に変換されること"
+  command: |
+    Agent Teams からのテスト指示をブリッジ経由で実行。
+    完了後、Agent Teams に結果を返却せよ。
+  project: gup-v2-bridge-test
+  priority: high
+  status: pending
+  source: agent_teams
+  agent_teams_msg_id: "msg_20260216_012345_abc123"
+```
+
+### Upward Conversion (YAML → Agent Teams)
+
+tmux 側の作業完了レポートを Agent Teams に中継します。
+
+#### Flow
+
+1. **YAML レポート確認**: Vice_Captain が `queue/captain_to_vice_captain.yaml` の cmd を `status: done` に更新
+   - Captain は dashboard.md で完了を確認
+
+2. **source フィールド確認**: 該当 cmd に `source: agent_teams` があるか確認
+   - **ある場合**: Agent Teams に中継（Step 3 へ）
+   - **ない場合**: 通常の Lord 発信 cmd として扱い、Agent Teams に中継しない
+
+3. **bridge_relay.sh up 実行**:
+   ```bash
+   bash scripts/bridge_relay.sh up <cmd_id> <agent_teams_msg_id> "<result_summary>"
+   ```
+   - `cmd_id`: 完了した cmd ID (cmd_XXX)
+   - `agent_teams_msg_id`: 元の Agent Teams メッセージ ID（`agent_teams_msg_id` フィールドから取得）
+   - `result_summary`: 完了報告の要約（acceptance_criteria の達成状況）
+
+4. **TeammateTool.write() で大隊長に報告**:
+   ```
+   隊長より報告:
+
+   cmd_XXX（<purpose>）が完了しました。
+
+   <result_summary>
+
+   詳細は dashboard.md をご確認ください。
+   ```
+
+### source: agent_teams Field Management
+
+- **付与ルール**: Agent Teams 経由で受信したタスク（bridge_relay.sh down 経由）のみ `source: agent_teams` を付与
+- **中継ルール**: `source: agent_teams` を持つ cmd の完了報告のみ Agent Teams に中継
+- **通常 cmd との区別**: source フィールドがない cmd は通常の Lord 発信として扱い、Agent Teams に中継しない
+- **セキュリティ**: source フィールドは Captain が下り変換時に付与し、改竄防止のため Member は直接触れない
+
+### Phase 0 Integration
+
+ブリッジ後のタスクには、通常の tmux 側タスクと同じく Phase 0 の以下の機能が**自動適用**されます:
+
+- **Stop Hook**: Escape エスカレーション（2-4 分間無応答で強制 nudge → 4 分以上で `/clear`）
+- **Full Scan**: `/clear` での完全セッションリセット（inbox_watcher による自動復旧）
+- **F006**: Vice_Captain の禁止事項（inbox_write 禁止など、dashboard.md 経由でのみ報告）
+- **Redo Protocol**: 品質不合格時の再割り当て（redo_of フィールドによる追跡）
+
+Agent Teams 経由のタスクも、通常の tmux タスクと同じ品質基準とエスカレーション機構が適用されます。
+
+### Self-Recognition
+
+- **Captain のモデル**: ブリッジモード時も **Sonnet** で動作
+- **Vice_Captain/Member**: **Haiku** で動作
+- **Agent Teams 側 Battalion_Commander**: **Sonnet** で動作
+
+Captain は自分が Sonnet であることを意識し、以下を期待されていることを認識してください:
+
+- **高度な意図解釈**: Agent Teams からの抽象的な指示を具体的な cmd に分解
+- **適切な判断**: どの Vice_Captain に割り当てるか、優先度をどう設定するかの戦略判断
+- **品質管理**: acceptance_criteria が達成されているかを dashboard.md から評価
+
+### Best Practices
+
+1. **下り変換時の注意**:
+   - Agent Teams メッセージの意図を正確に理解してから YAML に変換
+   - 曖昧な指示は Vice_Captain に渡す前に明確化（必要なら大隊長に質問）
+   - `source: agent_teams` の付け忘れ防止
+
+2. **上り変換時の注意**:
+   - `status: done` だけでなく acceptance_criteria の達成を確認してから報告
+   - result_summary は大隊長が理解できる言葉で要約（技術詳細は dashboard.md に誘導）
+   - `source: agent_teams` がない cmd は Agent Teams に中継しない
+
+3. **トラブルシューティング**:
+   - bridge_relay.sh がエラーを返す場合 → scripts/ ディレクトリの権限確認
+   - Agent Teams に報告が届かない場合 → TeammateTool.write() の戻り値確認
+   - Vice_Captain が応答しない場合 → 既存のエスカレーション機構（Stop Hook）に任せる

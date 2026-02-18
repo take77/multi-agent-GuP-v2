@@ -40,6 +40,18 @@ mcp_tools: [Notion, Playwright, GitHub, Sequential Thinking, Memory]
 mcp_usage: "Lazy-loaded. Always ToolSearch before first use."
 ---
 
+# Project-Specific Settings Override
+
+**IMPORTANT**: This project uses its own persona system (Girls und Panzer characters).
+All global CLAUDE.md settings (e.g., Sakurasou character configurations) are **DISABLED** for this project.
+
+- ❌ Do NOT use Sakurasou personas
+- ❌ Do NOT apply global character speech styles
+- ✅ Use GuP-v2 persona files in `persona/` directory
+- ✅ Follow `instructions/` for agent behavior
+
+---
+
 # Data Authority Rule
 
 **CRITICAL**: master_dashboard.md は二次データ（参謀長/副隊長の要約）である。
@@ -203,6 +215,18 @@ Layer 4: Session context — volatile (CLAUDE.md auto-loaded, instructions/*.md,
 
 System manages ALL white-collar work, not just self-improvement. Project folders can be external (outside this repo). `projects/` is git-ignored (contains secrets).
 
+## Agent Teams ハイブリッドモード(オプション)
+
+--agent-teams フラグで起動すると、上層が Agent Teams で連携する。
+
+- 大隊長: Agent Teams リード（Opus, delegate モード）
+- 参謀長: Agent SDK モニタプロセス（品質ゲート/アーキビスト/障害監視）
+- 隊長: Agent Teams チームメイト（Sonnet）+ ブリッジ
+- 副隊長・隊員: Phase 0 強化済みの tmux + YAML inbox（変更なし）
+
+フラグなし起動は従来動作と 100% 同一。
+Phase 0（作業層安定性改善）の適用が前提。
+
 # Captain Mandatory Rules
 
 1. **Dashboard**: Vice Captain's responsibility. Captain reads it, never writes it.
@@ -236,6 +260,10 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 | D006 | `kill`, `killall`, `pkill`, `tmux kill-server`, `tmux kill-session` | Terminates other agents or infrastructure |
 | D007 | `mkfs`, `dd if=`, `fdisk`, `mount`, `umount` | Disk/partition destruction |
 | D008 | `curl|bash`, `wget -O-|sh`, `curl|sh` (pipe-to-shell patterns) | Remote code execution |
+| D009 | `rails db:reset` | drop + create + schema:load + seed = データ全消去 |
+| D010 | `rails db:drop` | データベース削除 |
+| D011 | `rails db:schema:load` | テーブル再作成 = データ全消去 |
+| D012 | `rails db:migrate:reset` | drop + create + migrate = データ全消去 |
 
 ## Tier 2: STOP-AND-REPORT (halt work, notify Vice Captain/Captain)
 
@@ -255,6 +283,9 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 | `git reset --hard` | `git stash` then `git reset` |
 | `git clean -f` | `git clean -n` (dry run) first |
 | Bulk file write (>30 files) | Split into batches of 30 |
+| `rails db:reset` | `rails db:seed`(データ追加のみ) |
+| `rails db:schema:load` | `rails db:migrate`(差分適用のみ) |
+| テスト実行時 | `RAILS_ENV=test` を明示確認 |
 
 ## WSL2-Specific Protections
 

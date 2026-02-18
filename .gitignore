@@ -3,6 +3,10 @@
 # デフォルト全除外 → OSS公開対象のみ許可
 # ══════════════════════════════════════════════════
 
+# Node.js dependencies (exclude from repository)
+node_modules/
+scripts/monitor/node_modules/
+
 # Step 1: 全て除外
 *
 
@@ -23,12 +27,15 @@
 # Claude Code settings (spinner verbs only, no secrets)
 !.claude/
 !.claude/settings.json
+!.claude/hooks/
+!.claude/hooks/session_start.sh
 
 # Instructions (core OSS)
 !instructions/
 !instructions/shogun.md
 !instructions/karo.md
 !instructions/ashigaru.md
+!instructions/battalion_commander.md
 
 # Multi-CLI: CLI-specific tool descriptions
 !instructions/cli_specific/
@@ -51,6 +58,7 @@
 !lib/
 !lib/cli_adapter.sh
 !lib/ntfy_auth.sh
+!lib/launch_common.sh
 
 # Multi-CLI: Codex auto-load file
 !AGENTS.md
@@ -60,6 +68,8 @@
 !first_setup.sh
 !setup.sh
 !install.bat
+!gup_v2_launch.sh
+!gup_v2_launch_hybrid.sh
 
 # Development tooling
 !Makefile
@@ -67,6 +77,7 @@
 # Config (sample files only, no secrets)
 !config/
 !config/ntfy_auth.env.sample
+!config/settings.yaml
 
 # Templates
 !templates/
@@ -85,6 +96,8 @@
 !scripts/build_instructions.sh
 !scripts/check_inbox_on_stop.sh
 !scripts/watcher_supervisor.sh
+!scripts/bridge_relay.sh
+!scripts/fallback_to_tmux.sh
 
 
 # SayTask (sample template only, not actual data)
@@ -122,7 +135,35 @@
 !tests/test_helper/
 !tests/test_helper/README.md
 
+# Test framework submodules
+!tests/bats/
+
 # CI/CD
 !.github/
 !.github/workflows/
 !.github/workflows/*.yml
+
+# Agent Teams hybrid mode base structure (cmd_023)
+!instructions/
+!instructions/agent_teams/
+!instructions/agent_teams/.gitkeep
+!instructions/agent_teams/*.md
+
+!logs/
+!logs/bridge/
+!logs/bridge/.gitkeep
+!logs/monitor/
+!logs/monitor/.gitkeep
+
+!scripts/
+!scripts/monitor/
+!scripts/monitor/**
+
+# Test infrastructure (cmd_024)
+!tests/
+!tests/**
+
+# Queue HQ (cmd_032)
+!queue/
+!queue/hq/
+!queue/hq/**

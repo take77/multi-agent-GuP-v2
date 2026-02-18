@@ -1,0 +1,13 @@
+session_state:
+  last_updated: null
+  agent_teams_active: false
+  lead_context:
+    current_objective: null
+    active_commands: []
+  teammates:
+    darjeeling: { status: idle, current_task: null, last_response: null, bridge_active: false }
+    katyusha: { status: idle, current_task: null, last_response: null, bridge_active: false }
+    kay: { status: idle, current_task: null, last_response: null, bridge_active: false }
+    maho: { status: idle, current_task: null, last_response: null, bridge_active: false }
+  pending_tasks: []
+  incidents: []

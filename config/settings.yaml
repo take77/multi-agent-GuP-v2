@@ -1,0 +1,75 @@
+# multi-agent-GuP-v2 設定ファイル
+
+# 言語設定
+# ja: 日本語のみ（併記なし）
+# en: 英語（日本語 + 英訳併記）
+# その他の言語コード（es, zh, ko, fr, de 等）も対応
+language: ja
+
+# シェル設定
+# bash: bash用プロンプト（デフォルト）
+# zsh: zsh用プロンプト
+shell: bash
+
+# スキル設定
+skill:
+  # スキル保存先（スキル名に gup- プレフィックスを付けて保存）
+  save_path: "~/.claude/skills/"
+
+  # ローカルスキル保存先（このプロジェクト専用）
+  local_path: "/home/take77/Developments/Tools/multi-agent-GuP-v2/skills/"
+
+# ログ設定
+logging:
+  level: info  # debug | info | warn | error
+  path: "/home/take77/Developments/Tools/multi-agent-GuP-v2/logs/"
+
+agent_teams:
+  enabled: false
+  environment_variable: "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"
+
+  lead:
+    agent_id: anzu
+    model: opus
+    effort: medium
+    delegate_mode: true
+    session: command
+    pane: 0
+
+  monitor:
+    agent_id: miho
+    type: agent_sdk
+    script: "scripts/monitor/start.ts"
+    state_file: "queue/hq/session_state.yaml"
+    hooks:
+      TaskCompleted: true
+      TeammateIdle: true
+      Stop: true
+      PostToolUse: true
+
+  teammates:
+    - agent_id: darjeeling
+      model: sonnet
+      cluster_session: darjeeling
+      bridge_mode: true
+    - agent_id: katyusha
+      model: sonnet
+      cluster_session: katyusha
+      bridge_mode: true
+    - agent_id: kay
+      model: sonnet
+      cluster_session: kay
+      bridge_mode: true
+    - agent_id: maho
+      model: sonnet
+      cluster_session: maho
+      bridge_mode: true
+
+  bridge:
+    conversion_timeout_sec: 5
+    log_dir: "logs/bridge"
+
+  fallback:
+    auto_detect: true
+    unresponsive_threshold_sec: 300
+    manual_command: "scripts/fallback_to_tmux.sh"

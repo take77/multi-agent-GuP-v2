@@ -1189,6 +1189,173 @@ Subscribe to the same topic in the [ntfy app](https://ntfy.sh) on your phone. Th
 </details>
 
 <details>
+<summary><b>Agent Teams Hybrid Mode (Experimental)</b> (click to expand)</summary>
+
+### Overview
+
+Agent Teams Hybrid Mode integrates Claude Agent Teams / Agent SDK into the upper layer (Battalion Commander, Chief of Staff, Captains) while keeping the lower layer (Vice Captains, Members) on the proven Phase 0 tmux + YAML inbox architecture.
+
+**Key principle**: Leadership uses Agent Teams for coordination, workers stay on stable Phase 0 infrastructure. Zero impact on the working layer.
+
+```
+Agent Teams Layer (--agent-teams flag)
+┌─────────────────────────────────────────┐
+│  Battalion Commander (Opus, delegate)   │
+│    ↕ TeammateTool.write()               │
+│  Captains ×4 (Sonnet, bridge mode)     │
+│    ↕ bridge_relay.sh                    │
+├─────────────────────────────────────────┤
+│  Chief of Staff (Agent SDK monitor)     │
+│    hooks: TaskCompleted / TeammateIdle   │
+│           Stop / PostToolUse            │
+└─────────────────────────────────────────┘
+                 ↕ YAML inbox (unchanged)
+┌─────────────────────────────────────────┐
+│  Phase 0 Layer (tmux + YAML)            │
+│  Vice Captains + Members ×5 per cluster │
+│  (Stop Hook / Full Scan / F006 / Redo)  │
+└─────────────────────────────────────────┘
+```
+
+### Prerequisites
+
+- **Phase 0 applied**: inbox_watcher.sh, check_inbox_on_stop.sh, and escalation hooks in place
+- **Environment variable**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
+- **Node.js installed**: Required for Chief of Staff monitor process
+- **Dependencies installed**: Run `cd scripts/monitor && npm install`
+
+### Startup
+
+```bash
+# Traditional mode (unchanged)
+./gup_v2_launch.sh
+
+# Agent Teams Hybrid Mode
+export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+./gup_v2_launch.sh --agent-teams
+```
+
+### Model Mixing
+
+| Agent | Model | Mode | Reason |
+|-------|-------|------|--------|
+| Battalion Commander | Opus | delegate | Strategic decisions, high-level coordination |
+| Captains (4) | Sonnet | bridge | Task routing with YAML bridge_relay |
+| Vice Captains + Members | Sonnet/Opus | standard | Phase 0 unchanged, no Agent Teams awareness |
+
+### Bridge Mechanism
+
+**Downward (Agent Teams → YAML)**:
+1. Battalion Commander sends message via TeammateTool.write()
+2. Captain receives message, calls `bridge_relay.sh down`
+3. Python script generates `cmd_XXX` in queue YAML with `source: agent_teams`
+4. inbox_write.sh wakes Vice Captain
+5. Vice Captain processes cmd normally (no awareness of Agent Teams)
+
+**Upward (YAML → Agent Teams)**:
+1. Vice Captain marks cmd as done, updates dashboard.md
+2. Captain reads dashboard, checks `source: agent_teams` field
+3. Captain calls `bridge_relay.sh up`
+4. Captain uses TeammateTool.write() to send report to Battalion Commander
+
+**Security marker**: `source: agent_teams` field ensures only Agent Teams-originated cmds are relayed back. Lord-initiated cmds (no source field) stay internal.
+
+### Chief of Staff Monitor
+
+Runs as Agent SDK process with 4 hooks:
+
+| Hook | Trigger | Purpose |
+|------|---------|---------|
+| TaskCompleted | Task completion | Quality gate: validates acceptance_criteria, blocks if unmet |
+| TeammateIdle | Agent becomes idle | Detects prolonged idle, increments counter |
+| Stop | Session end | Saves session_state.yaml for recovery |
+| PostToolUse | Tool usage | Audit log (security, compliance) |
+
+**Dry-run mode** for testing:
+```bash
+cd scripts/monitor
+npx tsx start.ts --dry-run
+```
+
+### Fallback
+
+**Automatic**: Chief of Staff detects anomaly → notifies Battalion Commander → executes fallback script
+
+**Manual**:
+```bash
+bash scripts/fallback_to_tmux.sh
+```
+
+**Effect**:
+- Sets `GUP_BRIDGE_MODE=0` for all cluster sessions
+- Sets `GUP_AGENT_TEAMS_ACTIVE=0` for command session
+- Updates `queue/hq/session_state.yaml` to `agent_teams_active: false`
+- Notifies all Captains via inbox_write.sh
+
+**Impact on workers**: **None**. Phase 0 layer continues stable operation regardless of leadership layer communication mode.
+
+### Comparison: Flag vs No Flag
+
+| Item | No Flag (Traditional) | --agent-teams |
+|------|----------------------|---------------|
+| Upper layer communication | tmux + inbox | Agent Teams |
+| Monitor process | None | Agent SDK hooks |
+| Model mixing | All Sonnet or per settings | Lead=Opus, Teams=Sonnet |
+| Lower layer | tmux + YAML | tmux + YAML (identical) |
+| Backward compatibility | N/A | 100% — no flag = traditional mode |
+
+### Configuration
+
+```yaml
+# config/settings.yaml
+agent_teams:
+  enabled: false
+  environment_variable: "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"
+
+  lead:
+    agent_id: anzu
+    model: opus
+    delegate_mode: true
+
+  monitor:
+    agent_id: miho
+    type: agent_sdk
+    script: "scripts/monitor/start.ts"
+    state_file: "queue/hq/session_state.yaml"
+    hooks:
+      TaskCompleted: true
+      TeammateIdle: true
+      Stop: true
+      PostToolUse: true
+
+  teammates:
+    - agent_id: darjeeling
+      model: sonnet
+      bridge_mode: true
+    # ... (katyusha, kay, maho)
+
+  bridge:
+    conversion_timeout_sec: 5
+    log_dir: "logs/bridge"
+
+  fallback:
+    auto_detect: true
+    unresponsive_threshold_sec: 300
+```
+
+### Testing
+
+All 27 tests pass (Skip 0, Fail 0). Run:
+```bash
+cd ~/Developments/Tools/multi-agent-GuP-v2
+bash tests/run_all.sh
+```
+
+**Note**: This is experimental. Production integration testing (marked as `[ ]` in the PR test plan) occurs post-merge.
+
+</details>
+
+<details>
 <summary><b>Common Workflows</b> (click to expand)</summary>
 
 **Normal daily use:**

@@ -1165,6 +1165,174 @@ ntfy_topic: "captain-yourname"
 </details>
 
 <details>
+<summary><b>Agent Teams ハイブリッドモード（実験的機能）</b>（クリックで展開）</summary>
+
+### 概要
+
+Agent Teams ハイブリッドモードは、上層（大隊長・参謀長・隊長）に Claude Agent Teams / Agent SDK を統合し、下層（副隊長・隊員）はPhase 0 強化済みの tmux + YAML inbox をそのまま維持するハイブリッドアーキテクチャです。
+
+**核心原則**: 上層の指揮系統は Agent Teams で連携し、下層の作業層は安定したPhase 0インフラで稼働。作業層への影響ゼロ。
+
+```
+Agent Teams Layer (--agent-teams フラグ)
+┌─────────────────────────────────────────┐
+│  大隊長 あんず (Opus, delegate mode)     │
+│    ↕ TeammateTool.write()               │
+│  隊長×4 (Sonnet, bridge mode)           │
+│    ダージリン/カチューシャ/ケイ/まほ     │
+│    ↕ bridge_relay.sh                    │
+├─────────────────────────────────────────┤
+│  参謀長 みほ (Agent SDK monitor)        │
+│    hooks: TaskCompleted / TeammateIdle   │
+│           Stop / PostToolUse            │
+└─────────────────────────────────────────┘
+                 ↕ YAML inbox (変更なし)
+┌─────────────────────────────────────────┐
+│  Phase 0 Layer (tmux + YAML)            │
+│  副隊長 + 隊員×5 per cluster             │
+│  (Stop Hook / Full Scan / F006 / Redo)  │
+└─────────────────────────────────────────┘
+```
+
+### 前提条件
+
+- **Phase 0適用済み**: inbox_watcher.sh、check_inbox_on_stop.sh、エスカレーションフックが導入済みであること
+- **環境変数**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` を設定
+- **Node.js インストール済み**: 参謀長モニタプロセスに必要
+- **依存関係インストール**: `cd scripts/monitor && npm install` を実行済み
+
+### 起動方法
+
+```bash
+# 従来モード（変更なし）
+./gup_v2_launch.sh
+
+# Agent Teams ハイブリッドモード
+export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+./gup_v2_launch.sh --agent-teams
+```
+
+### モデルミキシング
+
+| エージェント | モデル | モード | 理由 |
+|------------|--------|--------|------|
+| 大隊長 あんず | Opus | delegate | 戦略決定・高度な調整 |
+| 隊長×4 | Sonnet | bridge | YAML bridge_relayによるタスクルーティング |
+| 副隊長 + 隊員 | Sonnet/Opus | 通常 | Phase 0変更なし、Agent Teams非認識 |
+
+### ブリッジの仕組み
+
+**下り通信（Agent Teams → YAML）**:
+1. 大隊長が TeammateTool.write() でメッセージを送信
+2. 隊長がメッセージを受信し、`bridge_relay.sh down` を呼び出し
+3. Python スクリプトが queue YAML に `cmd_XXX` を生成（`source: agent_teams` 付与）
+4. inbox_write.sh が副隊長を起動
+5. 副隊長が通常通り cmd を処理（Agent Teams 非認識）
+
+**上り通信（YAML → Agent Teams）**:
+1. 副隊長が cmd を完了としてマークし、dashboard.md を更新
+2. 隊長が dashboard を読み、`source: agent_teams` フィールドを確認
+3. 隊長が `bridge_relay.sh up` を呼び出し
+4. 隊長が TeammateTool.write() で大隊長に報告を送信
+
+**セキュリティマーカー**: `source: agent_teams` フィールドにより、Agent Teams 発信の cmd のみが上り報告される。司令官発信の cmd（source フィールドなし）は内部処理のみ。
+
+### 参謀長モニタ（みほ）
+
+Agent SDK プロセスとして稼働し、4つのフックを実装:
+
+| フック | トリガー | 目的 |
+|--------|---------|------|
+| TaskCompleted | タスク完了 | 品質ゲート: acceptance_criteria を検証、未達なら拒否 |
+| TeammateIdle | エージェントがアイドル | 長期アイドルを検知、カウンタ増加 |
+| Stop | セッション終了 | session_state.yaml に状態保存して復旧可能に |
+| PostToolUse | ツール使用 | 監査ログ（セキュリティ・コンプライアンス） |
+
+**Dry-run モード**（テスト用）:
+```bash
+cd scripts/monitor
+npx tsx start.ts --dry-run
+```
+
+### フォールバック
+
+**自動**: 参謀長が異常検知 → 大隊長に通知 → フォールバックスクリプト実行
+
+**手動**:
+```bash
+bash scripts/fallback_to_tmux.sh
+```
+
+**実行内容**:
+- 全クラスタセッションの `GUP_BRIDGE_MODE=0` に設定
+- command セッションの `GUP_AGENT_TEAMS_ACTIVE=0` に設定
+- `queue/hq/session_state.yaml` を `agent_teams_active: false` に更新
+- inbox_write.sh 経由で全隊長に通知
+
+**作業層への影響**: **なし**。Phase 0 層は指揮層の通信モードに関係なく安定動作を継続。
+
+### 比較: フラグあり/なし
+
+| 項目 | フラグなし（従来） | --agent-teams |
+|------|------------------|---------------|
+| 上層通信 | tmux + inbox | Agent Teams |
+| モニタプロセス | なし | Agent SDK hooks |
+| モデルミキシング | 全Sonnet or 設定次第 | Lead=Opus, Teams=Sonnet |
+| 下層 | tmux + YAML | tmux + YAML（同一） |
+| 後方互換性 | N/A | 100% — フラグなし = 従来動作 |
+
+### 設定
+
+```yaml
+# config/settings.yaml
+agent_teams:
+  enabled: false
+  environment_variable: "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"
+
+  lead:
+    agent_id: anzu
+    model: opus
+    delegate_mode: true
+
+  monitor:
+    agent_id: miho
+    type: agent_sdk
+    script: "scripts/monitor/start.ts"
+    state_file: "queue/hq/session_state.yaml"
+    hooks:
+      TaskCompleted: true
+      TeammateIdle: true
+      Stop: true
+      PostToolUse: true
+
+  teammates:
+    - agent_id: darjeeling
+      model: sonnet
+      bridge_mode: true
+    # ... (katyusha, kay, maho)
+
+  bridge:
+    conversion_timeout_sec: 5
+    log_dir: "logs/bridge"
+
+  fallback:
+    auto_detect: true
+    unresponsive_threshold_sec: 300
+```
+
+### テスト
+
+全27テスト合格（Skip 0, Fail 0）。実行方法:
+```bash
+cd ~/Developments/Tools/multi-agent-GuP-v2
+bash tests/run_all.sh
+```
+
+**注意**: これは実験的機能です。本番統合テスト（PRのテスト計画で `[ ]` となっている項目）はマージ後に実施されます。
+
+</details>
+
+<details>
 <summary><b>よく使うワークフロー</b>（クリックで展開）</summary>
 
 **通常の毎日の使用：**
