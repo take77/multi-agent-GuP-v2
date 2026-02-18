@@ -400,11 +400,63 @@ agent_is_busy() {
     return 1  # idle
 }
 
+# ─── Hybrid mode bridge: write to Agent Teams JSON inbox ───
+# Used when GUP_AGENT_TEAMS_ACTIVE=1 and target pane has @agent_role=captain.
+# In hybrid mode, the captain pane runs Agent Teams (not a bare shell), so
+# tmux send-keys would hit bash and print "command not found".
+# Returns 0 (true) if hybrid bridge was used, 1 otherwise.
+write_hybrid_inbox() {
+    local unread_count="$1"
+
+    local agent_role
+    agent_role=$(tmux show-options -vp -t "$PANE_TARGET" @agent_role 2>/dev/null || true)
+
+    if [[ "${GUP_AGENT_TEAMS_ACTIVE:-0}" != "1" || "$agent_role" != "captain" ]]; then
+        return 1  # 通常モード — 呼び出し元が tmux send-keys を使う
+    fi
+
+    local team_name
+    team_name=$(tmux show-options -vp -t "$PANE_TARGET" @team_name 2>/dev/null || echo "")
+    local captain_agent_id
+    captain_agent_id=$(tmux show-options -vp -t "$PANE_TARGET" @agent_id 2>/dev/null || echo "")
+
+    if [[ -z "$team_name" || -z "$captain_agent_id" ]]; then
+        echo "[$(date)] [HYBRID] WARN: team_name or agent_id unresolved for $AGENT_ID, falling back to tmux" >&2
+        return 1
+    fi
+
+    local inbox_path="$HOME/.claude/teams/${team_name}/inboxes/${captain_agent_id}.json"
+    local timestamp
+    timestamp=$(date -u "+%Y-%m-%dT%H:%M:%S.000Z")
+    local msg_text="inbox-bridge: ${unread_count} unread message(s) in queue/inbox/${captain_agent_id}.yaml"
+
+    local entry
+    entry=$(printf '{"from":"inbox-bridge","text":"%s","timestamp":"%s","read":false,"summary":"Squad report: %s unread"}' \
+        "$msg_text" "$timestamp" "$unread_count")
+
+    if [[ -f "$inbox_path" ]]; then
+        if command -v jq >/dev/null 2>&1; then
+            local tmp
+            tmp=$(jq --argjson entry "$entry" '. += [$entry]' "$inbox_path")
+            echo "$tmp" > "$inbox_path"
+        else
+            echo "[$(date)] [HYBRID] WARN: jq not found, using fallback for Agent Teams inbox" >&2
+            echo "$entry" >> "${inbox_path}.pending"
+        fi
+    else
+        mkdir -p "$(dirname "$inbox_path")"
+        echo "[$entry]" > "$inbox_path"
+    fi
+    echo "[$(date)] [HYBRID] Agent Teams bridge: wrote to ${inbox_path}" >&2
+    return 0
+}
+
 # ─── Send wake-up nudge ───
 # Layered approach:
 #   1. If agent has active inotifywait self-watch → skip (agent wakes itself)
 #   2. If agent is busy (Working) → skip (nudge during Working loses Enter)
-#   3. tmux send-keys (短いnudgeのみ、timeout 5s)
+#   3. Hybrid mode (GUP_AGENT_TEAMS_ACTIVE=1 + @agent_role=captain) → write to Agent Teams inbox
+#   4. tmux send-keys (短いnudgeのみ、timeout 5s)
 send_wakeup() {
     local unread_count="$1"
     local nudge="inbox${unread_count}"
@@ -426,7 +478,12 @@ send_wakeup() {
         return 0
     fi
 
-    # 優先度3: tmux send-keys（テキストとEnterを分離 — Codex TUI対策）
+    # 優先度3: ハイブリッドモード — Agent Teams JSON inbox へ書き込み
+    if write_hybrid_inbox "$unread_count"; then
+        return 0
+    fi
+
+    # 優先度4: tmux send-keys（テキストとEnterを分離 — Codex TUI対策）
     echo "[$(date)] [SEND-KEYS] Sending nudge to $PANE_TARGET for $AGENT_ID" >&2
     if timeout 5 tmux send-keys -t "$PANE_TARGET" "$nudge" 2>/dev/null; then
         sleep 0.3
@@ -461,6 +518,11 @@ send_wakeup_with_escape() {
     # Phase 2 still skips if agent is busy — Escape during Working would interrupt
     if agent_is_busy; then
         echo "[$(date)] [SKIP] Agent $AGENT_ID is busy (Working), deferring Phase 2 nudge" >&2
+        return 0
+    fi
+
+    # ハイブリッドモード — Agent Teams JSON inbox へ書き込み（Escape送信不要）
+    if write_hybrid_inbox "$unread_count"; then
         return 0
     fi
 

@@ -382,6 +382,25 @@ Actions after recovery:
 2. If pending cmds exist → check Vice_Captain state, then issue instructions
 3. If all cmds done → await Lord's next command
 
+## 上り報告 Push プロトコル（参謀長への通知）
+
+施策（cmd）の全サブタスク完了 or 失敗確定時に、参謀長へ inbox_write で通知する。
+**完了（cmd_done）と失敗（cmd_failed）の2イベントのみ。** 進行中の報告は dashboard.md。
+
+### cmd 完了時（全サブタスク done）
+```bash
+bash scripts/inbox_write.sh chief_of_staff \
+  "cmd_XXX 全タスク完了。{施策タイトル}、受入基準 N/N 達成。" \
+  cmd_done captain_{your_name}
+```
+
+### cmd 失敗時（サブタスク failed or ブロッカー）
+```bash
+bash scripts/inbox_write.sh chief_of_staff \
+  "cmd_XXX 失敗。{理由}。エスカレーション。" \
+  cmd_failed captain_{your_name}
+```
+
 ## Context Loading (Session Start)
 
 1. Read CLAUDE.md (auto-loaded)
