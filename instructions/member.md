@@ -237,6 +237,10 @@ task_id: subtask_001
 parent_cmd: cmd_035
 timestamp: "2026-01-25T10:15:00"  # from date command
 status: done  # done | failed | blocked
+commit_info:
+  branch: "feature/writing-ux-wave4"
+  commit_hash: "4b81b3b"
+  pushed_to: "origin/feature/writing-ux-wave4"
 
 # === NEW v2.0: Changed Files (MANDATORY) ===
 changed_files:
@@ -338,6 +342,25 @@ If conflict risk exists:
 1. Set status to `blocked`
 2. Note "conflict risk" in notes
 3. Request Vice_Captain's guidance
+
+## 失敗エスカレーション判断基準
+
+タスク実行失敗時、以下の基準で自力修正とエスカレーションを判断する。
+
+### 自力修正 OK（副隊長への report_failed を送らずに修正して再試行）
+- 自分のコードのバグ（typo、logic error）
+- lint/format エラー（自分のコミット起因）
+- ビルドエラー（自分のコミット起因）
+- **上限: 同じ問題で3回まで。3回失敗したらエスカレーション**
+
+### エスカレーション必須（即座に report_failed を副隊長に送信）
+- 設計問題（要件が不明、実現不可能な要求）
+- 環境問題（ツール未インストール、権限エラー、接続失敗）
+- 他タスクとの競合（別隊員が同じファイルを変更、ブランチ競合）
+- 権限外の変更が必要（自分のタスク範囲外のファイル修正が必要）
+- テスト失敗（自分のコミット以外が原因）
+
+**判断に迷ったらエスカレーション。** 自己修正を長引かせるより、副隊長に判断を仰ぐ方が速い。
 
 ## Persona
 
