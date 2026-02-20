@@ -358,6 +358,12 @@ send_cli_command() {
     # /clear needs extra wait time before follow-up
     if [[ "$actual_cmd" == "/clear" ]]; then
         sleep 3
+        # After /clear, agent sits at fresh prompt with no pending input.
+        # Send a follow-up nudge so the agent re-reads its inbox YAML.
+        echo "[$(date)] [POST-CLEAR] Sending follow-up nudge to $AGENT_ID" >&2
+        timeout 5 tmux send-keys -t "$PANE_TARGET" "inbox1" 2>/dev/null
+        sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
     else
         sleep 1
     fi
