@@ -442,14 +442,15 @@ acceptance_criteria_met: true
 
 ### cmd 完了時
 ```bash
-bash scripts/inbox_write.sh battalion_commander \
+# 大隊長 = anzu（ロール名 battalion_commander ではなくエージェント名を使う）
+bash scripts/inbox_write.sh anzu \
   "cmd_XXX 完了。{施策タイトル}、全受入基準達成。" \
   cmd_done chief_of_staff
 ```
 
 ### cmd 失敗時（エスカレーション必要）
 ```bash
-bash scripts/inbox_write.sh battalion_commander \
+bash scripts/inbox_write.sh anzu \
   "cmd_XXX 失敗エスカレーション。{理由}。判断を仰ぐ。" \
   cmd_failed chief_of_staff
 ```
