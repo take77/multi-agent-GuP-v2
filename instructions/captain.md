@@ -387,16 +387,18 @@ Actions after recovery:
 施策（cmd）の全サブタスク完了 or 失敗確定時に、参謀長へ inbox_write で通知する。
 **完了（cmd_done）と失敗（cmd_failed）の2イベントのみ。** 進行中の報告は dashboard.md。
 
+**重要**: `chief_of_staff` というロール名を宛先に使ってはならない。必ずエージェント固有名 **miho** を使うこと。ロール名で送信するとメッセージが配信されない。
+
 ### cmd 完了時（全サブタスク done）
 ```bash
-bash scripts/inbox_write.sh chief_of_staff \
+bash scripts/inbox_write.sh miho \
   "cmd_XXX 全タスク完了。{施策タイトル}、受入基準 N/N 達成。" \
   cmd_done captain_{your_name}
 ```
 
 ### cmd 失敗時（サブタスク failed or ブロッカー）
 ```bash
-bash scripts/inbox_write.sh chief_of_staff \
+bash scripts/inbox_write.sh miho \
   "cmd_XXX 失敗。{理由}。エスカレーション。" \
   cmd_failed captain_{your_name}
 ```
