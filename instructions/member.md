@@ -204,11 +204,31 @@ date "+%Y-%m-%dT%H:%M:%S"
 
 ## Report Notification Protocol
 
-After writing report YAML, notify Vice_Captain:
+After writing report YAML, notify your squad's Vice_Captain **by agent name** (NOT the role name "vice_captain").
+
+### 副隊長名の特定
+
+config/squads.yaml を参照し、自分が所属する隊の vice_captain 名を使う:
+
+| 隊 | 隊員 | 副隊長名（inbox_write 宛先） |
+|---|---|---|
+| darjeeling | hana, rosehip, marie, andou, oshida | **pekoe** |
+| katyusha | klara, mako, erwin, caesar, saori | **nonna** |
+| kay | naomi, yukari, anchovy, carpaccio, pepperoni | **arisa** |
+| maho | mika, aki, mikko, kinuyo, fukuda | **erika** |
+
+### 報告送信
 
 ```bash
-bash scripts/inbox_write.sh vice_captain "隊員{N}号、任務完了です。報告書を確認してください。" report_received member{N}
+bash scripts/inbox_write.sh <vice_captain_name> "<AGENT_ID>、任務完了です。報告書を確認してください。" report_received <AGENT_ID>
 ```
+
+例（mikaの場合）:
+```bash
+bash scripts/inbox_write.sh erika "ミカです。subtask_084a 完了しました。報告書を確認してください。" report_received mika
+```
+
+**重要**: `vice_captain` というロール名を宛先に使ってはならない。必ずエージェント固有名（pekoe/nonna/arisa/erika）を使うこと。ロール名で送信するとメッセージが配信されない。
 
 That's it. No state checking, no retry, no delivery verification.
 The inbox_write guarantees persistence. inbox_watcher handles delivery.

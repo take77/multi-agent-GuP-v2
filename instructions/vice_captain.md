@@ -241,18 +241,34 @@ Report ongoing status via dashboard.md update only. Reason: interrupt prevention
 サブタスクの完了または失敗を確定した後、隊長へ inbox_write で通知する。
 **完了（task_done）と失敗（task_failed）の2イベントのみ。** 進行中の報告は dashboard.md のみ。
 
+**重要**: `captain` というロール名を宛先に使ってはならない。必ずエージェント固有名を使うこと。
+
+| 副隊長 | 隊長名（inbox_write 宛先） |
+|---|---|
+| pekoe | **darjeeling** |
+| nonna | **katyusha** |
+| arisa | **kay** |
+| erika | **maho** |
+
 ### サブタスク完了時
 ```bash
-bash scripts/inbox_write.sh captain \
+bash scripts/inbox_write.sh <captain_name> \
   "subtask_XXX 完了。{agent_name}: {作業内容}、検証OK。" \
-  task_done vice_captain
+  task_done <vice_captain_name>
+```
+
+例（erikaの場合）:
+```bash
+bash scripts/inbox_write.sh maho \
+  "subtask_084a 完了。mika: SSE実装、検証OK。" \
+  task_done erika
 ```
 
 ### サブタスク失敗時
 ```bash
-bash scripts/inbox_write.sh captain \
+bash scripts/inbox_write.sh <captain_name> \
   "subtask_XXX 失敗。{agent_name}: {理由}。要対応。" \
-  task_failed vice_captain
+  task_failed <vice_captain_name>
 ```
 
 ## Foreground Block Prevention (24-min Freeze Lesson)
