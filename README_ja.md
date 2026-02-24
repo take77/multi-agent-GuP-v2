@@ -247,24 +247,25 @@ cd /mnt/c/tools/multi-agent-GuP-v2
 #### A. 従来モード（YAML-only mode）— 推奨・安定版
 
 - **起動コマンド**: `./gup_v2_launch.sh`
-- **構成**: tmux セッションのみ、Claude Code CLI が各ペインで稼働
-- **用途**: 標準的な運用、既存ワークフロー
-- **特徴**: シンプル、単一クラスタ向き
+- **構成**: 司令部(2名) + 4隊(各7名) = 30エージェント、5 tmuxセッション
+- **通信**: YAML mailbox のみ
+- **特徴**: 全エージェントがClaude Codeを直接起動。安定性重視。
 
 #### B. ハイブリッドモード（Agent Teams Hybrid mode）— 実験的
 
 - **起動コマンド**: `./gup_v2_launch_hybrid.sh` または `./gup_v2_launch.sh --agent-teams`
-- **構成**: 上層（Agent Teams）+ 下層（tmux YAML）のハイブリッド
-- **用途**: 大規模プロジェクト、複数クラスタ並列実行
-- **特徴**: 高度、4クラスタ並列実行可能
+- **構成**: 司令部(2名) + 4隊(各7名) = 30エージェント、5 tmuxセッション（従来モードと同一構成）
+- **通信**: Agent Teams + YAML mailbox（二層構造）
+- **特徴**: 各隊の隊長はAgent Teamsが制御（Claude Code直接起動なし）。参謀長モニタプロセスがYAML↔Agent Teams間を双方向連携。
 
 #### 🔍 違いの要点
 
 | | 従来モード | ハイブリッドモード |
 |---|---|---|
 | **起動** | `./gup_v2_launch.sh` | `./gup_v2_launch_hybrid.sh` または `--agent-teams` |
-| **構成** | YAML-only | Agent Teams + YAML |
-| **クラスタ数** | 1 | 最大4並列 |
+| **構成** | 司令部+4隊=30エージェント | 司令部+4隊=30エージェント（同一） |
+| **通信方式** | YAML mailbox のみ | Agent Teams + YAML（二層） |
+| **隊長起動** | Claude Code直接起動 | Agent Teamsが制御 |
 | **安定性** | 安定版 | 実験的 |
 | **推奨** | 初心者・標準運用 | 大規模プロジェクト |
 

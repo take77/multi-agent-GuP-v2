@@ -244,22 +244,25 @@ cd /mnt/c/tools/multi-agent-GuP-v2
 
 Captain supports two operation modes. Choose based on your project scale:
 
-#### A. Standard Mode (YAML-only)
+#### A. Conventional Mode (YAML-only)
 
-- **Startup**: `./gup_v2_launch.sh`
-- **Architecture**: tmux sessions only, Claude Code CLI on all panes
-- **Use case**: Standard workflow, single-cluster operation
+- **Launch**: `./gup_v2_launch.sh`
+- **Structure**: Command(2) + 4 squads(7 each) = 30 agents, 5 tmux sessions
+- **Communication**: YAML mailbox only
+- **Feature**: All agents run Claude Code directly. Prioritizes stability.
 
-#### B. Agent Teams Hybrid Mode (Experimental)
+#### B. Hybrid Mode (Agent Teams + YAML)
 
-- **Startup**: `./gup_v2_launch_hybrid.sh` or `./gup_v2_launch.sh --agent-teams`
-- **Architecture**: Upper layer (Agent Teams) + Lower layer (tmux YAML) hybrid
-- **Use case**: Large-scale projects, 4-cluster parallel execution
+- **Launch**: `./gup_v2_launch_hybrid.sh` or `./gup_v2_launch.sh --agent-teams`
+- **Structure**: Command(2) + 4 squads(7 each) = 30 agents, 5 tmux sessions (same as conventional)
+- **Communication**: Agent Teams + YAML mailbox (dual-layer)
+- **Feature**: Squad captains are controlled by Agent Teams (no direct Claude Code launch).
+  Chief-of-staff monitor process bridges YAML↔Agent Teams bidirectionally.
 
 #### Key Difference
 
-- **Standard mode**: Simple, single-cluster — proven and stable
-- **Hybrid mode**: Advanced, supports 4-cluster parallel execution with Agent Teams coordination layer
+- **Conventional mode**: 4-cluster YAML-only communication — proven and stable
+- **Hybrid mode**: Same 4-cluster structure with Agent Teams coordination layer on top
 
 For detailed configuration and technical architecture, see the [Agent Teams Hybrid Mode (Experimental)](#agent-teams-hybrid-mode-experimental) section below.
 

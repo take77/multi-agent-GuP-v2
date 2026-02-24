@@ -59,6 +59,7 @@ fi
 # Time-based escalation: track how long unread messages have been waiting
 FIRST_UNREAD_SEEN=${FIRST_UNREAD_SEEN:-0}
 LAST_CLEAR_TS=${LAST_CLEAR_TS:-0}
+LAST_BRIDGE_SIGNAL_TS=${LAST_BRIDGE_SIGNAL_TS:-0}
 
 # ─── Load settings from config/settings.yaml ───
 # Falls back to defaults if file doesn't exist or parsing fails
@@ -406,55 +407,52 @@ agent_is_busy() {
     return 1  # idle
 }
 
-# ─── Hybrid mode bridge: write to Agent Teams JSON inbox ───
-# Used when GUP_AGENT_TEAMS_ACTIVE=1 and target pane has @agent_role=captain.
-# In hybrid mode, the captain pane runs Agent Teams (not a bare shell), so
+# ─── Hybrid mode bridge: signal relay to Battalion Commander ───
+# Used when GUP_AGENT_TEAMS_ACTIVE=1 and this agent is a captain (has cluster config).
+# In hybrid mode, the captain pane is an empty shell (Agent Teams runs elsewhere), so
 # tmux send-keys would hit bash and print "command not found".
-# Returns 0 (true) if hybrid bridge was used, 1 otherwise.
+# Instead, send a bridge_signal to anzu (Battalion Commander) via inbox_write.
+# Anzu then relays "inbox check" to the captain via Agent Teams SendMessage.
+# The captain reads its own inbox via bash and processes reports autonomously.
+#
+# Throttle: max one signal per 30 seconds per captain to avoid spam.
+# Returns 0 (true) if hybrid bridge was used, 1 otherwise (caller falls back to tmux).
 write_hybrid_inbox() {
     local unread_count="$1"
 
-    local agent_role
-    agent_role=$(tmux show-options -vp -t "$PANE_TARGET" @agent_role 2>/dev/null || true)
-
-    if [[ "${GUP_AGENT_TEAMS_ACTIVE:-0}" != "1" || "$agent_role" != "captain" ]]; then
-        return 1  # 通常モード — 呼び出し元が tmux send-keys を使う
-    fi
-
-    local team_name
-    team_name=$(tmux show-options -vp -t "$PANE_TARGET" @team_name 2>/dev/null || echo "")
-    local captain_agent_id
-    captain_agent_id=$(tmux show-options -vp -t "$PANE_TARGET" @agent_id 2>/dev/null || echo "")
-
-    if [[ -z "$team_name" || -z "$captain_agent_id" ]]; then
-        echo "[$(date)] [HYBRID] WARN: team_name or agent_id unresolved for $AGENT_ID, falling back to tmux" >&2
+    # Gate 1: Agent Teams mode only. Normal mode → return 1 (no impact).
+    if [[ "${GUP_AGENT_TEAMS_ACTIVE:-0}" != "1" ]]; then
         return 1
     fi
 
-    local inbox_path="$HOME/.claude/teams/${team_name}/inboxes/${captain_agent_id}.json"
-    local timestamp
-    timestamp=$(date -u "+%Y-%m-%dT%H:%M:%S.000Z")
-    local msg_text="inbox-bridge: ${unread_count} unread message(s) in queue/inbox/${captain_agent_id}.yaml"
-
-    local entry
-    entry=$(printf '{"from":"inbox-bridge","text":"%s","timestamp":"%s","read":false,"summary":"Squad report: %s unread"}' \
-        "$msg_text" "$timestamp" "$unread_count")
-
-    if [[ -f "$inbox_path" ]]; then
-        if command -v jq >/dev/null 2>&1; then
-            local tmp
-            tmp=$(jq --argjson entry "$entry" '. += [$entry]' "$inbox_path")
-            echo "$tmp" > "$inbox_path"
-        else
-            echo "[$(date)] [HYBRID] WARN: jq not found, using fallback for Agent Teams inbox" >&2
-            echo "$entry" >> "${inbox_path}.pending"
-        fi
-    else
-        mkdir -p "$(dirname "$inbox_path")"
-        echo "[$entry]" > "$inbox_path"
+    # Gate 2: Captain check via cluster config. Non-captains → return 1 (normal tmux flow).
+    local script_dir="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+    local cluster_config="${script_dir}/clusters/${AGENT_ID}/config.yaml"
+    if [[ ! -f "$cluster_config" ]]; then
+        return 1
     fi
-    echo "[$(date)] [HYBRID] Agent Teams bridge: wrote to ${inbox_path}" >&2
-    return 0
+
+    # Throttle: skip if bridge_signal was sent within last 30 seconds
+    local now
+    now=$(date +%s)
+    if [[ "$LAST_BRIDGE_SIGNAL_TS" -gt 0 && "$LAST_BRIDGE_SIGNAL_TS" -gt "$((now - 30))" ]] 2>/dev/null; then
+        echo "[$(date)] [BRIDGE-SIGNAL] Throttled for $AGENT_ID (within 30s window)" >&2
+        return 0  # Return 0 to prevent fallback to tmux send-keys on empty pane
+    fi
+
+    # Send bridge_signal to Battalion Commander (anzu) via inbox_write
+    if bash "${script_dir}/scripts/inbox_write.sh" anzu \
+        "bridge_signal: ${AGENT_ID} に未読${unread_count}件あり。SendMessage で ${AGENT_ID} に inbox確認を指示せよ。" \
+        bridge_signal \
+        "$AGENT_ID" 2>/dev/null; then
+        LAST_BRIDGE_SIGNAL_TS=$now
+        echo "[$(date)] [BRIDGE-SIGNAL] Sent to anzu: $AGENT_ID has $unread_count unread" >&2
+        return 0
+    fi
+
+    # inbox_write failed — fall back to tmux (best effort)
+    echo "[$(date)] [BRIDGE-SIGNAL] WARN: inbox_write to anzu failed for $AGENT_ID, falling back to tmux" >&2
+    return 1
 }
 
 # ─── Send wake-up nudge ───
