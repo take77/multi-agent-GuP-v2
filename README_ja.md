@@ -1230,12 +1230,28 @@ export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 5. 副隊長が通常通り cmd を処理（Agent Teams 非認識）
 
 **上り通信（YAML → Agent Teams）**:
-1. 副隊長が cmd を完了としてマークし、dashboard.md を更新
-2. 隊長が dashboard を読み、`source: agent_teams` フィールドを確認
+1. 副隊長がサブタスク完了 → inbox_write で task_done を隊長に送信（push）
+2. 隊長が task_done を受信、`source: agent_teams` フィールドをチェック
 3. 隊長が `bridge_relay.sh up` を呼び出し
-4. 隊長が TeammateTool.write() で大隊長に報告を送信
+4. 隊長が inbox_write で cmd_done を参謀長（miho）に送信
+5. 隊長が TeammateTool.write() で大隊長に報告
 
 **セキュリティマーカー**: `source: agent_teams` フィールドにより、Agent Teams 発信の cmd のみが上り報告される。司令官発信の cmd（source フィールドなし）は内部処理のみ。
+
+### 上り Push プロトコル
+
+Agent Teams モードでは、進行状況の確認は dashboard.md、完了/失敗のみ inbox_write push で通知します。
+
+4つの inbox type:
+
+| Type | 方向 | トリガー |
+|------|------|----------|
+| task_done | Vice Captain → Captain | サブタスク完了 |
+| task_failed | Vice Captain → Captain | サブタスク失敗 |
+| cmd_done | Captain → Chief of Staff | 施策完了 |
+| cmd_failed | Captain → Chief of Staff | 施策失敗 |
+
+**agent名使用の注意**: inbox_write の送信先には agent_id ではなく agent名（miho 等）を使用します。参謀長は Agent SDK プロセスとして稼働しており、tmux ペインを持たないため、agent_id によるペイン識別ができません。
 
 ### 参謀長モニタ（みほ）
 
@@ -1396,7 +1412,13 @@ multi-agent-GuP-v2/
 ├── instructions/             # エージェント指示書
 │   ├── captain.md            # 隊長の指示書
 │   ├── vice_captain.md       # 副隊長の指示書
-│   ├── member.md           # 隊員の指示書
+│   ├── member.md             # 隊員の指示書
+│   ├── battalion_commander.md # （ハイブリッドモード用）
+│   ├── chief_of_staff.md     # （ハイブリッドモード用）
+│   ├── agent_teams/          # Agent Teams 専用指示書
+│   ├── common/               # 共通ルール
+│   ├── roles/                # ロール定義
+│   ├── generated/            # ビルド生成ファイル
 │   └── cli_specific/         # CLI固有のツール説明
 │       ├── claude_tools.md   # Claude Code ツール・機能
 │       └── copilot_tools.md  # GitHub Copilot CLI ツール・機能
@@ -1405,7 +1427,10 @@ multi-agent-GuP-v2/
 │   ├── inbox_write.sh        # エージェントinboxへのメッセージ書き込み
 │   ├── inbox_watcher.sh      # inotifywaitでinbox変更を監視
 │   ├── ntfy.sh               # スマホにプッシュ通知を送信
-│   └── ntfy_listener.sh      # スマホからのメッセージをストリーミング受信
+│   ├── ntfy_listener.sh      # スマホからのメッセージをストリーミング受信
+│   ├── bridge_relay.sh       # Agent Teams JSON ↔ YAML 変換
+│   ├── watcher_supervisor.sh # （ハイブリッドモード用）watcher 監督
+│   └── build_instructions.sh # CLI 別指示書生成
 │
 ├── config/
 │   ├── settings.yaml         # 言語、ntfy、その他の設定

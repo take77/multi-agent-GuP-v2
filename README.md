@@ -1253,12 +1253,28 @@ export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 5. Vice Captain processes cmd normally (no awareness of Agent Teams)
 
 **Upward (YAML → Agent Teams)**:
-1. Vice Captain marks cmd as done, updates dashboard.md
-2. Captain reads dashboard, checks `source: agent_teams` field
+1. Vice Captain completes subtasks → sends task_done to Captain via inbox_write (push)
+2. Captain receives task_done, checks `source: agent_teams` field
 3. Captain calls `bridge_relay.sh up`
-4. Captain uses TeammateTool.write() to send report to Battalion Commander
+4. Captain sends cmd_done to Chief of Staff (miho) via inbox_write
+5. Captain uses TeammateTool.write() to report to Battalion Commander
 
 **Security marker**: `source: agent_teams` field ensures only Agent Teams-originated cmds are relayed back. Lord-initiated cmds (no source field) stay internal.
+
+### Upward Push Protocol
+
+Agent Teams communication uses inbox_write push instead of dashboard.md polling for upward reports:
+
+| Type | Direction | Trigger |
+|------|-----------|---------|
+| task_done | Vice Captain → Captain | Subtask completed |
+| task_failed | Vice Captain → Captain | Subtask failed |
+| cmd_done | Captain → Chief of Staff | Policy completed |
+| cmd_failed | Captain → Chief of Staff | Policy failed |
+
+**Important**: Progress tracking still uses dashboard.md. Only done/failed events trigger inbox_write push.
+
+**Agent name targeting**: When sending to Chief of Staff, use the agent name (e.g., "miho") as the target, not a role name. The Agent SDK monitor identifies agents by their assigned names.
 
 ### Chief of Staff Monitor
 
@@ -1420,6 +1436,12 @@ multi-agent-GuP-v2/
 │   ├── captain.md            # Captain instructions
 │   ├── vice_captain.md       # Vice Captain instructions
 │   ├── member.md           # Member instructions
+│   ├── battalion_commander.md # Battalion Commander (hybrid mode)
+│   ├── chief_of_staff.md     # Chief of Staff (hybrid mode)
+│   ├── agent_teams/          # Agent Teams specific instructions
+│   ├── common/               # Common rules (all CLIs)
+│   ├── roles/                # Role definitions
+│   ├── generated/            # Generated instruction files per CLI
 │   └── cli_specific/         # CLI-specific tool descriptions
 │       ├── claude_tools.md   # Claude Code tools & features
 │       └── copilot_tools.md  # GitHub Copilot CLI tools & features
@@ -1427,6 +1449,9 @@ multi-agent-GuP-v2/
 ├── scripts/                  # Utility scripts
 │   ├── inbox_write.sh        # Write messages to agent inbox
 │   ├── inbox_watcher.sh      # Watch inbox changes via inotifywait
+│   ├── bridge_relay.sh       # Agent Teams JSON ↔ YAML conversion
+│   ├── watcher_supervisor.sh # Hybrid mode watcher supervisor
+│   ├── build_instructions.sh # CLI-specific instruction generation
 │   ├── ntfy.sh               # Send push notifications to phone
 │   └── ntfy_listener.sh      # Stream incoming messages from phone
 │
