@@ -107,6 +107,9 @@ workflow:
   - step: 11.7
     action: saytask_notify
     note: "Update streaks.yaml and send ntfy notification. See SayTask section."
+  - step: 11.8
+    action: push_notify_captain
+    note: "task_done または task_failed の場合のみ captain へ inbox_write で通知。進行中報告は dashboard.md のみ。See Step 11.8 section."
   - step: 12
     action: reset_pane_display
     note: |
@@ -144,7 +147,7 @@ panes:
 inbox:
   write_script: "scripts/inbox_write.sh"
   to_member: true
-  to_captain: false  # Use dashboard.md instead (interrupt prevention)
+  to_captain: "done/failed only"  # task_done/task_failed type のみ許可（進行中報告は dashboard.md のみ）
 
 parallelization:
   independent_tasks: parallel
@@ -227,9 +230,46 @@ bash scripts/inbox_write.sh member3 "タスクYAMLを読んで作業を開始し
 # No sleep needed. All messages guaranteed delivered by inbox_watcher.sh
 ```
 
-### No Inbox to Captain
+### inbox to captain: done/failedのみ許可
 
-Report via dashboard.md update only. Reason: interrupt prevention during lord's input.
+**inbox to captain: done/failedのみ許可**（task_done/task_failed）— 進行中報告はdashboard.mdのみ
+
+Report ongoing status via dashboard.md update only. Reason: interrupt prevention during lord's input.
+
+## Step 11.8: 隊長への完了/失敗 Push 通知
+
+サブタスクの完了または失敗を確定した後、隊長へ inbox_write で通知する。
+**完了（task_done）と失敗（task_failed）の2イベントのみ。** 進行中の報告は dashboard.md のみ。
+
+**重要**: `captain` というロール名を宛先に使ってはならない。必ずエージェント固有名を使うこと。
+
+| 副隊長 | 隊長名（inbox_write 宛先） |
+|---|---|
+| pekoe | **darjeeling** |
+| nonna | **katyusha** |
+| arisa | **kay** |
+| erika | **maho** |
+
+### サブタスク完了時
+```bash
+bash scripts/inbox_write.sh <captain_name> \
+  "subtask_XXX 完了。{agent_name}: {作業内容}、検証OK。" \
+  task_done <vice_captain_name>
+```
+
+例（erikaの場合）:
+```bash
+bash scripts/inbox_write.sh maho \
+  "subtask_084a 完了。mika: SSE実装、検証OK。" \
+  task_done erika
+```
+
+### サブタスク失敗時
+```bash
+bash scripts/inbox_write.sh <captain_name> \
+  "subtask_XXX 失敗。{agent_name}: {理由}。要対応。" \
+  task_failed <vice_captain_name>
+```
 
 ## Foreground Block Prevention (24-min Freeze Lesson)
 
@@ -296,6 +336,7 @@ task:
   worktree_path: "worktrees/member1"  # optional。省略時はmember自身がブランチを切る
   description: "Create hello1.md with content 'おはよう1'"
   target_path: "/path/to/project/hello1.md"
+  target_branch: "feature/writing-ux-wave4"   # 必須フィールド: 作業対象ブランチ
   echo_message: "🔥 member1, starting the task!"
   status: assigned
   timestamp: "2026-01-25T12:00:00"

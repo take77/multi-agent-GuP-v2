@@ -163,6 +163,12 @@ Special cases (CLI commands sent directly via send-keys):
 - `type: clear_command` → sends `/clear` + Enter + content
 - `type: model_switch` → sends the /model command directly
 
+Inbox type definitions (upward report events):
+- `type: task_done` — Vice Captain → Captain: サブタスク完了通知
+- `type: task_failed` — Vice Captain → Captain: サブタスク失敗通知
+- `type: cmd_done` — Captain → Chief of Staff / Chief of Staff → Commander: 施策完了通知
+- `type: cmd_failed` — Captain → Chief of Staff / Chief of Staff → Commander: 施策失敗・エスカレーション通知
+
 ## Inbox Processing Protocol (vice_captain/member)
 
 When you receive `inboxN` (e.g. `inbox3`):
@@ -195,7 +201,9 @@ When vice_captain determines a task needs to be redone:
 | Direction | Method | Reason |
 |-----------|--------|--------|
 | Member → Vice Captain | Report YAML + inbox_write | File-based notification |
-| Vice Captain → Captain/Commander | dashboard.md update only | **inbox to captain FORBIDDEN** — prevents interrupting Commander's input |
+| Vice Captain → Captain | **done/failed only: inbox_write (task_done/task_failed)**, otherwise dashboard.md | Push on completion/failure only. Progress updates via dashboard. |
+| Captain → Chief of Staff | **done/failed only: inbox_write (cmd_done/cmd_failed)**, otherwise dashboard.md | Push on policy completion/failure only. |
+| Chief of Staff → Commander | **done/failed only: inbox_write (cmd_done/cmd_failed)**, otherwise dashboard.md | Push on critical events only. |
 | Top → Down | YAML + inbox_write | Standard wake-up |
 
 ## File Operation Rule

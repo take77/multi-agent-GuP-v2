@@ -240,6 +240,39 @@ cd /mnt/c/tools/multi-agent-GuP-v2
 ./gup_v2_launch.sh
 ```
 
+### 🚀 起動方法の選択
+
+このシステムは2つの起動モードを提供します：
+
+#### A. 従来モード（YAML-only mode）— 推奨・安定版
+
+- **起動コマンド**: `./gup_v2_launch.sh`
+- **構成**: 司令部(2名) + 4隊(各7名) = 30エージェント、5 tmuxセッション
+- **通信**: YAML mailbox のみ
+- **特徴**: 全エージェントがClaude Codeを直接起動。安定性重視。
+
+#### B. ハイブリッドモード（Agent Teams Hybrid mode）— 実験的
+
+- **起動コマンド**: `./gup_v2_launch_hybrid.sh` または `./gup_v2_launch.sh --agent-teams`
+- **構成**: 司令部(2名) + 4隊(各7名) = 30エージェント、5 tmuxセッション（従来モードと同一構成）
+- **通信**: Agent Teams + YAML mailbox（二層構造）
+- **特徴**: 各隊の隊長はAgent Teamsが制御（Claude Code直接起動なし）。参謀長モニタプロセスがYAML↔Agent Teams間を双方向連携。
+
+#### 🔍 違いの要点
+
+| | 従来モード | ハイブリッドモード |
+|---|---|---|
+| **起動** | `./gup_v2_launch.sh` | `./gup_v2_launch_hybrid.sh` または `--agent-teams` |
+| **構成** | 司令部+4隊=30エージェント | 司令部+4隊=30エージェント（同一） |
+| **通信方式** | YAML mailbox のみ | Agent Teams + YAML（二層） |
+| **隊長起動** | Claude Code直接起動 | Agent Teamsが制御 |
+| **安定性** | 安定版 | 実験的 |
+| **推奨** | 初心者・標準運用 | 大規模プロジェクト |
+
+詳細な仕組みと設定は [🛠️ 上級者向け](#-上級者向け) セクション内の「Agent Teams ハイブリッドモード」を参照してください。
+
+---
+
 ### 📱 スマホからアクセス（どこからでも指揮）
 
 ベッドから、カフェから、トイレから。スマホでAI部下を操作できる。
@@ -1230,12 +1263,28 @@ export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 5. 副隊長が通常通り cmd を処理（Agent Teams 非認識）
 
 **上り通信（YAML → Agent Teams）**:
-1. 副隊長が cmd を完了としてマークし、dashboard.md を更新
-2. 隊長が dashboard を読み、`source: agent_teams` フィールドを確認
+1. 副隊長がサブタスク完了 → inbox_write で task_done を隊長に送信（push）
+2. 隊長が task_done を受信、`source: agent_teams` フィールドをチェック
 3. 隊長が `bridge_relay.sh up` を呼び出し
-4. 隊長が TeammateTool.write() で大隊長に報告を送信
+4. 隊長が inbox_write で cmd_done を参謀長（miho）に送信
+5. 隊長が TeammateTool.write() で大隊長に報告
 
 **セキュリティマーカー**: `source: agent_teams` フィールドにより、Agent Teams 発信の cmd のみが上り報告される。司令官発信の cmd（source フィールドなし）は内部処理のみ。
+
+### 上り Push プロトコル
+
+Agent Teams モードでは、進行状況の確認は dashboard.md、完了/失敗のみ inbox_write push で通知します。
+
+4つの inbox type:
+
+| Type | 方向 | トリガー |
+|------|------|----------|
+| task_done | Vice Captain → Captain | サブタスク完了 |
+| task_failed | Vice Captain → Captain | サブタスク失敗 |
+| cmd_done | Captain → Chief of Staff | 施策完了 |
+| cmd_failed | Captain → Chief of Staff | 施策失敗 |
+
+**agent名使用の注意**: inbox_write の送信先には agent_id ではなく agent名（miho 等）を使用します。参謀長は Agent SDK プロセスとして稼働しており、tmux ペインを持たないため、agent_id によるペイン識別ができません。
 
 ### 参謀長モニタ（みほ）
 
@@ -1396,7 +1445,13 @@ multi-agent-GuP-v2/
 ├── instructions/             # エージェント指示書
 │   ├── captain.md            # 隊長の指示書
 │   ├── vice_captain.md       # 副隊長の指示書
-│   ├── member.md           # 隊員の指示書
+│   ├── member.md             # 隊員の指示書
+│   ├── battalion_commander.md # （ハイブリッドモード用）
+│   ├── chief_of_staff.md     # （ハイブリッドモード用）
+│   ├── agent_teams/          # Agent Teams 専用指示書
+│   ├── common/               # 共通ルール
+│   ├── roles/                # ロール定義
+│   ├── generated/            # ビルド生成ファイル
 │   └── cli_specific/         # CLI固有のツール説明
 │       ├── claude_tools.md   # Claude Code ツール・機能
 │       └── copilot_tools.md  # GitHub Copilot CLI ツール・機能
@@ -1405,7 +1460,10 @@ multi-agent-GuP-v2/
 │   ├── inbox_write.sh        # エージェントinboxへのメッセージ書き込み
 │   ├── inbox_watcher.sh      # inotifywaitでinbox変更を監視
 │   ├── ntfy.sh               # スマホにプッシュ通知を送信
-│   └── ntfy_listener.sh      # スマホからのメッセージをストリーミング受信
+│   ├── ntfy_listener.sh      # スマホからのメッセージをストリーミング受信
+│   ├── bridge_relay.sh       # Agent Teams JSON ↔ YAML 変換
+│   ├── watcher_supervisor.sh # （ハイブリッドモード用）watcher 監督
+│   └── build_instructions.sh # CLI 別指示書生成
 │
 ├── config/
 │   ├── settings.yaml         # 言語、ntfy、その他の設定

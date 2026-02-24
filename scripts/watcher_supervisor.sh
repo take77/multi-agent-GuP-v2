@@ -37,6 +37,17 @@ start_watcher_if_missing() {
         return 0
     fi
 
+    # ハイブリッドモード判定: 隊長エージェントは watcher 起動をスキップ
+    if [[ "${GUP_AGENT_TEAMS_ACTIVE:-0}" == "1" ]]; then
+        local agent_role
+        agent_role=$(tmux show-options -vp -t "$pane" @agent_role 2>/dev/null || true)
+        if [[ "$agent_role" == "captain" ]]; then
+            # ハイブリッドモードでは隊長の watcher をスキップ
+            # 代わりに inbox_watcher.sh のハイブリッドブリッジが Agent Teams JSON inbox を処理する
+            return 0
+        fi
+    fi
+
     if pgrep -f "scripts/inbox_watcher.sh ${agent} " >/dev/null 2>&1; then
         return 0
     fi

@@ -137,11 +137,28 @@ except Exception as e:
         )
 
         if [ -n "$CMD_ID" ]; then
-            # Notify vice_captain via inbox_write.sh
+            # Resolve vice_captain name from cluster config
+            VC_NAME=""
+            CLUSTER_CONFIG="$SCRIPT_DIR/clusters/$CLUSTER_SESSION/config.yaml"
+            if [ -f "$CLUSTER_CONFIG" ]; then
+                VC_NAME=$(python3 -c "
+import yaml
+with open('$CLUSTER_CONFIG') as f:
+    cfg = yaml.safe_load(f)
+print(cfg.get('vice_captain', ''))
+" 2>/dev/null)
+            fi
+
+            if [ -z "$VC_NAME" ]; then
+                log "ERROR: vice_captain not found in $CLUSTER_CONFIG — falling back to 'vice_captain'"
+                VC_NAME="vice_captain"
+            fi
+
+            # Notify vice_captain via inbox_write.sh (using resolved name)
             if [ -n "$CLUSTER_ID" ]; then
-                CLUSTER_ID="$CLUSTER_ID" bash "$SCRIPT_DIR/scripts/inbox_write.sh" vice_captain "新規指令 $CMD_ID を受信。処理されたし。" cmd_new "$CAPTAIN_ID"
+                CLUSTER_ID="$CLUSTER_ID" bash "$SCRIPT_DIR/scripts/inbox_write.sh" "$VC_NAME" "新規指令 $CMD_ID を受信。処理されたし。" cmd_new "$CAPTAIN_ID"
             else
-                bash "$SCRIPT_DIR/scripts/inbox_write.sh" vice_captain "新規指令 $CMD_ID を受信。処理されたし。" cmd_new "$CAPTAIN_ID"
+                bash "$SCRIPT_DIR/scripts/inbox_write.sh" "$VC_NAME" "新規指令 $CMD_ID を受信。処理されたし。" cmd_new "$CAPTAIN_ID"
             fi
 
             log "DOWN SUCCESS: $CMD_ID created (project=$PROJECT, priority=$PRIORITY)"

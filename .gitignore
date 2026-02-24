@@ -3,15 +3,15 @@
 # デフォルト全除外 → OSS公開対象のみ許可
 # ══════════════════════════════════════════════════
 
-# Node.js dependencies (exclude from repository)
-node_modules/
-scripts/monitor/node_modules/
-
 # Step 1: 全て除外
 *
 
 # Step 2: ディレクトリの探索を許可（中身は個別に許可）
 !*/
+
+# Node.js dependencies (must be AFTER !*/ to take effect in whitelist mode)
+node_modules/
+scripts/monitor/node_modules/
 
 # Step 3: OSS公開対象ファイルを許可
 !.gitignore
@@ -36,6 +36,7 @@ scripts/monitor/node_modules/
 !instructions/karo.md
 !instructions/ashigaru.md
 !instructions/battalion_commander.md
+!instructions/chief_of_staff.md
 
 # Multi-CLI: CLI-specific tool descriptions
 !instructions/cli_specific/
@@ -158,6 +159,7 @@ scripts/monitor/node_modules/
 !scripts/
 !scripts/monitor/
 !scripts/monitor/**
+scripts/monitor/node_modules/
 
 # Test infrastructure (cmd_024)
 !tests/

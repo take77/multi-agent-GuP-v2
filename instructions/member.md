@@ -204,11 +204,31 @@ date "+%Y-%m-%dT%H:%M:%S"
 
 ## Report Notification Protocol
 
-After writing report YAML, notify Vice_Captain:
+After writing report YAML, notify your squad's Vice_Captain **by agent name** (NOT the role name "vice_captain").
+
+### 副隊長名の特定
+
+config/squads.yaml を参照し、自分が所属する隊の vice_captain 名を使う:
+
+| 隊 | 隊員 | 副隊長名（inbox_write 宛先） |
+|---|---|---|
+| darjeeling | hana, rosehip, marie, andou, oshida | **pekoe** |
+| katyusha | klara, mako, erwin, caesar, saori | **nonna** |
+| kay | naomi, yukari, anchovy, carpaccio, pepperoni | **arisa** |
+| maho | mika, aki, mikko, kinuyo, fukuda | **erika** |
+
+### 報告送信
 
 ```bash
-bash scripts/inbox_write.sh vice_captain "隊員{N}号、任務完了です。報告書を確認してください。" report_received member{N}
+bash scripts/inbox_write.sh <vice_captain_name> "<AGENT_ID>、任務完了です。報告書を確認してください。" report_received <AGENT_ID>
 ```
+
+例（mikaの場合）:
+```bash
+bash scripts/inbox_write.sh erika "ミカです。subtask_084a 完了しました。報告書を確認してください。" report_received mika
+```
+
+**重要**: `vice_captain` というロール名を宛先に使ってはならない。必ずエージェント固有名（pekoe/nonna/arisa/erika）を使うこと。ロール名で送信するとメッセージが配信されない。
 
 That's it. No state checking, no retry, no delivery verification.
 The inbox_write guarantees persistence. inbox_watcher handles delivery.
@@ -237,6 +257,10 @@ task_id: subtask_001
 parent_cmd: cmd_035
 timestamp: "2026-01-25T10:15:00"  # from date command
 status: done  # done | failed | blocked
+commit_info:
+  branch: "feature/writing-ux-wave4"
+  commit_hash: "4b81b3b"
+  pushed_to: "origin/feature/writing-ux-wave4"
 
 # === NEW v2.0: Changed Files (MANDATORY) ===
 changed_files:
@@ -338,6 +362,25 @@ If conflict risk exists:
 1. Set status to `blocked`
 2. Note "conflict risk" in notes
 3. Request Vice_Captain's guidance
+
+## 失敗エスカレーション判断基準
+
+タスク実行失敗時、以下の基準で自力修正とエスカレーションを判断する。
+
+### 自力修正 OK（副隊長への report_failed を送らずに修正して再試行）
+- 自分のコードのバグ（typo、logic error）
+- lint/format エラー（自分のコミット起因）
+- ビルドエラー（自分のコミット起因）
+- **上限: 同じ問題で3回まで。3回失敗したらエスカレーション**
+
+### エスカレーション必須（即座に report_failed を副隊長に送信）
+- 設計問題（要件が不明、実現不可能な要求）
+- 環境問題（ツール未インストール、権限エラー、接続失敗）
+- 他タスクとの競合（別隊員が同じファイルを変更、ブランチ競合）
+- 権限外の変更が必要（自分のタスク範囲外のファイル修正が必要）
+- テスト失敗（自分のコミット以外が原因）
+
+**判断に迷ったらエスカレーション。** 自己修正を長引かせるより、副隊長に判断を仰ぐ方が速い。
 
 ## Persona
 
