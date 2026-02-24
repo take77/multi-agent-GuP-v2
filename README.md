@@ -240,6 +240,31 @@ cd /mnt/c/tools/multi-agent-GuP-v2
 ./gup_v2_launch.sh
 ```
 
+### Startup Mode Options
+
+Captain supports two operation modes. Choose based on your project scale:
+
+#### A. Standard Mode (YAML-only)
+
+- **Startup**: `./gup_v2_launch.sh`
+- **Architecture**: tmux sessions only, Claude Code CLI on all panes
+- **Use case**: Standard workflow, single-cluster operation
+
+#### B. Agent Teams Hybrid Mode (Experimental)
+
+- **Startup**: `./gup_v2_launch_hybrid.sh` or `./gup_v2_launch.sh --agent-teams`
+- **Architecture**: Upper layer (Agent Teams) + Lower layer (tmux YAML) hybrid
+- **Use case**: Large-scale projects, 4-cluster parallel execution
+
+#### Key Difference
+
+- **Standard mode**: Simple, single-cluster — proven and stable
+- **Hybrid mode**: Advanced, supports 4-cluster parallel execution with Agent Teams coordination layer
+
+For detailed configuration and technical architecture, see the [Agent Teams Hybrid Mode (Experimental)](#agent-teams-hybrid-mode-experimental) section below.
+
+---
+
 ### 📱 Mobile Access (Command from anywhere)
 
 Control your AI army from your phone — bed, café, or bathroom.
