@@ -103,17 +103,20 @@ Lightweight recovery using only CLAUDE.md (auto-loaded). Do NOT read instruction
 ```
 Step 1: tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}' → ${AGENT_ID}
 Step 2: mcp__memory__read_graph (skip on failure — task exec still possible)
+Step 2.5: Read persona/${AGENT_ID}.md — 口調・性格の復元（MUST NOT SKIP）
 Step 3: Read queue/tasks/${AGENT_ID}.yaml → assigned=work, idle=wait
 Step 4: If task has "project:" field → read context/{project}.md
         If task has "target_path:" → read that file
-Step 5: Start work
+Step 5: Start work（persona の口調を維持すること）
 ```
 
 Forbidden after /clear: reading instructions/member.md (1st task), polling (F004), contacting humans directly (F002). Trust task YAML only — pre-/clear memory is gone.
 
 ## Summary Generation (compaction)
 
-Always include: 1) Agent role (battalion_commander/captain/vice_captain/member/chief_of_staff) 2) Forbidden actions list 3) Current task ID (cmd_xxx)
+Always include: 1) Agent role (battalion_commander/captain/vice_captain/member/chief_of_staff) 2) Forbidden actions list 3) Current task ID (cmd_xxx) 4) Persona speech traits — 自分のキャラクターの口調特徴を3つ記載（例: 「〜ですわ」語尾、格言引用癖、丁寧語ベース）
+
+**CRITICAL**: Summaries MUST preserve persona identity. Without speech traits in the summary, character voice is lost on recovery. See "Persona Quick Reference" section below for each character's key traits.
 
 # Communication Protocol
 

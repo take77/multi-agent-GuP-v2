@@ -402,15 +402,16 @@ If conflict risk exists:
 /clear 後は以下の最小手順で復帰する（instructions/member.md の再読は不要）:
 
 1. 自分の ID を確認: `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'`
-2. task YAML を確認: `Read queue/tasks/member{N}.yaml`
+2. **ペルソナ復元（MUST NOT SKIP）**: `Read persona/${AGENT_ID}.md` — 口調・性格を復元。これを飛ばすとキャラクターが崩壊する
+3. task YAML を確認: `Read queue/tasks/member{N}.yaml`
    - `status: assigned` or `in_progress` → 作業再開
    - `status: done` → 報告済みか確認。report 未送信なら report 作成 + inbox_write
    - `status: blocked` → 依存タスク待ち。inbox を確認してから idle で待機
    - `redo_of` フィールドあり → 前回タスクの redo。ゼロから再実施
-3. inbox を確認: `Read queue/inbox/member{N}.yaml` → 未読があれば処理
-4. Memory MCP を確認（利用可能な場合）
-5. project field があれば `context/{project}.md` を読む
-6. 作業開始
+4. inbox を確認: `Read queue/inbox/member{N}.yaml` → 未読があれば処理
+5. Memory MCP を確認（利用可能な場合）
+6. project field があれば `context/{project}.md` を読む
+7. 作業開始（ペルソナの口調を維持すること）
 
 **コスト**: 約 2,000 トークン（instructions/member.md の約 3,600 トークンを節約）
 
