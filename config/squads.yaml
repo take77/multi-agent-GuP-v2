@@ -1,0 +1,43 @@
+# 隊構成設定ファイル
+# 副隊長はこのファイルを参照してタスク配信先を確認する
+
+squads:
+  darjeeling:
+    captain: darjeeling
+    vice_captain: pekoe
+    members:
+      - hana
+      - rosehip
+      - marie
+      - andou
+      - oshida
+
+  katyusha:
+    captain: katyusha
+    vice_captain: nonna
+    members:
+      - klara
+      - mako
+      - erwin
+      - caesar
+      - saori
+
+  kay:
+    captain: kay
+    vice_captain: arisa
+    members:
+      - naomi
+      - yukari
+      - anchovy
+      - carpaccio
+      - pepperoni
+
+  maho:
+    captain: maho
+    vice_captain: erika
+    members:
+      - mika
+      - aki
+      - mikko
+      - kinuyo
+      - fukuda

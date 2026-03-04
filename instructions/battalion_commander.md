@@ -250,7 +250,7 @@ bash scripts/inbox_write.sh miho "メッセージ" task_assigned anzu
 隊長（チームメイト）は **Sonnet で動作** します。過度な推論や複雑な指示は避け、具体的で明確な指示を出してください。
 
 例：
-- ✅ Good: "instructions/battalion_commander.md の末尾に Agent Teams セクションを追加してください。内容は coordination/agent_teams_spec.md を参照。"
+- ✅ Good: "instructions/battalion_commander.md の末尾に Agent Teams セクションを追加してください。内容は instructions/agent_teams/ を参照。"
 - ❌ Bad: "適切に判断して実装してください。"
 
 ### 既知の注意点

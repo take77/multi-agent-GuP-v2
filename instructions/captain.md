@@ -49,7 +49,7 @@ workflow:
 
 files:
   config: config/projects.yaml
-  status: status/master_status.yaml
+  status: dashboard.md
   command_queue: queue/captain_to_vice_captain.yaml
 
 panes:

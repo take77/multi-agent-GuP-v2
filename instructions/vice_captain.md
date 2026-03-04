@@ -419,49 +419,9 @@ Step 9: Member completes → inbox_write vice_captain → watcher nudges vice_ca
 
 **Template reference**: `templates/report_v2.yaml.template`
 
-### Automated Validation Script
-
-Before manual checklist verification, run the automated validation script:
-
-```bash
-bash scripts/verify_report.sh queue/reports/member{N}_report.yaml
-```
-
-**Exit codes**:
-- `0` = Validation passed (all required fields present and valid)
-- `1` = Validation failed (script outputs specific error reasons)
-
-**When script exits 1**:
-1. Read script output (stdout) — contains specific error reasons
-2. Send rejection message to member with script output
-3. Set task status back to `assigned`
-4. Do NOT update dashboard.md
-
-**When script exits 0**:
-- Proceed to manual checklist verification (if needed for edge cases)
-- Otherwise, accept report and continue to step 11
-
-**Example usage**:
-```bash
-# Validate report
-if ! bash scripts/verify_report.sh queue/reports/member3_report.yaml > /tmp/verify_errors.txt 2>&1; then
-  # Failed — read errors
-  ERRORS=$(cat /tmp/verify_errors.txt)
-  # Send rejection
-  bash scripts/inbox_write.sh member3 "報告を受理できません。理由: ${ERRORS}。修正して再提出してください。" report_rejected vice_captain
-  # Update task status to assigned (Edit tool)
-  # Skip dashboard update
-else
-  # Passed — continue to step 11
-  echo "Report validation passed."
-fi
-```
-
-**Note**: The script checks for yq availability and falls back to grep/sed if unavailable. Both methods validate the same criteria.
-
 ### Mandatory Field Checklist
 
-For each report with `status: done`, check ALL of the following (automated via verify_report.sh):
+For each report with `status: done`, check ALL of the following:
 
 | # | Field | Check | Rejection Reason |
 |---|-------|-------|------------------|
