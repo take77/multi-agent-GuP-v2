@@ -30,6 +30,10 @@ scripts/monitor/node_modules/
 !.claude/hooks/
 !.claude/hooks/session_start.sh
 
+# Persona files (character definitions — safe for OSS)
+!persona/
+!persona/*.md
+
 # Instructions (core OSS)
 !instructions/
 !instructions/shogun.md
