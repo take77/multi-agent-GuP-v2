@@ -124,12 +124,11 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "モデル構成:"
             echo "  大隊長/参謀長: Opus（--captain-no-thinkingで大隊長のthinking無効化）"
-            echo "  隊長/副隊長:   Opus"
-            echo "  隊員1-4:   Sonnet"
-            echo "  隊員5-8:   Opus"
+            echo "  隊長:          Opus"
+            echo "  隊員1-6:       Sonnet"
             echo ""
             echo "隊形:"
-            echo "  平時の隊（デフォルト）: 隊員1-4=Sonnet, 隊員5-8=Opus"
+            echo "  平時の隊（デフォルト）: 隊員1-6=Sonnet"
             echo "  決戦モード（--kessen）:   全隊員=Opus"
             echo ""
             echo "表示モード:"
@@ -195,8 +194,8 @@ launch_darjeeling_cluster() {
     launch_squad_cluster "darjeeling" "🫖" "ダージリン隊" \
         "darjeeling,pekoe,hana,rosehip,marie,oshida,andou" \
         "ダージリン,オレンジペコ,五十鈴華,ローズヒップ,マリー,押田,安藤" \
-        "captain,vice_captain,member,member,member,member,member" \
-        "magenta,red,blue,blue,blue,blue,blue"
+        "captain,member,member,member,member,member,member" \
+        "magenta,blue,blue,blue,blue,blue,blue"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -206,8 +205,8 @@ launch_katyusha_cluster() {
     launch_squad_cluster "katyusha" "🪆" "カチューシャ隊" \
         "katyusha,nonna,klara,mako,erwin,caesar,saori" \
         "カチューシャ,ノンナ,クラーラ,冷泉麻子,エルヴィン,カエサル,武部沙織" \
-        "captain,vice_captain,member,member,member,member,member" \
-        "magenta,red,blue,blue,blue,blue,blue"
+        "captain,member,member,member,member,member,member" \
+        "magenta,blue,blue,blue,blue,blue,blue"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -217,8 +216,8 @@ launch_kay_cluster() {
     launch_squad_cluster "kay" "🦅" "ケイ隊" \
         "kay,arisa,naomi,anchovy,pepperoni,carpaccio,yukari" \
         "ケイ,アリサ,ナオミ,アンチョビ,ペパロニ,カルパッチョ,秋山優花里" \
-        "captain,vice_captain,member,member,member,member,member" \
-        "magenta,red,blue,blue,blue,blue,blue"
+        "captain,member,member,member,member,member,member" \
+        "magenta,blue,blue,blue,blue,blue,blue"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -228,8 +227,8 @@ launch_maho_cluster() {
     launch_squad_cluster "maho" "🖤" "西住まほ隊" \
         "maho,erika,mika,aki,mikko,kinuyo,fukuda" \
         "西住まほ,逸見エリカ,ミカ,アキ,ミッコ,西絹代,福田" \
-        "captain,vice_captain,member,member,member,member,member" \
-        "magenta,red,blue,blue,blue,blue,blue"
+        "captain,member,member,member,member,member,member" \
+        "magenta,blue,blue,blue,blue,blue,blue"
 }
 
 # バナー表示実行
@@ -316,8 +315,8 @@ if [ "$CLEAN_MODE" = true ]; then
     fi
 
     # 既存の dashboard.md 判定の後に追加
-    if [ -f "./queue/captain_to_vice_captain.yaml" ]; then
-        if grep -q "id: cmd_" "./queue/captain_to_vice_captain.yaml" 2>/dev/null; then
+    if [ -f "./queue/captain_queue.yaml" ]; then
+        if grep -q "id: cmd_" "./queue/captain_queue.yaml" 2>/dev/null; then
             NEED_BACKUP=true
         fi
     fi
@@ -327,7 +326,7 @@ if [ "$CLEAN_MODE" = true ]; then
         cp "./dashboard.md" "$BACKUP_DIR/" 2>/dev/null || true
         cp -r "./queue/reports" "$BACKUP_DIR/" 2>/dev/null || true
         cp -r "./queue/tasks" "$BACKUP_DIR/" 2>/dev/null || true
-        cp "./queue/captain_to_vice_captain.yaml" "$BACKUP_DIR/" 2>/dev/null || true
+        cp "./queue/captain_queue.yaml" "$BACKUP_DIR/" 2>/dev/null || true
         log_info "📦 前回の記録をバックアップ: $BACKUP_DIR"
     fi
 fi
@@ -339,13 +338,21 @@ fi
 # queue ディレクトリが存在しない場合は作成（初回起動時に必要）
 [ -d ./queue/reports ] || mkdir -p ./queue/reports
 [ -d ./queue/tasks ] || mkdir -p ./queue/tasks
-# inbox はLinux FSにシンボリックリンク（WSL2の/mnt/c/ではinotifywaitが動かないため）
-INBOX_LINUX_DIR="$HOME/.local/share/multi-agent-captain/inbox"
-if [ ! -L ./queue/inbox ]; then
-    mkdir -p "$INBOX_LINUX_DIR"
-    [ -d ./queue/inbox ] && cp ./queue/inbox/*.yaml "$INBOX_LINUX_DIR/" 2>/dev/null && rm -rf ./queue/inbox
-    ln -sf "$INBOX_LINUX_DIR" ./queue/inbox
-    log_info "  └─ inbox → Linux FS ($INBOX_LINUX_DIR) にシンボリックリンク作成"
+
+# inbox ディレクトリ処理（OS別）
+OS_TYPE="$(uname -s)"
+if [ "$OS_TYPE" = "Darwin" ]; then
+    # macOS: 通常のディレクトリを使用
+    [ -d ./queue/inbox ] || mkdir -p ./queue/inbox
+else
+    # Linux/WSL2: Linux FSにシンボリックリンク（WSL2の/mnt/c/ではinotifywaitが動かないため）
+    INBOX_LINUX_DIR="$HOME/.local/share/multi-agent-captain/inbox"
+    if [ ! -L ./queue/inbox ]; then
+        mkdir -p "$INBOX_LINUX_DIR"
+        [ -d ./queue/inbox ] && cp ./queue/inbox/*.yaml "$INBOX_LINUX_DIR/" 2>/dev/null && rm -rf ./queue/inbox
+        ln -sf "$INBOX_LINUX_DIR" ./queue/inbox
+        log_info "  └─ inbox → Linux FS ($INBOX_LINUX_DIR) にシンボリックリンク作成"
+    fi
 fi
 
 if [ "$CLEAN_MODE" = true ]; then
@@ -778,16 +785,16 @@ echo ""
 echo "     【darjeelingセッション】ダージリン隊（7ペイン）"
 echo "     ┌──────────┬──────────┐"
 echo "     │darjeeling│  marie   │"
-echo "     │ (隊長)   │ (隊員3)  │"
+echo "     │ (隊長)   │ (隊員4)  │"
 echo "     ├──────────┤──────────┤"
 echo "     │  pekoe   │ oshida   │"
-echo "     │(副隊長)  │ (隊員4)  │"
+echo "     │ (隊員1)  │ (隊員5)  │"
 echo "     ├──────────┤──────────┤"
 echo "     │  hana    │ andou    │"
-echo "     │ (隊員1)  │ (隊員5)  │"
+echo "     │ (隊員2)  │ (隊員6)  │"
 echo "     ├──────────┘          │"
 echo "     │ rosehip             │"
-echo "     │ (隊員2)             │"
+echo "     │ (隊員3)             │"
 echo "     └─────────────────────┘"
 echo ""
 echo "     ※ katyusha / kay / maho 隊も同一レイアウト（7ペイン×4隊）"

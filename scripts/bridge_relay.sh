@@ -47,10 +47,10 @@ if [ "$DIRECTION" == "down" ]; then
 
     # Determine queue path (cluster-aware)
     if [ -d "$SCRIPT_DIR/clusters/$CLUSTER_SESSION/queue" ]; then
-        QUEUE_FILE="$SCRIPT_DIR/clusters/$CLUSTER_SESSION/queue/captain_to_vice_captain.yaml"
+        QUEUE_FILE="$SCRIPT_DIR/clusters/$CLUSTER_SESSION/queue/captain_queue.yaml"
         CLUSTER_ID="$CLUSTER_SESSION"
     else
-        QUEUE_FILE="$SCRIPT_DIR/queue/captain_to_vice_captain.yaml"
+        QUEUE_FILE="$SCRIPT_DIR/queue/captain_queue.yaml"
         CLUSTER_ID=""
     fi
 
@@ -137,28 +137,28 @@ except Exception as e:
         )
 
         if [ -n "$CMD_ID" ]; then
-            # Resolve vice_captain name from cluster config
-            VC_NAME=""
+            # Resolve captain name from cluster config
+            CAPTAIN_NAME=""
             CLUSTER_CONFIG="$SCRIPT_DIR/clusters/$CLUSTER_SESSION/config.yaml"
             if [ -f "$CLUSTER_CONFIG" ]; then
-                VC_NAME=$(python3 -c "
+                CAPTAIN_NAME=$(python3 -c "
 import yaml
 with open('$CLUSTER_CONFIG') as f:
     cfg = yaml.safe_load(f)
-print(cfg.get('vice_captain', ''))
+print(cfg.get('captain', ''))
 " 2>/dev/null)
             fi
 
-            if [ -z "$VC_NAME" ]; then
-                log "ERROR: vice_captain not found in $CLUSTER_CONFIG — falling back to 'vice_captain'"
-                VC_NAME="vice_captain"
+            if [ -z "$CAPTAIN_NAME" ]; then
+                log "WARNING: captain not found in $CLUSTER_CONFIG — falling back to '$CAPTAIN_ID'"
+                CAPTAIN_NAME="$CAPTAIN_ID"
             fi
 
-            # Notify vice_captain via inbox_write.sh (using resolved name)
+            # Notify captain via inbox_write.sh (captain processes cmd directly)
             if [ -n "$CLUSTER_ID" ]; then
-                CLUSTER_ID="$CLUSTER_ID" bash "$SCRIPT_DIR/scripts/inbox_write.sh" "$VC_NAME" "新規指令 $CMD_ID を受信。処理されたし。" cmd_new "$CAPTAIN_ID"
+                CLUSTER_ID="$CLUSTER_ID" bash "$SCRIPT_DIR/scripts/inbox_write.sh" "$CAPTAIN_NAME" "新規指令 $CMD_ID を受信。処理されたし。" cmd_new bridge_relay
             else
-                bash "$SCRIPT_DIR/scripts/inbox_write.sh" "$VC_NAME" "新規指令 $CMD_ID を受信。処理されたし。" cmd_new "$CAPTAIN_ID"
+                bash "$SCRIPT_DIR/scripts/inbox_write.sh" "$CAPTAIN_NAME" "新規指令 $CMD_ID を受信。処理されたし。" cmd_new bridge_relay
             fi
 
             log "DOWN SUCCESS: $CMD_ID created (project=$PROJECT, priority=$PRIORITY)"
