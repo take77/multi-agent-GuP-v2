@@ -46,12 +46,31 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
         echo "messages: []" > "$INBOX"
     fi
 
+    # macOS compatibility: timeout polyfill
+    # Linux has timeout in coreutils; macOS does not.
+    # This polyfill only activates when timeout is missing (no impact on Linux).
+    if ! command -v timeout &>/dev/null; then
+        timeout() { perl -e 'alarm shift; exec @ARGV' "$@"; }
+    fi
+
     echo "[$(date)] inbox_watcher started — agent: $AGENT_ID, pane: $PANE_TARGET, cli: $CLI_TYPE" >&2
 
-    # Ensure inotifywait is available
-    if ! command -v inotifywait &>/dev/null; then
-        echo "[inbox_watcher] ERROR: inotifywait not found. Install: sudo apt install inotify-tools" >&2
-        exit 1
+    # Detect OS and set file watcher command
+    OS_TYPE="$(uname -s)"
+    if [ "$OS_TYPE" = "Darwin" ]; then
+        # macOS: use fswatch
+        if ! command -v fswatch &>/dev/null; then
+            echo "[inbox_watcher] ERROR: fswatch not found. Install: brew install fswatch" >&2
+            exit 1
+        fi
+        FILE_WATCHER="fswatch"
+    else
+        # Linux: use inotifywait
+        if ! command -v inotifywait &>/dev/null; then
+            echo "[inbox_watcher] ERROR: inotifywait not found. Install: sudo apt install inotify-tools" >&2
+            exit 1
+        fi
+        FILE_WATCHER="inotifywait"
     fi
 fi
 
@@ -677,35 +696,76 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
 # ─── Startup: process any existing unread messages ───
 process_unread_once
 
-# ─── Main loop: event-driven via inotifywait ───
+# ─── Main loop: event-driven via inotifywait (Linux) or fswatch (macOS) ───
 # Timeout configured via config/settings.yaml (default 30s).
 # WSL2 /mnt/c/ can miss inotify events.
 # Shorter timeout = faster escalation retry for stuck agents.
 # INOTIFY_TIMEOUT is loaded from settings.yaml or defaults to 30
 
-while true; do
-    # Block until file is modified OR timeout (safety net for WSL2)
-    # set +e: inotifywait returns 2 on timeout, which would kill script under set -e
-    set +e
-    inotifywait -q -t "$INOTIFY_TIMEOUT" -e modify -e close_write "$INBOX" 2>/dev/null
-    rc=$?
-    set -e
+if [ "$FILE_WATCHER" = "fswatch" ]; then
+    # ─── macOS: fswatch-based loop ───
+    # fswatch doesn't have native timeout, so we use a background process approach
+    while true; do
+        set +e
+        # Run fswatch in background, timeout after INOTIFY_TIMEOUT seconds
+        fswatch -1 --event Updated --event Renamed "$INBOX" &
+        FSWATCH_PID=$!
 
-    # rc=0: event fired (instant delivery)
-    # rc=1: watch invalidated — Claude Code uses atomic write (tmp+rename),
-    #        which replaces the inode. inotifywait sees DELETE_SELF → rc=1.
-    #        File still exists with new inode. Treat as event, re-watch next loop.
-    # rc=2: timeout (30s safety net for WSL2 inotify gaps)
-    # All cases: check for unread, then loop back to inotifywait (re-watches new inode)
-    sleep 0.3
+        # Wait for fswatch or timeout
+        WAIT_COUNT=0
+        while kill -0 "$FSWATCH_PID" 2>/dev/null; do
+            sleep 1
+            WAIT_COUNT=$((WAIT_COUNT + 1))
+            if [ "$WAIT_COUNT" -ge "$INOTIFY_TIMEOUT" ]; then
+                kill "$FSWATCH_PID" 2>/dev/null || true
+                wait "$FSWATCH_PID" 2>/dev/null || true
+                rc=2  # timeout
+                break
+            fi
+        done
 
-    if [ "$rc" -eq 2 ]; then
-        if [ "${ASW_PROCESS_TIMEOUT:-1}" = "1" ]; then
-            process_unread "timeout"
+        if [ "$WAIT_COUNT" -lt "$INOTIFY_TIMEOUT" ]; then
+            wait "$FSWATCH_PID" 2>/dev/null
+            rc=$?  # 0 = event fired
         fi
-    else
-        process_unread "event"
-    fi
-done
+        set -e
+
+        sleep 0.3
+
+        if [ "$rc" -eq 2 ]; then
+            if [ "${ASW_PROCESS_TIMEOUT:-1}" = "1" ]; then
+                process_unread "timeout"
+            fi
+        else
+            process_unread "event"
+        fi
+    done
+else
+    # ─── Linux: inotifywait-based loop ───
+    while true; do
+        # Block until file is modified OR timeout (safety net for WSL2)
+        # set +e: inotifywait returns 2 on timeout, which would kill script under set -e
+        set +e
+        inotifywait -q -t "$INOTIFY_TIMEOUT" -e modify -e close_write "$INBOX" 2>/dev/null
+        rc=$?
+        set -e
+
+        # rc=0: event fired (instant delivery)
+        # rc=1: watch invalidated — Claude Code uses atomic write (tmp+rename),
+        #        which replaces the inode. inotifywait sees DELETE_SELF → rc=1.
+        #        File still exists with new inode. Treat as event, re-watch next loop.
+        # rc=2: timeout (30s safety net for WSL2 inotify gaps)
+        # All cases: check for unread, then loop back to inotifywait (re-watches new inode)
+        sleep 0.3
+
+        if [ "$rc" -eq 2 ]; then
+            if [ "${ASW_PROCESS_TIMEOUT:-1}" = "1" ]; then
+                process_unread "timeout"
+            fi
+        else
+            process_unread "event"
+        fi
+    done
+fi
 
 fi  # end testing guard

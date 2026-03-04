@@ -197,8 +197,8 @@ if [ -n "$CLUSTER_MODE" ]; then
             launch_squad_cluster "darjeeling" "🫖" "ダージリン隊" \
                 "darjeeling,pekoe,hana,rosehip,marie,oshida,andou" \
                 "ダージリン,オレンジペコ,五十鈴華,ローズヒップ,マリー,押田,安藤" \
-                "captain,vice_captain,member,member,member,member,member" \
-                "magenta,red,blue,blue,blue,blue,blue" \
+                "captain,member,member,member,member,member,member" \
+                "magenta,blue,blue,blue,blue,blue,blue" \
                 true
             exit 0
             ;;
@@ -208,8 +208,8 @@ if [ -n "$CLUSTER_MODE" ]; then
             launch_squad_cluster "katyusha" "🪆" "カチューシャ隊" \
                 "katyusha,nonna,klara,mako,erwin,caesar,saori" \
                 "カチューシャ,ノンナ,クラーラ,冷泉麻子,エルヴィン,カエサル,武部沙織" \
-                "captain,vice_captain,member,member,member,member,member" \
-                "magenta,red,blue,blue,blue,blue,blue" \
+                "captain,member,member,member,member,member,member" \
+                "magenta,blue,blue,blue,blue,blue,blue" \
                 true
             exit 0
             ;;
@@ -219,8 +219,8 @@ if [ -n "$CLUSTER_MODE" ]; then
             launch_squad_cluster "kay" "🦅" "ケイ隊" \
                 "kay,arisa,naomi,anchovy,pepperoni,carpaccio,yukari" \
                 "ケイ,アリサ,ナオミ,アンチョビ,ペパロニ,カルパッチョ,秋山優花里" \
-                "captain,vice_captain,member,member,member,member,member" \
-                "magenta,red,blue,blue,blue,blue,blue" \
+                "captain,member,member,member,member,member,member" \
+                "magenta,blue,blue,blue,blue,blue,blue" \
                 true
             exit 0
             ;;
@@ -230,8 +230,8 @@ if [ -n "$CLUSTER_MODE" ]; then
             launch_squad_cluster "maho" "🖤" "西住まほ隊" \
                 "maho,erika,mika,aki,mikko,kinuyo,fukuda" \
                 "西住まほ,逸見エリカ,ミカ,アキ,ミッコ,西絹代,福田" \
-                "captain,vice_captain,member,member,member,member,member" \
-                "magenta,red,blue,blue,blue,blue,blue" \
+                "captain,member,member,member,member,member,member" \
+                "magenta,blue,blue,blue,blue,blue,blue" \
                 true
             exit 0
             ;;
@@ -241,26 +241,26 @@ if [ -n "$CLUSTER_MODE" ]; then
             launch_squad_cluster "darjeeling" "🫖" "ダージリン隊" \
                 "darjeeling,pekoe,hana,rosehip,marie,oshida,andou" \
                 "ダージリン,オレンジペコ,五十鈴華,ローズヒップ,マリー,押田,安藤" \
-                "captain,vice_captain,member,member,member,member,member" \
-                "magenta,red,blue,blue,blue,blue,blue" \
+                "captain,member,member,member,member,member,member" \
+                "magenta,blue,blue,blue,blue,blue,blue" \
                 true
             launch_squad_cluster "katyusha" "🪆" "カチューシャ隊" \
                 "katyusha,nonna,klara,mako,erwin,caesar,saori" \
                 "カチューシャ,ノンナ,クラーラ,冷泉麻子,エルヴィン,カエサル,武部沙織" \
-                "captain,vice_captain,member,member,member,member,member" \
-                "magenta,red,blue,blue,blue,blue,blue" \
+                "captain,member,member,member,member,member,member" \
+                "magenta,blue,blue,blue,blue,blue,blue" \
                 true
             launch_squad_cluster "kay" "🦅" "ケイ隊" \
                 "kay,arisa,naomi,anchovy,pepperoni,carpaccio,yukari" \
                 "ケイ,アリサ,ナオミ,アンチョビ,ペパロニ,カルパッチョ,秋山優花里" \
-                "captain,vice_captain,member,member,member,member,member" \
-                "magenta,red,blue,blue,blue,blue,blue" \
+                "captain,member,member,member,member,member,member" \
+                "magenta,blue,blue,blue,blue,blue,blue" \
                 true
             launch_squad_cluster "maho" "🖤" "西住まほ隊" \
                 "maho,erika,mika,aki,mikko,kinuyo,fukuda" \
                 "西住まほ,逸見エリカ,ミカ,アキ,ミッコ,西絹代,福田" \
-                "captain,vice_captain,member,member,member,member,member" \
-                "magenta,red,blue,blue,blue,blue,blue" \
+                "captain,member,member,member,member,member,member" \
+                "magenta,blue,blue,blue,blue,blue,blue" \
                 true
             exit 0
             ;;
@@ -293,8 +293,8 @@ if [ "$CLEAN_MODE" = true ]; then
         fi
     fi
 
-    if [ -f "./queue/captain_to_vice_captain.yaml" ]; then
-        if grep -q "id: cmd_" "./queue/captain_to_vice_captain.yaml" 2>/dev/null; then
+    if [ -f "./queue/captain_queue.yaml" ]; then
+        if grep -q "id: cmd_" "./queue/captain_queue.yaml" 2>/dev/null; then
             NEED_BACKUP=true
         fi
     fi
@@ -304,7 +304,7 @@ if [ "$CLEAN_MODE" = true ]; then
         cp "./dashboard.md" "$BACKUP_DIR/" 2>/dev/null || true
         cp -r "./queue/reports" "$BACKUP_DIR/" 2>/dev/null || true
         cp -r "./queue/tasks" "$BACKUP_DIR/" 2>/dev/null || true
-        cp "./queue/captain_to_vice_captain.yaml" "$BACKUP_DIR/" 2>/dev/null || true
+        cp "./queue/captain_queue.yaml" "$BACKUP_DIR/" 2>/dev/null || true
         log_info "📦 前回の記録をバックアップ: $BACKUP_DIR"
     fi
 fi
@@ -720,32 +720,32 @@ if [ "$SETUP_ONLY" = false ]; then
     launch_squad_cluster "darjeeling" "🫖" "ダージリン隊" \
         "darjeeling,pekoe,hana,rosehip,marie,oshida,andou" \
         "ダージリン,オレンジペコ,五十鈴華,ローズヒップ,マリー,押田,安藤" \
-        "captain,vice_captain,member,member,member,member,member" \
-        "magenta,red,blue,blue,blue,blue,blue" \
+        "captain,member,member,member,member,member,member" \
+        "magenta,blue,blue,blue,blue,blue,blue" \
         true
 
     log_war "🪆 カチューシャ隊クラスタも起動中..."
     launch_squad_cluster "katyusha" "🪆" "カチューシャ隊" \
         "katyusha,nonna,klara,mako,erwin,caesar,saori" \
         "カチューシャ,ノンナ,クラーラ,冷泉麻子,エルヴィン,カエサル,武部沙織" \
-        "captain,vice_captain,member,member,member,member,member" \
-        "magenta,red,blue,blue,blue,blue,blue" \
+        "captain,member,member,member,member,member,member" \
+        "magenta,blue,blue,blue,blue,blue,blue" \
         true
 
     log_war "🦅 ケイ隊クラスタも起動中..."
     launch_squad_cluster "kay" "🦅" "ケイ隊" \
         "kay,arisa,naomi,anchovy,pepperoni,carpaccio,yukari" \
         "ケイ,アリサ,ナオミ,アンチョビ,ペパロニ,カルパッチョ,秋山優花里" \
-        "captain,vice_captain,member,member,member,member,member" \
-        "magenta,red,blue,blue,blue,blue,blue" \
+        "captain,member,member,member,member,member,member" \
+        "magenta,blue,blue,blue,blue,blue,blue" \
         true
 
     log_war "🖤 西住まほ隊クラスタも起動中..."
     launch_squad_cluster "maho" "🖤" "西住まほ隊" \
         "maho,erika,mika,aki,mikko,kinuyo,fukuda" \
         "西住まほ,逸見エリカ,ミカ,アキ,ミッコ,西絹代,福田" \
-        "captain,vice_captain,member,member,member,member,member" \
-        "magenta,red,blue,blue,blue,blue,blue" \
+        "captain,member,member,member,member,member,member" \
+        "magenta,blue,blue,blue,blue,blue,blue" \
         true
 
     # ═══════════════════════════════════════════════════════════════════════════

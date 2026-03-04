@@ -52,12 +52,24 @@ generate_prompt() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 依存ツールチェック関数
+# 依存ツールチェック関数（macOS / Linux 両対応）
 # ═══════════════════════════════════════════════════════════════════════════════
 check_dependencies() {
     local missing=()
-    command -v inotifywait >/dev/null 2>&1 || missing+=("inotifywait (sudo apt install inotify-tools)")
-    command -v xxd >/dev/null 2>&1 || missing+=("xxd (sudo apt install xxd)")
+    local os_type
+    os_type="$(uname -s)"
+
+    # ファイル監視ツール: macOS=fswatch, Linux=inotifywait
+    if [ "$os_type" = "Darwin" ]; then
+        command -v fswatch >/dev/null 2>&1 || missing+=("fswatch (brew install fswatch)")
+    else
+        command -v inotifywait >/dev/null 2>&1 || missing+=("inotifywait (sudo apt install inotify-tools)")
+    fi
+
+    # xxd: macOS は vim に同梱、Linux は別パッケージ
+    command -v xxd >/dev/null 2>&1 || missing+=("xxd (sudo apt install xxd / brew install vim)")
+
+    # Python3 + PyYAML
     command -v python3 >/dev/null 2>&1 || missing+=("python3")
     python3 -c "import yaml" 2>/dev/null || missing+=("PyYAML (pip3 install pyyaml)")
 
@@ -90,7 +102,7 @@ show_battle_cry() {
     echo -e "\033[1;33m  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\033[0m"
     echo -e "\033[1;33m  ┃\033[0m  \033[1;37m🏯 multi-agent-captain\033[0m  〜 \033[1;36mマルチエージェント統率システム\033[0m 〜           \033[1;33m┃\033[0m"
     echo -e "\033[1;33m  ┃\033[0m                                                                           \033[1;33m┃\033[0m"
-    echo -e "\033[1;33m  ┃\033[0m    \033[1;35m隊長\033[0m: プロジェクト統括    \033[1;31m副隊長\033[0m: タスク管理    \033[1;34m隊員\033[0m: 実働部隊×8      \033[1;33m┃\033[0m"
+    echo -e "\033[1;33m  ┃\033[0m    \033[1;35m隊長\033[0m: プロジェクト統括 + タスク管理    \033[1;34m隊員\033[0m: 実働部隊×6          \033[1;33m┃\033[0m"
     echo -e "\033[1;33m  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\033[0m"
     echo ""
 }
@@ -107,7 +119,7 @@ show_battle_cry() {
 #   launch_squad_cluster "darjeeling" "🫖" "ダージリン隊" \
 #     "darjeeling,pekoe,hana,rosehip,marie,oshida,andou" \
 #     "ダージリン,オレンジペコ,五十鈴華,ローズヒップ,マリー,押田,安藤" \
-#     "captain,vice_captain,member,member,member,member,member" \
+#     "captain,member,member,member,member,member,member" \
 #     "magenta,red,blue,blue,blue,blue,blue"
 #     true  # ← 8番目: agent_teams_mode（省略時 false）
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -187,9 +199,9 @@ launch_squad_cluster() {
             tmux set-environment -t "${CLUSTER_ID}:agents.${p}" GUP_BRIDGE_MODE 1
         fi
 
-        # モデル設定（隊長・副隊長=Opus, 隊員=Sonnet）
+        # モデル設定（隊長=Opus, 隊員=Sonnet）
         local model_name="Sonnet"
-        if [ "$agent_role" = "captain" ] || [ "$agent_role" = "vice_captain" ]; then
+        if [ "$agent_role" = "captain" ]; then
             model_name="Opus"
         fi
         tmux set-option -p -t "${CLUSTER_ID}:agents.${p}" @model_name "$model_name"
@@ -225,7 +237,7 @@ launch_squad_cluster() {
 
             # モデル決定
             local model_opt="--model sonnet"
-            if [ "$agent_role" = "captain" ] || [ "$agent_role" = "vice_captain" ]; then
+            if [ "$agent_role" = "captain" ]; then
                 model_opt="--model opus"
             fi
 
