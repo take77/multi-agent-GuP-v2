@@ -238,6 +238,37 @@ acceptance_criteria:
 
 ### Step 2: タスク分配判断
 
+#### 2.0 並列配信ルール（CRITICAL）
+
+**独立した施策が複数ある場合、必ず並列に配信すること。** シリアル（1隊ずつ順番に）配信は禁止。
+
+```
+❌ シリアル配信（禁止）:
+  施策A → darjeeling_queue.yaml 書く → inbox_write darjeeling → 完了待ち
+  施策B → katyusha_queue.yaml 書く → inbox_write katyusha → 完了待ち
+
+✅ 並列配信（必須）:
+  施策A → darjeeling_queue.yaml 書く
+  施策B → katyusha_queue.yaml 書く
+  施策C → kay_queue.yaml 書く
+  → inbox_write darjeeling
+  → inbox_write katyusha
+  → inbox_write kay
+  → master_dashboard.md 一括更新
+```
+
+**手順**:
+1. commander_to_staff.yaml の全施策を読み、依存関係を分析
+2. 依存のない施策を特定（同時配信対象）
+3. 各隊のキューYAMLを一括で書き込み
+4. inbox_write を連続実行（全隊分）
+5. master_dashboard.md を一括更新
+
+**依存がある施策の扱い**:
+- 依存元の施策を先に配信（即時配信グループ）
+- 依存先の施策は dependency_graph.yaml に登録し、完了イベントでディスパッチ
+- 依存元と無関係な施策は、依存先と同時に配信して良い
+
 #### 2.1 分配ルール（企画書12.4節準拠）
 
 施策の数と規模に応じて、以下のルールで分配方式を決定:
