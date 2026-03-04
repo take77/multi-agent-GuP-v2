@@ -125,6 +125,7 @@ scripts/monitor/node_modules/
 !skills/
 !skills/skill-creator/
 !skills/skill-creator/SKILL.md
+!skills/section-wrapper-pattern.md
 
 # Tests
 !tests/
