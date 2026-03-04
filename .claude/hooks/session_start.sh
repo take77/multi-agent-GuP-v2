@@ -103,7 +103,6 @@ if [ -z "$AGENT_ROLE" ]; then
         anzu) AGENT_ROLE="battalion_commander" ;;
         miho) AGENT_ROLE="chief_of_staff" ;;
         darjeeling|katyusha|kay|maho) AGENT_ROLE="captain" ;;
-        pekoe|nonna|arisa|erika) AGENT_ROLE="vice_captain" ;;
         *) AGENT_ROLE="member" ;;
     esac
 fi
