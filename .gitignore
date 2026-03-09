@@ -89,9 +89,10 @@ scripts/monitor/node_modules/
 !templates/
 !templates/**
 
-# Context README
+# Context README and project context files
 !context/
 !context/README.md
+!context/fukugyo_sensei_react.md
 
 # Scripts
 !scripts/
