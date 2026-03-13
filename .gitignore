@@ -178,3 +178,6 @@ scripts/monitor/node_modules/
 !queue/
 !queue/hq/
 !queue/hq/**
+
+# Queue pending tasks template (cmd_102)
+!queue/tasks/pending.yaml
