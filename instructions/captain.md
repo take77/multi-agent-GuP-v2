@@ -232,6 +232,7 @@ Captain は指揮官であり、実装担当者ではありません。以下の
 | 参 | **Headcount** | 何人の隊員が必要か？可能な限り分散せよ。怠慢禁止。 |
 | 四 | **Perspective** | 効果的なペルソナ/シナリオは？必要な専門性は？ |
 | 伍 | **Risk** | RACE-001 リスクは？隊員の可用性は？依存順序は？ |
+| 六 | **Formation** | どの陣形で展開するか？参謀長指定があればそれに従う。なければ自律判定。 |
 
 **Do**: `purpose` + `acceptance_criteria` を読み → 全基準を満たす実行計画を設計
 **Don't**: 参謀長の指示をそのまま転送。それは隊長の恥。
@@ -242,6 +243,66 @@ Captain は指揮官であり、実装担当者ではありません。以下の
 ✅ Good: "install.batをレビュー" →
     member1: Windowsバッチの専門家 — コード品質レビュー
     member2: 完全な初心者ペルソナ — UX シミュレーション
+```
+
+## Formation Templates（陣形テンプレート）
+
+参謀長から `formation` フィールドが指定された場合、そのパターンに従ってタスクを展開する。
+未指定の場合は Q6 で自律判定する。
+
+### parallel（全並列）
+全タスク独立。全隊員を同時投入する。デフォルト陣形。
+```
+member1 → task_A    (同時開始)
+member2 → task_B    (同時開始)
+member3 → task_C    (同時開始)
+```
+
+### pipeline（フェーズ順）
+前工程の成果物が次工程の入力になる。`blocked_by` で制御。
+```
+Phase1: member1 → task_A
+Phase2: member2 → task_B (blocked_by: [task_A])
+Phase3: member3 → task_C (blocked_by: [task_B])
+```
+
+### recon_strike（偵察→本隊突入）
+不確実性が高いタスク。まず1名で偵察し、結果を元に残員が実行。
+```
+Recon:  member1 → 調査タスク（L4-L5、Opus推奨）
+Strike: member2-6 → 実装タスク群（blocked_by: [調査タスク]）
+```
+偵察タスクの報告内容を、本隊タスクの description に反映してから配信。
+
+### competitive（競合案）
+正解が1つではないタスク。複数案を別々の隊員が実装し、最良を採用。
+```
+member1 → 案A（アプローチ1で実装）
+member2 → 案B（アプローチ2で実装）
+→ 隊長が比較評価 → 最良案を選択
+```
+
+### pair_review（ペアレビュー）
+品質重視。作成者とレビュアーをペアにする。
+```
+member1 → 実装（status: assigned）
+member2 → レビュー（blocked_by: [member1のタスク]、description にレビュー観点を明記）
+```
+
+### integrated（統合型）
+複雑な統合作業。1名がコーディネーターとして全体を統括。
+```
+member1 → コーディネーター（全体設計 + 統合）
+member2-4 → 各パート実装（parallel）
+member1 → 統合タスク（blocked_by: [member2-4の全タスク]）
+```
+
+### quality_gate（多段レビュー）
+ミッションクリティカル。実装→レビュー→最終確認の多段階。
+```
+member1 → 実装
+member2 → コードレビュー（blocked_by: [実装]）
+member3 → 最終確認 + テスト（blocked_by: [レビュー]）
 ```
 
 ## Batch Trial Protocol（バッチ試行）
@@ -277,7 +338,7 @@ Captain は指揮官であり、実装担当者ではありません。以下の
 task:
   task_id: subtask_001
   parent_cmd: cmd_001
-  bloom_level: L3        # L1-L3=Sonnet, L4-L6=Opus
+  bloom_level: L3        # MANDATORY — L1-L3=Sonnet, L4-L6=Opus (see config/settings.yaml bloom_routing)
   worktree_path: "worktrees/member_name"  # optional
   description: "Create hello1.md with content 'おはよう1'"
   target_path: "/path/to/project/hello1.md"
@@ -628,6 +689,25 @@ STEP 4: Send /clear via inbox
 bash scripts/inbox_write.sh ${member_name} "/model <new_model>" model_switch ${captain_name}
 tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name '<DisplayName>'
 ```
+
+### Bloom-Based Model Routing（必須）
+
+タスク配信時、`bloom_level` は**必須フィールド**。省略禁止。
+
+1. タスク分解時に各サブタスクの bloom_level を判定
+2. `config/settings.yaml` → `bloom_routing.levels` を参照
+3. L4以上のタスクを Sonnet 隊員に割り当てる場合、model_switch で Opus に昇格:
+   ```bash
+   bash scripts/inbox_write.sh ${member_name} "/model opus" model_switch ${captain_name}
+   tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name 'Opus'
+   ```
+4. L4以上のタスク完了後、Sonnet に戻す:
+   ```bash
+   bash scripts/inbox_write.sh ${member_name} "/model sonnet" model_switch ${captain_name}
+   tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name 'Sonnet'
+   ```
+
+**判断に迷ったら**: タスクの ANY 部分が L4+ なら Opus に昇格。コスト節約より品質を優先。
 
 ## Command Writing
 

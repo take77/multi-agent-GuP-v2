@@ -73,3 +73,37 @@ agent_teams:
     auto_detect: true
     unresponsive_threshold_sec: 300
     manual_command: "scripts/fallback_to_tmux.sh"
+
+# Bloom Taxonomy 動的モデルルーティング
+# タスク複雑度（L1-L6）に基づき、適切なモデルに振り分ける
+bloom_routing:
+  # Bloom Level → 推奨モデルマッピング
+  levels:
+    L1:  # Remember（記憶）: コピー、移動、単純置換
+      model: haiku
+      description: "記憶・再現タスク"
+    L2:  # Understand（理解）: 整理、分類、フォーマット変換
+      model: sonnet
+      description: "理解・分類タスク"
+    L3:  # Apply（適用）: テンプレート適用、定型修正
+      model: sonnet
+      description: "適用・定型実装タスク"
+    L4:  # Analyze（分析）: 原因調査、コードレビュー、デバッグ
+      model: opus
+      description: "分析・調査タスク"
+    L5:  # Evaluate（評価）: 設計評価、アーキテクチャレビュー
+      model: opus
+      description: "評価・比較タスク"
+    L6:  # Create（創造）: 新規設計、要件定義、戦略立案
+      model: opus
+      description: "創造・設計タスク"
+
+  # Sonnet/Opus 境界
+  # L1-L3: Sonnet（または Haiku）で十分
+  # L4-L6: Opus が望ましい
+  sonnet_max: L3
+  opus_min: L4
+
+  # モデル切替コマンド（隊長が隊員に送信）
+  # bash scripts/inbox_write.sh ${member} "/model opus" model_switch ${captain}
+  switch_type: model_switch
