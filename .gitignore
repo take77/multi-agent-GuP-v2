@@ -107,6 +107,7 @@ scripts/monitor/node_modules/
 !scripts/fallback_to_tmux.sh
 !scripts/init_runtime_data.sh
 !scripts/slim_yaml.py
+!scripts/slim_yaml.sh
 
 
 # SayTask (sample template only, not actual data)
