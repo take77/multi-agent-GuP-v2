@@ -244,6 +244,32 @@ Captain は指揮官であり、実装担当者ではありません。以下の
     member2: 完全な初心者ペルソナ — UX シミュレーション
 ```
 
+## Batch Trial Protocol（バッチ試行）
+
+30件以上のサブタスクに分解された場合、以下のプロトコルに従う:
+
+1. **パイロットバッチ選定**: 最初の1-2タスクだけを先に配信
+   - 品質基準が最も明確なタスクを選ぶ
+   - 可能であれば異なる種類のタスクを1つずつ
+2. **パイロットバッチ実行**: 通常のTask Delivery Checklistに従い配信
+3. **品質確認**: パイロットバッチの報告を受領し、品質を評価
+   - acceptance_criteria を満たしているか
+   - 成果物の品質・形式に問題はないか
+   - 隊員の理解度に不安はないか
+4. **残りバッチへの反映**:
+   - 品質OK → 残りタスクを一括配信
+   - 品質NG → パイロットバッチでの学びを残りタスクの description に反映してから配信
+   - フィードバックは具体的に: 「〇〇の形式で書け」「△△を含めよ」等
+
+30件未満の場合は従来通り全タスクを並列配信してよい。
+
+**判断基準**:
+| サブタスク数 | 方式 |
+|-------------|------|
+| 1-5 | 全並列配信 |
+| 6-29 | 全並列配信（ただし新種タスクは試行推奨） |
+| 30+ | バッチ試行プロトコル必須 |
+
 ## Task YAML Format
 
 ```yaml
@@ -389,6 +415,31 @@ With dependency: idle → blocked → assigned → done/failed
 2. No dependencies → `status: assigned`, dispatch immediately
 3. Has dependencies → `status: blocked`, write YAML only. **Do NOT inbox_write**
 
+### Pending Queue（任意）
+
+依存ありタスクを `queue/tasks/pending.yaml` にも登録できる（推奨だが強制ではない）。
+
+**利点**: 全ブロック中タスクを一箇所で俯瞰可能。個別の member YAML を全件スキャンする必要がない。
+
+**登録手順**:
+1. 依存ありタスクを通常通り `queue/tasks/${member}.yaml` に `status: blocked` で書く
+2. 同時に `queue/tasks/pending.yaml` の `pending_tasks` リストにも追加:
+   ```yaml
+   - task_id: subtask_XXX
+     parent_cmd: cmd_XXX
+     target_member: member_name
+     blocked_by: [subtask_YYY, subtask_ZZZ]
+     task_yaml_content:
+       # 隊員に配信するタスクYAML全体をここに含める
+       task_id: subtask_XXX
+       parent_cmd: cmd_XXX
+       bloom_level: L3
+       description: "..."
+       # ...
+     queued_at: "ISO 8601"
+   ```
+3. 依存先が完了したら Step 11.5 でスキャン・解除される
+
 ### On Report Reception: Unblock
 
 After report scan + dashboard update:
@@ -400,6 +451,20 @@ After report scan + dashboard update:
    - If list empty → change `blocked` → `assigned`
    - inbox_write to wake the member
 4. If list still has items → remain `blocked`
+
+### Pending Queue Scan（pending.yaml 使用時）
+
+`queue/tasks/pending.yaml` を使用している場合、既存の member YAML スキャンに加えて以下を実行:
+
+1. `queue/tasks/pending.yaml` を読み取り、`pending_tasks` リストを確認
+2. 各タスクの `blocked_by` に完了した task_id が含まれているか確認
+3. 含まれている場合:
+   - `blocked_by` リストから完了 task_id を除去
+   - リストが空になったら:
+     a. `pending_tasks` からそのタスクを除去
+     b. `queue/tasks/${target_member}.yaml` に `task_yaml_content` の内容を書き込み（status: assigned）
+     c. inbox_write で隊員を起動
+4. リストにまだ未完了の task_id が残っている場合 → `pending_tasks` 内で `blocked_by` を更新するのみ
 
 ## Report Validation (v2.0 — Step 10.5)
 
