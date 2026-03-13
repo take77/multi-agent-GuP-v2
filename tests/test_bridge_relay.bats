@@ -20,6 +20,6 @@ setup() {
 @test "source: agent_teams が付与される" {
   # YAML生成を確認
   bash scripts/bridge_relay.sh down test_captain test_cluster "テスト" "test-proj" "medium" "基準" > /dev/null
-  # queue/captain_to_vice_captain.yaml に source: agent_teams が含まれることを確認
-  grep -q "source: agent_teams" queue/captain_to_vice_captain.yaml
+  # captain_queue.yaml に source: agent_teams が含まれることを確認
+  grep -q "source: agent_teams" queue/captain_queue.yaml
 }

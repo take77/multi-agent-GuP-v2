@@ -41,6 +41,7 @@ scripts/monitor/node_modules/
 !instructions/ashigaru.md
 !instructions/battalion_commander.md
 !instructions/chief_of_staff.md
+!instructions/vice_captain.md
 
 # Multi-CLI: CLI-specific tool descriptions
 !instructions/cli_specific/
@@ -106,6 +107,8 @@ scripts/monitor/node_modules/
 !scripts/bridge_relay.sh
 !scripts/fallback_to_tmux.sh
 !scripts/init_runtime_data.sh
+!scripts/slim_yaml.py
+!scripts/slim_yaml.sh
 
 
 # SayTask (sample template only, not actual data)
@@ -177,3 +180,6 @@ scripts/monitor/node_modules/
 !queue/
 !queue/hq/
 !queue/hq/**
+
+# Queue pending tasks template (cmd_102)
+!queue/tasks/pending.yaml

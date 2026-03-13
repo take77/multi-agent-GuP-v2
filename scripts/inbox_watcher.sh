@@ -587,7 +587,8 @@ process_unread() {
             echo "[$(date)] All messages read for $AGENT_ID — escalation reset (fast-path)" >&2
         fi
         FIRST_UNREAD_SEEN=0
-        if ! agent_is_busy; then
+        # Clear stale nudge text — Codex CLI only (Claude CLI C-u erases user input)
+        if [[ "$(get_effective_cli_type)" == "codex" ]] && ! agent_is_busy; then
             timeout 2 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
         fi
         return 0
@@ -678,11 +679,19 @@ for s in data.get('specials', []):
             echo "[$(date)] All messages read for $AGENT_ID — escalation reset" >&2
         fi
         FIRST_UNREAD_SEEN=0
-        # Clear stale nudge text from input field (Codex CLI prefills last input on idle).
-        # Only send C-u when agent is idle — during Working it would be disruptive.
-        if ! agent_is_busy; then
+        # Clear stale nudge text — Codex CLI only (Claude CLI C-u erases user input)
+        if [[ "$(get_effective_cli_type)" == "codex" ]] && ! agent_is_busy; then
             timeout 2 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
         fi
+    fi
+
+    # Inbox overflow check — auto-slim when messages exceed threshold
+    if [ -f "$INBOX" ]; then
+      msg_count=$(python3 -c "import yaml; d=yaml.safe_load(open('$INBOX')); print(len(d.get('messages',[])) if d else 0)" 2>/dev/null || echo 0)
+      if [ "$msg_count" -ge 50 ]; then
+        echo "[$(date)] [SLIM] Inbox overflow detected for $AGENT_ID ($msg_count messages). Running slim_yaml.sh..." >&2
+        bash "$(dirname "${BASH_SOURCE[0]}")/slim_yaml.sh" "$AGENT_ID" &
+      fi
     fi
 }
 

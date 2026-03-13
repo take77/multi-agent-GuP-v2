@@ -4,15 +4,15 @@ version: "1.0"
 updated: "2026-02-09"
 description: "Claude Code + tmux multi-agent parallel development platform with Girls und Panzer military structure"
 
-hierarchy: "指揮官 (human) → 大隊長(anzu) → 参謀長(miho) → 各隊(隊長 → 隊員1-6)"
+hierarchy: "指揮官 (human) → 大隊長(anzu) → 参謀長(miho) → 各隊(隊長 → 副隊長(QC専任) + 隊員1-5)"
 communication: "YAML files + inbox mailbox system (event-driven, NO polling)"
 
 tmux_sessions:
   command: { pane_0: battalion_commander(anzu), pane_1: chief_of_staff(miho) }
-  darjeeling: { pane_0: darjeeling(captain), pane_1-6: pekoe,hana,rosehip,marie,oshida,andou(member) }
-  katyusha: { pane_0: katyusha(captain), pane_1-6: nonna,klara,mako,erwin,caesar,saori(member) }
-  kay: { pane_0: kay(captain), pane_1-6: arisa,naomi,yukari,anchovy,carpaccio,pepperoni(member) }
-  maho: { pane_0: maho(captain), pane_1-6: erika,mika,aki,mikko,kinuyo,fukuda(member) }
+  darjeeling: { pane_0: darjeeling(captain), pane_1: pekoe(vice_captain/QC), pane_2-6: hana,rosehip,marie,oshida,andou(member) }
+  katyusha: { pane_0: katyusha(captain), pane_1: nonna(vice_captain/QC), pane_2-6: klara,mako,erwin,caesar,saori(member) }
+  kay: { pane_0: kay(captain), pane_1: arisa(vice_captain/QC), pane_2-6: naomi,yukari,anchovy,carpaccio,pepperoni(member) }
+  maho: { pane_0: maho(captain), pane_1: erika(vice_captain/QC), pane_2-6: mika,aki,mikko,kinuyo,fukuda(member) }
 
 files:
   config: config/projects.yaml          # Project list (summary)
@@ -127,7 +127,7 @@ YAML ファイルへの書き込み + inbox_write の実行が完了して初め
    - chief_of_staff (miho) → `persona/miho.md`
    - captain (darjeeling/katyusha/kay/maho) → `persona/{name}.md`
    - member → `persona/{name}.md`
-4. **Read your instructions file**: battalion_commander→`instructions/battalion_commander.md`, captain→`instructions/captain.md`, member→`instructions/member.md`, chief_of_staff→`instructions/chief_of_staff.md`. **NEVER SKIP** — even if a conversation summary exists. Summaries do NOT preserve persona, speech style, or forbidden actions. This defines WHAT you do.
+4. **Read your instructions file**: battalion_commander→`instructions/battalion_commander.md`, captain→`instructions/captain.md`, vice_captain→`instructions/vice_captain.md`, member→`instructions/member.md`, chief_of_staff→`instructions/chief_of_staff.md`. **NEVER SKIP** — even if a conversation summary exists. Summaries do NOT preserve persona, speech style, or forbidden actions. This defines WHAT you do.
 5. Rebuild state from primary YAML data (queue/, tasks/, reports/)
 6. Review forbidden actions, then start work
 
@@ -205,6 +205,8 @@ Special cases (CLI commands sent directly via send-keys):
 
 Inbox type definitions (upward report events):
 - `type: report_received` — Member → Captain: タスク完了通知
+- `type: qc_request` — Captain → Vice Captain: 品質検査依頼（L4+タスクのみ）
+- `type: qc_result` — Vice Captain → Captain: 品質検査結果（PASS/FAIL）
 - `type: cmd_done` — Captain → Chief of Staff / Chief of Staff → Commander: 施策完了通知
 - `type: cmd_failed` — Captain → Chief of Staff / Chief of Staff → Commander: 施策失敗・エスカレーション通知
 

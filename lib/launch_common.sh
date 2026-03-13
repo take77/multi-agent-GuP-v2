@@ -199,9 +199,9 @@ launch_squad_cluster() {
             tmux set-environment -t "${CLUSTER_ID}:agents.${p}" GUP_BRIDGE_MODE 1
         fi
 
-        # モデル設定（隊長=Opus, 隊員=Sonnet）
+        # モデル設定（隊長=Opus, 副隊長=Opus, 隊員=Sonnet）
         local model_name="Sonnet"
-        if [ "$agent_role" = "captain" ]; then
+        if [ "$agent_role" = "captain" ] || [ "$agent_role" = "vice_captain" ]; then
             model_name="Opus"
         fi
         tmux set-option -p -t "${CLUSTER_ID}:agents.${p}" @model_name "$model_name"
@@ -235,9 +235,9 @@ launch_squad_cluster() {
                 continue
             fi
 
-            # モデル決定
+            # モデル決定（隊長・副隊長=Opus, 隊員=Sonnet）
             local model_opt="--model sonnet"
-            if [ "$agent_role" = "captain" ]; then
+            if [ "$agent_role" = "captain" ] || [ "$agent_role" = "vice_captain" ]; then
                 model_opt="--model opus"
             fi
 

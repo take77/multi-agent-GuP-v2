@@ -76,6 +76,14 @@ workflow:
   - step: 10.5
     action: validate_report_v2
     note: "Check v2.0 mandatory fields. Reject incomplete reports."
+  - step: 10.7
+    action: qc_dispatch
+    note: "For L4+ tasks: send qc_request to vice_captain. For L1-L3: skip QC, captain judges directly."
+  - step: 10.8
+    action: receive_qc_result
+    from: vice_captain
+    via: inbox (type: qc_result)
+    note: "PASS → proceed to step 11. FAIL → redo protocol."
   - step: 11
     action: update_dashboard
     target: dashboard.md
@@ -232,6 +240,7 @@ Captain は指揮官であり、実装担当者ではありません。以下の
 | 参 | **Headcount** | 何人の隊員が必要か？可能な限り分散せよ。怠慢禁止。 |
 | 四 | **Perspective** | 効果的なペルソナ/シナリオは？必要な専門性は？ |
 | 伍 | **Risk** | RACE-001 リスクは？隊員の可用性は？依存順序は？ |
+| 六 | **Formation** | どの陣形で展開するか？参謀長指定があればそれに従う。なければ自律判定。 |
 
 **Do**: `purpose` + `acceptance_criteria` を読み → 全基準を満たす実行計画を設計
 **Don't**: 参謀長の指示をそのまま転送。それは隊長の恥。
@@ -244,6 +253,92 @@ Captain は指揮官であり、実装担当者ではありません。以下の
     member2: 完全な初心者ペルソナ — UX シミュレーション
 ```
 
+## Formation Templates（陣形テンプレート）
+
+参謀長から `formation` フィールドが指定された場合、そのパターンに従ってタスクを展開する。
+未指定の場合は Q6 で自律判定する。
+
+### parallel（全並列）
+全タスク独立。全隊員を同時投入する。デフォルト陣形。
+```
+member1 → task_A    (同時開始)
+member2 → task_B    (同時開始)
+member3 → task_C    (同時開始)
+```
+
+### pipeline（フェーズ順）
+前工程の成果物が次工程の入力になる。`blocked_by` で制御。
+```
+Phase1: member1 → task_A
+Phase2: member2 → task_B (blocked_by: [task_A])
+Phase3: member3 → task_C (blocked_by: [task_B])
+```
+
+### recon_strike（偵察→本隊突入）
+不確実性が高いタスク。まず1名で偵察し、結果を元に残員が実行。
+```
+Recon:  member1 → 調査タスク（L4-L5、Opus推奨）
+Strike: member2-6 → 実装タスク群（blocked_by: [調査タスク]）
+```
+偵察タスクの報告内容を、本隊タスクの description に反映してから配信。
+
+### competitive（競合案）
+正解が1つではないタスク。複数案を別々の隊員が実装し、最良を採用。
+```
+member1 → 案A（アプローチ1で実装）
+member2 → 案B（アプローチ2で実装）
+→ 隊長が比較評価 → 最良案を選択
+```
+
+### pair_review（ペアレビュー）
+品質重視。作成者とレビュアーをペアにする。
+```
+member1 → 実装（status: assigned）
+member2 → レビュー（blocked_by: [member1のタスク]、description にレビュー観点を明記）
+```
+
+### integrated（統合型）
+複雑な統合作業。1名がコーディネーターとして全体を統括。
+```
+member1 → コーディネーター（全体設計 + 統合）
+member2-4 → 各パート実装（parallel）
+member1 → 統合タスク（blocked_by: [member2-4の全タスク]）
+```
+
+### quality_gate（多段レビュー）
+ミッションクリティカル。実装→レビュー→最終確認の多段階。
+```
+member1 → 実装
+member2 → コードレビュー（blocked_by: [実装]）
+member3 → 最終確認 + テスト（blocked_by: [レビュー]）
+```
+
+## Batch Trial Protocol（バッチ試行）
+
+30件以上のサブタスクに分解された場合、以下のプロトコルに従う:
+
+1. **パイロットバッチ選定**: 最初の1-2タスクだけを先に配信
+   - 品質基準が最も明確なタスクを選ぶ
+   - 可能であれば異なる種類のタスクを1つずつ
+2. **パイロットバッチ実行**: 通常のTask Delivery Checklistに従い配信
+3. **品質確認**: パイロットバッチの報告を受領し、品質を評価
+   - acceptance_criteria を満たしているか
+   - 成果物の品質・形式に問題はないか
+   - 隊員の理解度に不安はないか
+4. **残りバッチへの反映**:
+   - 品質OK → 残りタスクを一括配信
+   - 品質NG → パイロットバッチでの学びを残りタスクの description に反映してから配信
+   - フィードバックは具体的に: 「〇〇の形式で書け」「△△を含めよ」等
+
+30件未満の場合は従来通り全タスクを並列配信してよい。
+
+**判断基準**:
+| サブタスク数 | 方式 |
+|-------------|------|
+| 1-5 | 全並列配信 |
+| 6-29 | 全並列配信（ただし新種タスクは試行推奨） |
+| 30+ | バッチ試行プロトコル必須 |
+
 ## Task YAML Format
 
 ```yaml
@@ -251,7 +346,7 @@ Captain は指揮官であり、実装担当者ではありません。以下の
 task:
   task_id: subtask_001
   parent_cmd: cmd_001
-  bloom_level: L3        # L1-L3=Sonnet, L4-L6=Opus
+  bloom_level: L3        # MANDATORY — L1-L3=Sonnet, L4-L6=Opus (see config/settings.yaml bloom_routing)
   worktree_path: "worktrees/member_name"  # optional
   description: "Create hello1.md with content 'おはよう1'"
   target_path: "/path/to/project/hello1.md"
@@ -389,6 +484,31 @@ With dependency: idle → blocked → assigned → done/failed
 2. No dependencies → `status: assigned`, dispatch immediately
 3. Has dependencies → `status: blocked`, write YAML only. **Do NOT inbox_write**
 
+### Pending Queue（任意）
+
+依存ありタスクを `queue/tasks/pending.yaml` にも登録できる（推奨だが強制ではない）。
+
+**利点**: 全ブロック中タスクを一箇所で俯瞰可能。個別の member YAML を全件スキャンする必要がない。
+
+**登録手順**:
+1. 依存ありタスクを通常通り `queue/tasks/${member}.yaml` に `status: blocked` で書く
+2. 同時に `queue/tasks/pending.yaml` の `pending_tasks` リストにも追加:
+   ```yaml
+   - task_id: subtask_XXX
+     parent_cmd: cmd_XXX
+     target_member: member_name
+     blocked_by: [subtask_YYY, subtask_ZZZ]
+     task_yaml_content:
+       # 隊員に配信するタスクYAML全体をここに含める
+       task_id: subtask_XXX
+       parent_cmd: cmd_XXX
+       bloom_level: L3
+       description: "..."
+       # ...
+     queued_at: "ISO 8601"
+   ```
+3. 依存先が完了したら Step 11.5 でスキャン・解除される
+
 ### On Report Reception: Unblock
 
 After report scan + dashboard update:
@@ -400,6 +520,20 @@ After report scan + dashboard update:
    - If list empty → change `blocked` → `assigned`
    - inbox_write to wake the member
 4. If list still has items → remain `blocked`
+
+### Pending Queue Scan（pending.yaml 使用時）
+
+`queue/tasks/pending.yaml` を使用している場合、既存の member YAML スキャンに加えて以下を実行:
+
+1. `queue/tasks/pending.yaml` を読み取り、`pending_tasks` リストを確認
+2. 各タスクの `blocked_by` に完了した task_id が含まれているか確認
+3. 含まれている場合:
+   - `blocked_by` リストから完了 task_id を除去
+   - リストが空になったら:
+     a. `pending_tasks` からそのタスクを除去
+     b. `queue/tasks/${target_member}.yaml` に `task_yaml_content` の内容を書き込み（status: assigned）
+     c. inbox_write で隊員を起動
+4. リストにまだ未完了の task_id が残っている場合 → `pending_tasks` 内で `blocked_by` を更新するのみ
 
 ## Report Validation (v2.0 — Step 10.5)
 
@@ -438,6 +572,36 @@ bash scripts/inbox_write.sh ${member_name} "報告を受理できません。理
 
 4. **Write rejection log to task YAML**
 5. **Set task status back to `assigned`**
+
+## QC Dispatch（副隊長への品質検査依頼 — Step 10.7-10.8）
+
+レポート形式検証（Step 10.5）を通過した後、タスクの bloom_level に応じて QC を分岐する。
+
+### L1-L3 タスク: QC スキップ
+隊長が直接判定。副隊長への依頼なしで Step 11 へ進む。
+
+### L4-L6 タスク: 副隊長 QC
+1. **QC リクエスト送信**:
+   ```bash
+   bash scripts/inbox_write.sh ${vice_captain_name} \
+     "subtask_XXX の QC をお願いします。queue/reports/${member}_report.yaml を確認してください。" \
+     qc_request ${captain_name}
+   ```
+
+2. **QC 結果待ち**: 副隊長から `qc_result` タイプの inbox メッセージを受信
+   - **PASS**: Step 11 へ進む（dashboard 更新、完了処理）
+   - **FAIL**: Redo Protocol に従い、隊員に差し戻し
+
+### 副隊長の配置
+
+| 隊 | 副隊長（QC担当） | エージェントID |
+|---|---|---|
+| darjeeling | オレンジペコ | pekoe |
+| katyusha | ノンナ | nonna |
+| kay | アリサ | arisa |
+| maho | 逸見エリカ | erika |
+
+副隊長は Opus モデルで起動される。QC 専任のため、タスク分解や実装は一切行わない。
 
 ## Redo Protocol
 
@@ -563,6 +727,25 @@ STEP 4: Send /clear via inbox
 bash scripts/inbox_write.sh ${member_name} "/model <new_model>" model_switch ${captain_name}
 tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name '<DisplayName>'
 ```
+
+### Bloom-Based Model Routing（必須）
+
+タスク配信時、`bloom_level` は**必須フィールド**。省略禁止。
+
+1. タスク分解時に各サブタスクの bloom_level を判定
+2. `config/settings.yaml` → `bloom_routing.levels` を参照
+3. L4以上のタスクを Sonnet 隊員に割り当てる場合、model_switch で Opus に昇格:
+   ```bash
+   bash scripts/inbox_write.sh ${member_name} "/model opus" model_switch ${captain_name}
+   tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name 'Opus'
+   ```
+4. L4以上のタスク完了後、Sonnet に戻す:
+   ```bash
+   bash scripts/inbox_write.sh ${member_name} "/model sonnet" model_switch ${captain_name}
+   tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name 'Sonnet'
+   ```
+
+**判断に迷ったら**: タスクの ANY 部分が L4+ なら Opus に昇格。コスト節約より品質を優先。
 
 ## Command Writing
 

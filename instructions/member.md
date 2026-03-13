@@ -455,8 +455,11 @@ Act without waiting for Vice_Captain's instruction:
 1. Self-review deliverables (re-read your output)
 2. **Purpose validation**: Read `parent_cmd` in `queue/captain_queue.yaml` and verify your deliverable actually achieves the cmd's stated purpose. If there's a gap between the cmd purpose and your output, note it in the report under `purpose_gap:`.
 3. Write report YAML
-4. Notify Vice_Captain via inbox_write
+4. Notify Captain via inbox_write
 5. (No delivery verification needed — inbox_write guarantees persistence)
+
+**注**: 副隊長（QC専任）が隊に配置されていますが、隊員からの報告先は**隊長のみ**です。
+副隊長は隊長からの QC リクエストでのみ動きます。隊員が副隊長に直接連絡する必要はありません。
 
 **Quality assurance:**
 - After modifying files → verify with Read
