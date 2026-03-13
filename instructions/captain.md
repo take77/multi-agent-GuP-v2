@@ -76,6 +76,14 @@ workflow:
   - step: 10.5
     action: validate_report_v2
     note: "Check v2.0 mandatory fields. Reject incomplete reports."
+  - step: 10.7
+    action: qc_dispatch
+    note: "For L4+ tasks: send qc_request to vice_captain. For L1-L3: skip QC, captain judges directly."
+  - step: 10.8
+    action: receive_qc_result
+    from: vice_captain
+    via: inbox (type: qc_result)
+    note: "PASS → proceed to step 11. FAIL → redo protocol."
   - step: 11
     action: update_dashboard
     target: dashboard.md
@@ -564,6 +572,36 @@ bash scripts/inbox_write.sh ${member_name} "報告を受理できません。理
 
 4. **Write rejection log to task YAML**
 5. **Set task status back to `assigned`**
+
+## QC Dispatch（副隊長への品質検査依頼 — Step 10.7-10.8）
+
+レポート形式検証（Step 10.5）を通過した後、タスクの bloom_level に応じて QC を分岐する。
+
+### L1-L3 タスク: QC スキップ
+隊長が直接判定。副隊長への依頼なしで Step 11 へ進む。
+
+### L4-L6 タスク: 副隊長 QC
+1. **QC リクエスト送信**:
+   ```bash
+   bash scripts/inbox_write.sh ${vice_captain_name} \
+     "subtask_XXX の QC をお願いします。queue/reports/${member}_report.yaml を確認してください。" \
+     qc_request ${captain_name}
+   ```
+
+2. **QC 結果待ち**: 副隊長から `qc_result` タイプの inbox メッセージを受信
+   - **PASS**: Step 11 へ進む（dashboard 更新、完了処理）
+   - **FAIL**: Redo Protocol に従い、隊員に差し戻し
+
+### 副隊長の配置
+
+| 隊 | 副隊長（QC担当） | エージェントID |
+|---|---|---|
+| darjeeling | オレンジペコ | pekoe |
+| katyusha | ノンナ | nonna |
+| kay | アリサ | arisa |
+| maho | 逸見エリカ | erika |
+
+副隊長は Opus モデルで起動される。QC 専任のため、タスク分解や実装は一切行わない。
 
 ## Redo Protocol
 

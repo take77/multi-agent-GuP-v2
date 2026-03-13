@@ -194,8 +194,8 @@ launch_darjeeling_cluster() {
     launch_squad_cluster "darjeeling" "🫖" "ダージリン隊" \
         "darjeeling,pekoe,hana,rosehip,marie,oshida,andou" \
         "ダージリン,オレンジペコ,五十鈴華,ローズヒップ,マリー,押田,安藤" \
-        "captain,member,member,member,member,member,member" \
-        "magenta,blue,blue,blue,blue,blue,blue"
+        "captain,vice_captain,member,member,member,member,member" \
+        "magenta,red,blue,blue,blue,blue,blue"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -205,8 +205,8 @@ launch_katyusha_cluster() {
     launch_squad_cluster "katyusha" "🪆" "カチューシャ隊" \
         "katyusha,nonna,klara,mako,erwin,caesar,saori" \
         "カチューシャ,ノンナ,クラーラ,冷泉麻子,エルヴィン,カエサル,武部沙織" \
-        "captain,member,member,member,member,member,member" \
-        "magenta,blue,blue,blue,blue,blue,blue"
+        "captain,vice_captain,member,member,member,member,member" \
+        "magenta,red,blue,blue,blue,blue,blue"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -216,8 +216,8 @@ launch_kay_cluster() {
     launch_squad_cluster "kay" "🦅" "ケイ隊" \
         "kay,arisa,naomi,anchovy,pepperoni,carpaccio,yukari" \
         "ケイ,アリサ,ナオミ,アンチョビ,ペパロニ,カルパッチョ,秋山優花里" \
-        "captain,member,member,member,member,member,member" \
-        "magenta,blue,blue,blue,blue,blue,blue"
+        "captain,vice_captain,member,member,member,member,member" \
+        "magenta,red,blue,blue,blue,blue,blue"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -227,8 +227,8 @@ launch_maho_cluster() {
     launch_squad_cluster "maho" "🖤" "西住まほ隊" \
         "maho,erika,mika,aki,mikko,kinuyo,fukuda" \
         "西住まほ,逸見エリカ,ミカ,アキ,ミッコ,西絹代,福田" \
-        "captain,member,member,member,member,member,member" \
-        "magenta,blue,blue,blue,blue,blue,blue"
+        "captain,vice_captain,member,member,member,member,member" \
+        "magenta,red,blue,blue,blue,blue,blue"
 }
 
 # バナー表示実行
