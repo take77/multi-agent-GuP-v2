@@ -732,22 +732,25 @@ tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name '<DisplayName>'
 
 タスク配信時、`bloom_level` は**必須フィールド**。省略禁止。
 
-#### lib/model_router.sh の利用
+#### lib/model_router.sh の使い方
 
-`lib/model_router.sh` はタスクの bloom_level からモデルを自動判定するユーティリティ。
-手動マッピングの代わりにこのスクリプトを使うことで、設定変更時の追従漏れを防ぐ。
+`lib/model_router.sh` はbloom_levelからモデル名を自動解決するユーティリティ。
+source して関数を呼び出すか、--test で単体テストを実行できる。
 
 ```bash
-# スクリプトを読み込み
+# 関数を読み込む
 source lib/model_router.sh
 
-# bloom_level → 推奨モデルを取得（haiku|sonnet|opus）
+# bloom_level → モデルID (haiku|sonnet|opus)
 model=$(get_recommended_model "L4")   # → "opus"
 
-# 表示名を取得（ステータスバー更新用）
+# モデルID → 表示名
 display=$(get_model_display_name "$model")  # → "Opus"
 
-# モデル切替コマンドを生成（inbox_write 形式）
+# bloom_level の妥当性チェック
+validate_bloom_level "L4" && echo "valid"
+
+# モデル切替コマンドの生成（隊長向けヘルパー）
 cmd=$(get_model_switch_command "hana" "L4" "darjeeling")
 # → bash scripts/inbox_write.sh hana "/model opus" model_switch darjeeling
 ```
@@ -755,16 +758,21 @@ cmd=$(get_model_switch_command "hana" "L4" "darjeeling")
 #### タスク配信時の推奨フロー
 
 1. タスク分解時に各サブタスクの bloom_level を判定
-2. `source lib/model_router.sh` で関数をロード
-3. `get_recommended_model` で推奨モデルを取得
-4. 現在のモデルと異なる場合、model_switch で切り替え:
+2. `lib/model_router.sh` で推奨モデルを取得:
    ```bash
    source lib/model_router.sh
    model=$(get_recommended_model "${bloom_level}")
-   if [[ "$model" != "sonnet" ]]; then
-     bash scripts/inbox_write.sh ${member_name} "/model ${model}" model_switch ${captain_name}
-     tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name "$(get_model_display_name "$model")"
-   fi
+   ```
+3. L4以上のタスクを Sonnet 隊員に割り当てる場合、model_switch で Opus に昇格:
+   ```bash
+   source lib/model_router.sh
+   eval "$(get_model_switch_command ${member_name} ${bloom_level} ${captain_name})"
+   tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name "$(get_model_display_name $(get_recommended_model ${bloom_level}))"
+   ```
+   または手動で:
+   ```bash
+   bash scripts/inbox_write.sh ${member_name} "/model opus" model_switch ${captain_name}
+   tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name 'Opus'
    ```
 5. L4以上のタスク完了後、Sonnet に戻す:
    ```bash
