@@ -65,7 +65,6 @@ scripts/monitor/node_modules/
 !lib/cli_adapter.sh
 !lib/ntfy_auth.sh
 !lib/launch_common.sh
-!lib/model_router.sh
 
 # Multi-CLI: Codex auto-load file
 !AGENTS.md
