@@ -110,6 +110,7 @@ scripts/monitor/node_modules/
 !scripts/init_runtime_data.sh
 !scripts/slim_yaml.py
 !scripts/slim_yaml.sh
+!scripts/statusline.sh
 
 
 # SayTask (sample template only, not actual data)
