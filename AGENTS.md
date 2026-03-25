@@ -127,7 +127,7 @@ YAML ファイルへの書き込み + inbox_write の実行が完了して初め
    - chief_of_staff (miho) → `persona/miho.md`
    - captain (darjeeling/katyusha/kay/maho) → `persona/{name}.md`
    - member → `persona/{name}.md`
-4. **Read your instructions file**: battalion_commander→`instructions/battalion_commander.md`, captain→`instructions/generated/codex-captain.md`, vice_captain→`instructions/generated/codex-vice_captain.md`, member→`instructions/generated/codex-member.md`, chief_of_staff→`instructions/chief_of_staff.md`. **NEVER SKIP** — even if a conversation summary exists. Summaries do NOT preserve persona, speech style, or forbidden actions. This defines WHAT you do.
+4. **Read your instructions file**: battalion_commander→`instructions/generated/battalion_commander.md`, captain→`instructions/generated/captain.md`, vice_captain→`instructions/generated/vice_captain.md`, member→`instructions/generated/member.md`, chief_of_staff→`instructions/generated/chief_of_staff.md`. **NEVER SKIP** — even if a conversation summary exists. Summaries do NOT preserve persona, speech style, or forbidden actions. This defines WHAT you do. (Note: `instructions/generated/` はテンプレートから自動生成されたファイル。`scripts/build_instructions.sh` で再生成可能。)
 5. Rebuild state from primary YAML data (queue/, tasks/, reports/)
 6. Review forbidden actions, then start work
 
@@ -135,7 +135,7 @@ YAML ファイルへの書き込み + inbox_write の実行が完了して初め
 
 ## /clear Recovery (member only)
 
-Lightweight recovery using only AGENTS.md (auto-loaded). Do NOT read instructions/generated/codex-member.md (cost saving).
+Lightweight recovery using only AGENTS.md (auto-loaded). Do NOT read instructions/generated/member.md (cost saving).
 
 ```
 Step 1: tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}' → ${AGENT_ID}
@@ -147,7 +147,7 @@ Step 4: If task has "project:" field → read context/{project}.md
 Step 5: Start work（persona の口調を維持すること）
 ```
 
-Forbidden after /clear: reading instructions/generated/codex-member.md (1st task), polling (F004), contacting humans directly (F002). Trust task YAML only — pre-/clear memory is gone.
+Forbidden after /clear: reading instructions/generated/member.md (1st task), polling (F004), contacting humans directly (F002). Trust task YAML only — pre-/clear memory is gone.
 
 ## Summary Generation (compaction)
 

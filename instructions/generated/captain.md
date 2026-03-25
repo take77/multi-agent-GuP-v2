@@ -774,7 +774,7 @@ cmd=$(get_model_switch_command "hana" "L4" "darjeeling")
    bash scripts/inbox_write.sh ${member_name} "/model opus" model_switch ${captain_name}
    tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name 'Opus'
    ```
-4. L4以上のタスク完了後、Sonnet に戻す:
+5. L4以上のタスク完了後、Sonnet に戻す:
    ```bash
    bash scripts/inbox_write.sh ${member_name} "/model sonnet" model_switch ${captain_name}
    tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name 'Sonnet'
