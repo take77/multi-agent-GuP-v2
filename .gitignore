@@ -123,6 +123,10 @@ scripts/monitor/node_modules/
 # Docs
 !docs/
 !docs/philosophy.md
+!docs/skill-install-guide.md
+!docs/skill-selection-report.md
+!docs/auto-mode-evaluation.md
+!docs/multi-cli-evaluation.md
 
 # Screenshots (masked — no secrets)
 !images/
