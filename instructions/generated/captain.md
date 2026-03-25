@@ -782,6 +782,12 @@ cmd=$(get_model_switch_command "hana" "L4" "darjeeling")
 
 **判断に迷ったら**: タスクの ANY 部分が L4+ なら Opus に昇格。コスト節約より品質を優先。
 
+#### 単体テスト
+
+```bash
+bash lib/model_router.sh --test
+```
+
 ## Command Writing
 
 Captain receives cmds from Chief of Staff via `queue/captain_queue.yaml`.
