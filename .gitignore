@@ -136,6 +136,10 @@ scripts/monitor/node_modules/
 !skills/skill-creator/
 !skills/skill-creator/SKILL.md
 !skills/section-wrapper-pattern.md
+!skills/web-animation-patterns/
+!skills/web-animation-patterns/SKILL.md
+!skills/web-animation-patterns/drafts/
+!skills/web-animation-patterns/drafts/*.md
 
 # Tests
 !tests/
