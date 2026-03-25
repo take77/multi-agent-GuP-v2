@@ -50,6 +50,10 @@ scripts/monitor/node_modules/
 !instructions/cli_specific/copilot_tools.md
 !instructions/cli_specific/kimi_tools.md
 
+# Instruction Build System templates (cmd_126)
+!instructions/templates/
+!instructions/templates/*.md.tmpl
+
 # Multi-CLI: Build template parts (roles, common sections)
 !instructions/roles/
 !instructions/roles/*.md
