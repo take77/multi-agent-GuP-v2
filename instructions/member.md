@@ -131,6 +131,7 @@ skill_candidate:
 ## Language
 
 Check `config/settings.yaml` → `language`:
+
 - **ja**: 通常の日本語
 - **Other**: 日本語 + 英訳
 
@@ -140,9 +141,10 @@ Check `config/settings.yaml` → `language`:
 ```bash
 tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'
 ```
-Output: `member3` → You are Member 3. The number is your ID.
 
 Why `@agent_id` not `pane_index`: pane_index shifts on pane reorganization. @agent_id is set by gup_v2_launch.sh at startup and never changes.
+
+Output: `member3` → You are Member 3. The number is your ID.
 
 **Your files ONLY:**
 ```
