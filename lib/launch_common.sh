@@ -249,9 +249,9 @@ launch_squad_cluster() {
 
             log_info "  └─ ${agent_name} にClaude Code召喚完了"
 
-            # staggered launch: 最後以外は10秒待機
+            # staggered launch: 最後以外は3秒待機
             if [ $i -lt $((AGENT_COUNT - 1)) ]; then
-                sleep 10
+                sleep 3
             fi
         done
     fi
@@ -323,9 +323,9 @@ launch_command_server() {
     tmux set-option -t command -w pane-border-status top
     tmux set-option -t command -w pane-border-format '#{?pane_active,#[reverse],}#[bold]#{@agent_name}#[default] (#{@agent_role}/#{@model_name}) #{@current_task}'
 
-    # Claude Code起動（10秒間隔でstaggered launch）
+    # Claude Code起動（3秒間隔でstaggered launch）
     if [ "$SETUP_ONLY" = false ]; then
-        log_war "🎖️ 司令部にClaude Codeを召喚中（10秒間隔）..."
+        log_war "🎖️ 司令部にClaude Codeを召喚中（3秒間隔）..."
 
         for i in {0..1}; do
             local p=$((PANE_BASE + i))
@@ -339,9 +339,9 @@ launch_command_server() {
 
             log_info "  └─ ${agent_name} にClaude Code召喚完了"
 
-            # staggered launch: 最後以外は10秒待機
+            # staggered launch: 最後以外は3秒待機
             if [ $i -lt 1 ]; then
-                sleep 10
+                sleep 3
             fi
         done
     fi

@@ -277,12 +277,21 @@ if [ -n "$CLUSTER_MODE" ]; then
             exit 0
             ;;
         all)
-            log_info "🌐 クラスタモード: 全クラスタ起動"
+            log_info "🌐 クラスタモード: 全クラスタ並列起動"
             check_dependencies
-            launch_darjeeling_cluster
-            launch_katyusha_cluster
-            launch_kay_cluster
-            launch_maho_cluster
+            _par_dir=$(mktemp -d)
+            trap "rm -rf '$_par_dir'" EXIT
+            launch_darjeeling_cluster > "$_par_dir/darjeeling.log" 2>&1 &
+            launch_katyusha_cluster  > "$_par_dir/katyusha.log"  2>&1 &
+            launch_kay_cluster       > "$_par_dir/kay.log"       2>&1 &
+            launch_maho_cluster      > "$_par_dir/maho.log"      2>&1 &
+            wait
+            for _cn in darjeeling katyusha kay maho; do
+                echo "  ┌── ${_cn} ──"
+                cat "$_par_dir/${_cn}.log" | sed 's/^/  │ /'
+                echo "  └──"
+            done
+            rm -rf "$_par_dir"
             exit 0
             ;;
         *)
@@ -688,8 +697,10 @@ if [ "$SETUP_ONLY" = false ]; then
     echo "  Claude Code の起動を待機中（最大30秒）..."
 
     # 大隊長の起動を確認（最大30秒待機）
+    # NOTE: "bypass permissions" は --dangerously-skip-permissions 使用時に表示されない。
+    # Claude Code の入力プロンプト "❯" を検知する方式に変更（全モードで共通）。
     for i in {1..30}; do
-        if tmux capture-pane -t "command:main.${PANE_BASE}" -p | grep -q "bypass permissions"; then
+        if tmux capture-pane -t "command:main.${PANE_BASE}" -p | grep -qE '❯|bypass permissions'; then
             echo "  └─ 大隊長の Claude Code 起動確認完了（${i}秒）"
             break
         fi
@@ -723,16 +734,49 @@ if [ "$SETUP_ONLY" = false ]; then
     echo ""
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # STEP 6.7.5: 各隊クラスタ起動（デフォルト起動時）
+    # STEP 6.7.5: 各隊クラスタ起動（4隊並列）
     # ═══════════════════════════════════════════════════════════════════════════
-    log_war "🫖 ダージリン隊クラスタも起動中..."
-    launch_darjeeling_cluster
-    log_war "🪆 カチューシャ隊クラスタも起動中..."
-    launch_katyusha_cluster
-    log_war "🦅 ケイ隊クラスタも起動中..."
-    launch_kay_cluster
-    log_war "🖤 西住まほ隊クラスタも起動中..."
-    launch_maho_cluster
+    log_war "⚡ 全4隊クラスタを並列起動中..."
+
+    # 一時ディレクトリ（ログバッファ用）
+    _parallel_log_dir=$(mktemp -d)
+    trap "rm -rf '$_parallel_log_dir'" EXIT
+
+    launch_darjeeling_cluster > "$_parallel_log_dir/darjeeling.log" 2>&1 &
+    _pid_darjeeling=$!
+    launch_katyusha_cluster  > "$_parallel_log_dir/katyusha.log"  2>&1 &
+    _pid_katyusha=$!
+    launch_kay_cluster       > "$_parallel_log_dir/kay.log"       2>&1 &
+    _pid_kay=$!
+    launch_maho_cluster      > "$_parallel_log_dir/maho.log"      2>&1 &
+    _pid_maho=$!
+
+    # 全隊の起動完了を待機
+    _parallel_fail=0
+    for _pid_label in "darjeeling:$_pid_darjeeling" "katyusha:$_pid_katyusha" "kay:$_pid_kay" "maho:$_pid_maho"; do
+        _label="${_pid_label%%:*}"
+        _pid="${_pid_label##*:}"
+        if ! wait "$_pid"; then
+            log_error "  └─ ${_label} クラスタ起動失敗"
+            _parallel_fail=1
+        fi
+    done
+
+    # 各隊のログをまとめて表示（混在防止）
+    for _cluster_name in darjeeling katyusha kay maho; do
+        echo ""
+        echo "  ┌── ${_cluster_name} ──"
+        cat "$_parallel_log_dir/${_cluster_name}.log" | sed 's/^/  │ /'
+        echo "  └──"
+    done
+    rm -rf "$_parallel_log_dir"
+
+    if [ "$_parallel_fail" -eq 1 ]; then
+        log_error "一部クラスタの起動に失敗しました"
+        exit 1
+    fi
+
+    log_success "✅ 全4隊クラスタ並列起動完了"
 
     # ═══════════════════════════════════════════════════════════════════════════
     # STEP 6.6: watcher_supervisor起動（全隊のClaude Code起動完了後）

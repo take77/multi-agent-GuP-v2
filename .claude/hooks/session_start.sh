@@ -20,15 +20,20 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # ───────────────────────────────────────────────────────────────────────────────
 # Step 0: Read stdin JSON (for Agent Teams teammate mode)
 # ───────────────────────────────────────────────────────────────────────────────
+# Optimization: Skip read -t 0.5 when TMUX_PANE is set (normal tmux mode).
+# In tmux mode, stdin never contains JSON — the 0.5s wait is wasted.
+# This saves ~0.5s per agent on startup (30 agents = ~15s total).
 HOOK_INPUT=""
-if read -t 0.5 HOOK_INPUT 2>/dev/null; then
-    # JSON received (potential Agent Teams teammate environment)
-    # Extract session_id if jq is available (fallback to grep/sed if not)
-    if command -v jq >/dev/null 2>&1; then
-        SESSION_ID=$(echo "$HOOK_INPUT" | jq -r '.session_id' 2>/dev/null || echo "")
-    else
-        # Fallback: simple grep/sed extraction
-        SESSION_ID=$(echo "$HOOK_INPUT" | grep -o '"session_id":"[^"]*"' | sed 's/"session_id":"\([^"]*\)"/\1/' || echo "")
+if [ -z "$TMUX_PANE" ]; then
+    if read -t 0.5 HOOK_INPUT 2>/dev/null; then
+        # JSON received (potential Agent Teams teammate environment)
+        # Extract session_id if jq is available (fallback to grep/sed if not)
+        if command -v jq >/dev/null 2>&1; then
+            SESSION_ID=$(echo "$HOOK_INPUT" | jq -r '.session_id' 2>/dev/null || echo "")
+        else
+            # Fallback: simple grep/sed extraction
+            SESSION_ID=$(echo "$HOOK_INPUT" | grep -o '"session_id":"[^"]*"' | sed 's/"session_id":"\([^"]*\)"/\1/' || echo "")
+        fi
     fi
 fi
 
