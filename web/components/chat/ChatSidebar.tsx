@@ -7,7 +7,10 @@ import { Avatar } from "@/components/shared/Avatar";
 const STUCK_THRESHOLD = 5;
 
 export function ChatSidebar() {
-  const { clusters, selectedAgent, setSelectedAgent, messages } = useAppStore();
+  const clusters = useAppStore((s) => s.clusters);
+  const selectedAgent = useAppStore((s) => s.selectedAgent);
+  const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
+  const messages = useAppStore((s) => s.messages);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const toggle = (id: string) =>

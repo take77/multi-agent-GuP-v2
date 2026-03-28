@@ -65,7 +65,21 @@ export const useAppStore = create<AppState>((set) => ({
   setClusters: (c) => set({ clusters: c }),
 
   selectedAgent: "anzu",
-  setSelectedAgent: (id) => set({ selectedAgent: id }),
+  setSelectedAgent: (id) => {
+    set({ selectedAgent: id });
+    // Notify server so pane-streamer adjusts polling frequency
+    const token = typeof document !== "undefined"
+      ? document.cookie.split("; ").find((c) => c.startsWith("auth_token="))?.split("=")[1] ?? ""
+      : "";
+    fetch("/api/agents/active", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ agentId: id }),
+    }).catch(() => {});
+  },
   messages: INITIAL_CHATS,
   addMessage: (agentId, msg) =>
     set((s) => ({

@@ -5,16 +5,28 @@ import { eventBus } from "./event-bus";
 export interface PaneState {
   hash: string;
   lastChange: number;
+  lastPoll: number;
   active: boolean;
 }
 
 const ACTIVE_INTERVAL = 200;
-const IDLE_INTERVAL = 2000;
+const INACTIVE_INTERVAL = 3000;
 const IDLE_THRESHOLD = 10000; // 10s without change → idle
 
 let streaming = false;
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 export const paneStates = new Map<string, PaneState>();
+
+// Track which agent the frontend is currently viewing
+let activeAgentId: string | null = null;
+
+export function setActiveAgent(agentId: string | null): void {
+  activeAgentId = agentId;
+}
+
+export function getActiveAgent(): string | null {
+  return activeAgentId;
+}
 
 function hashContent(content: string): string {
   return createHash("sha256").update(content).digest("hex");
@@ -33,15 +45,24 @@ function pollPanes() {
   for (const pane of panes) {
     if (!pane.agentId || !pane.paneId) continue;
 
+    const prev = paneStates.get(pane.agentId);
+    const isActive = pane.agentId === activeAgentId;
+    const interval = isActive ? ACTIVE_INTERVAL : INACTIVE_INTERVAL;
+
+    // Skip if not enough time has elapsed for inactive agents
+    if (prev && now - prev.lastPoll < interval) {
+      continue;
+    }
+
     const content = capturePaneContent(pane.paneId);
     const hash = hashContent(content);
-    const prev = paneStates.get(pane.agentId);
 
     if (!prev || prev.hash !== hash) {
       // Content changed
       paneStates.set(pane.agentId, {
         hash,
         lastChange: now,
+        lastPoll: now,
         active: true,
       });
 
@@ -52,9 +73,15 @@ function pollPanes() {
         sessionName: pane.sessionName,
         timestamp: now,
       });
-    } else if (prev.active && now - prev.lastChange > IDLE_THRESHOLD) {
-      // Transition to idle
-      prev.active = false;
+    } else {
+      // No change — update poll time, check idle transition
+      const wasActive = prev.active;
+      const isIdle = now - prev.lastChange > IDLE_THRESHOLD;
+      paneStates.set(pane.agentId, {
+        ...prev,
+        lastPoll: now,
+        active: wasActive && !isIdle,
+      });
     }
   }
 }
@@ -63,8 +90,7 @@ export function startPaneStreaming(): void {
   if (streaming) return;
   streaming = true;
 
-  // Start with active interval; adaptive polling adjusts per-pane
-  // but the global poll rate uses the faster interval
+  // Global tick at ACTIVE_INTERVAL; per-agent throttling in pollPanes()
   intervalHandle = setInterval(pollPanes, ACTIVE_INTERVAL);
 }
 
