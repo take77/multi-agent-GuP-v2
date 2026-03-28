@@ -49,6 +49,8 @@ interface AppState {
   addInboxMessage: (msg: InboxMessage) => void;
   messageFilter: MessageFilter;
   setMessageFilter: (f: MessageFilter) => void;
+  showCommands: boolean;
+  setShowCommands: (v: boolean) => void;
 
   // SSE connection
   connected: boolean;
@@ -145,6 +147,8 @@ export const useAppStore = create<AppState>((set) => ({
     }),
   messageFilter: "all",
   setMessageFilter: (f) => set({ messageFilter: f }),
+  showCommands: true,
+  setShowCommands: (v) => set({ showCommands: v }),
 
   connected: false,
   setConnected: (v) => set({ connected: v }),
