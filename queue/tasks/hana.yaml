@@ -1,0 +1,64 @@
+task:
+  task_id: subtask_126b2a
+  parent_cmd: cmd_126
+  bloom_level: L5
+  description: |
+    【Webアニメーション パターンカタログ — カテゴリ1-2 ドラフト作成】
+
+    HP案件で使えるWebアニメーションパターンのドラフトを作成せよ。
+    担当カテゴリ: ページ遷移アニメーション + ナビゲーション
+
+    ■ 担当パターン（各カテゴリ最低2パターン、合計4-5パターン）:
+
+    カテゴリ1: ページ遷移アニメーション
+    - フェードイン/フェードアウト（ページ全体）
+    - スライドイン（方向付き遷移）
+    - クロスフェード
+    ※ Next.js App Router の View Transitions API や framer-motion との統合も検討
+
+    カテゴリ2: ナビゲーション
+    - Sticky/Fixed ヘッダー（スクロール時の背景変化）
+    - ハンバーガーメニュー（開閉アニメーション）
+    - メガメニュー（ドロップダウン）
+
+    ■ 各パターンの記述形式:
+
+    ### パターン名
+    **カテゴリ**: xxx
+    **難易度**: 低/中/高
+    **使用頻度**: ★★★★★
+
+    #### 概要
+    何をするアニメーションか
+
+    #### 実装コード
+    ```tsx
+    // React + Tailwind CSS の完全な実装例
+    // コピペで動くレベルで記述
+    ```
+
+    #### CSS（必要な場合）
+    ```css
+    @keyframes xxx { ... }
+    ```
+
+    #### 使い方
+    - どのページ/コンポーネントで使うか
+    - カスタマイズポイント
+
+    #### 注意点
+    - パフォーマンス、アクセシビリティ等
+
+    ■ 出力先:
+    - skills/web-animation-patterns/drafts/draft-transitions-nav.md
+    - 既存の section-wrapper-pattern.md のフォーマットを参考に
+
+    ■ 技術要件:
+    - Tailwind CSS v4 対応クラスを使用
+    - jQuery/vanilla JS → React hooks + Tailwind CSS に変換
+    - framer-motion は使わない（依存を増やさない。CSS + React stateで実現）
+    - prefers-reduced-motion メディアクエリ対応を含める
+  target_path: "/home/take77/Developments/Tools/multi-agent-GuP-v2/skills/web-animation-patterns/drafts/draft-transitions-nav.md"
+  target_branch: "cmd_126/hana/animation-skill"
+  status: in_progress
+  timestamp: "2026-03-26T00:30:56"

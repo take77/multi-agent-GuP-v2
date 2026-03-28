@@ -50,6 +50,10 @@ scripts/monitor/node_modules/
 !instructions/cli_specific/copilot_tools.md
 !instructions/cli_specific/kimi_tools.md
 
+# Instruction Build System templates (cmd_126)
+!instructions/templates/
+!instructions/templates/*.md.tmpl
+
 # Multi-CLI: Build template parts (roles, common sections)
 !instructions/roles/
 !instructions/roles/*.md
@@ -109,6 +113,7 @@ scripts/monitor/node_modules/
 !scripts/init_runtime_data.sh
 !scripts/slim_yaml.py
 !scripts/slim_yaml.sh
+!scripts/statusline.sh
 
 
 # SayTask (sample template only, not actual data)
@@ -118,6 +123,10 @@ scripts/monitor/node_modules/
 # Docs
 !docs/
 !docs/philosophy.md
+!docs/skill-install-guide.md
+!docs/skill-selection-report.md
+!docs/auto-mode-evaluation.md
+!docs/multi-cli-evaluation.md
 
 # Screenshots (masked — no secrets)
 !images/

@@ -2,7 +2,9 @@
 #
 # slim_yaml.sh - YAML slimming wrapper with file locking
 #
-# Usage: bash scripts/slim_yaml.sh <agent_id> [--dry-run]
+# Usage:
+#   bash scripts/slim_yaml.sh [--dry-run]            # Full slim (all queues)
+#   bash scripts/slim_yaml.sh <agent_id> [--dry-run]  # Agent-specific inbox slim
 #
 # This script acquires an exclusive lock before calling the Python slimmer,
 # ensuring no concurrent modifications to YAML files (same pattern as inbox_write.sh).
