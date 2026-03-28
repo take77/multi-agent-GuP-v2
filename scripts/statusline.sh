@@ -156,8 +156,15 @@ else
 
     # Fallback: read from Claude Code credentials file if env var not set
     if [ -z "$ACCESS_TOKEN" ]; then
-      CREDENTIALS_FILE="${HOME}/.config/claude/credentials.json"
-      if [ -f "$CREDENTIALS_FILE" ]; then
+      # Check multiple known paths
+      CREDENTIALS_FILE=""
+      for _cand in "${HOME}/.claude/.credentials.json" "${HOME}/.config/claude/credentials.json"; do
+        if [ -f "$_cand" ]; then
+          CREDENTIALS_FILE="$_cand"
+          break
+        fi
+      done
+      if [ -n "$CREDENTIALS_FILE" ] && [ -f "$CREDENTIALS_FILE" ]; then
         CREDENTIALS=$(cat "$CREDENTIALS_FILE" 2>/dev/null || echo "")
         if [ -n "$CREDENTIALS" ]; then
           if echo "$CREDENTIALS" | grep -q '^{'; then
