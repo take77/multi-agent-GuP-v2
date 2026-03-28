@@ -33,6 +33,12 @@ const RE_READ_CALL = /^Read\((.+)\)\s*$/;
 const RE_READING_FILES = /^Reading\s+\d+\s+file/;
 const RE_UPDATE_CALL = /^Update\((.+)\)\s*$/;
 const RE_WRITE_CALL = /^Write\((.+)\)\s*$/;
+const RE_EDIT_CALL = /^Edit\((.+)\)\s*$/;
+const RE_GLOB_CALL = /^Glob\((.+)\)\s*$/;
+const RE_GREP_CALL = /^Grep\((.+)\)\s*$/;
+const RE_AGENT_CALL = /^Agent\((.+)\)\s*$/;
+const RE_TODO_CALL = /^Todo(?:Write|Read)\((.+)\)\s*$/;
+const RE_TOOL_SEARCH_CALL = /^ToolSearch\((.+)\)\s*$/;
 const RE_COGITATE = /^✻\s+Cogitated\s+for\s+/;
 const RE_SEPARATOR = /^[─]{4,}/;
 const RE_STATUS_BAR = /^⏵⏵\s+/;
@@ -102,6 +108,12 @@ export function parseCapturePaneOutput(raw: string): ParsedSegment[] {
           RE_READING_FILES.test(next) ||
           RE_UPDATE_CALL.test(next) ||
           RE_WRITE_CALL.test(next) ||
+          RE_EDIT_CALL.test(next) ||
+          RE_GLOB_CALL.test(next) ||
+          RE_GREP_CALL.test(next) ||
+          RE_AGENT_CALL.test(next) ||
+          RE_TODO_CALL.test(next) ||
+          RE_TOOL_SEARCH_CALL.test(next) ||
           RE_COGITATE.test(next) ||
           RE_SEPARATOR.test(next) ||
           RE_STATUS_BAR.test(next) ||
@@ -196,6 +208,44 @@ export function parseCapturePaneOutput(raw: string): ParsedSegment[] {
         tool: "edit",
         filePath: writeMatch[1],
       });
+      i++;
+      continue;
+    }
+
+    // Edit(file) — alternative to Update
+    const editMatch = trimmed.match(RE_EDIT_CALL);
+    if (editMatch) {
+      segments.push({
+        kind: "tool-call",
+        text: trimmed,
+        tool: "edit",
+        filePath: editMatch[1],
+      });
+      i++;
+      continue;
+    }
+
+    // Glob(pattern) / Grep(pattern)
+    const globMatch = trimmed.match(RE_GLOB_CALL);
+    if (globMatch) {
+      segments.push({ kind: "tool-call", text: trimmed, tool: "read" });
+      i++;
+      continue;
+    }
+    const grepMatch = trimmed.match(RE_GREP_CALL);
+    if (grepMatch) {
+      segments.push({ kind: "tool-call", text: trimmed, tool: "read" });
+      i++;
+      continue;
+    }
+
+    // Agent(...) / TodoWrite(...) / TodoRead(...) / ToolSearch(...)
+    if (
+      RE_AGENT_CALL.test(trimmed) ||
+      RE_TODO_CALL.test(trimmed) ||
+      RE_TOOL_SEARCH_CALL.test(trimmed)
+    ) {
+      segments.push({ kind: "tool-call", text: trimmed, tool: "bash" });
       i++;
       continue;
     }

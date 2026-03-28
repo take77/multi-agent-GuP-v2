@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import type { ParsedSegment } from "@/lib/capture-pane-parser";
 
 /** Tool icon by tool type */
@@ -93,9 +95,9 @@ export function ParsedOutput({ segments }: { segments: ParsedSegment[] }) {
         elements.push(
           <div
             key={i}
-            className="prose prose-invert prose-sm max-w-none text-[12px] leading-[1.5] text-slate-300 [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_code]:bg-slate-700/50 [&_code]:px-1 [&_code]:rounded [&_code]:text-[11px] [&_pre]:bg-slate-900/50 [&_pre]:p-2 [&_pre]:rounded [&_pre]:text-[11px] [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs [&_a]:text-sky-400"
+            className="prose prose-invert prose-sm max-w-none text-[12px] leading-[1.5] text-slate-300 [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_code]:bg-slate-700/50 [&_code]:px-1 [&_code]:rounded [&_code]:text-[11px] [&_pre]:bg-slate-900/50 [&_pre]:p-2 [&_pre]:rounded [&_pre]:text-[11px] [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs [&_a]:text-sky-400 [&_table]:w-full [&_table]:border-collapse [&_table]:my-2 [&_table]:text-[11px] [&_th]:border [&_th]:border-slate-600 [&_th]:px-2 [&_th]:py-1 [&_th]:bg-slate-700/50 [&_th]:text-left [&_th]:font-semibold [&_td]:border [&_td]:border-slate-600 [&_td]:px-2 [&_td]:py-0.5 [&_tr:nth-child(even)]:bg-slate-800/30"
           >
-            <Markdown>{seg.text}</Markdown>
+            <Markdown remarkPlugins={[remarkGfm, remarkBreaks]}>{seg.text}</Markdown>
           </div>
         );
         break;
