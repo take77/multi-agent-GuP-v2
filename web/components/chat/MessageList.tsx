@@ -5,6 +5,7 @@ import { useAppStore } from "@/lib/store";
 import { Avatar } from "@/components/shared/Avatar";
 import { parseCapturePaneOutput } from "@/lib/capture-pane-parser";
 import { ParsedOutput } from "@/components/chat/ParsedOutput";
+import { getAgentDisplayName } from "@/lib/agent-names";
 
 /** Unified chat entry for timeline display */
 interface ChatEntry {
@@ -104,14 +105,27 @@ export function MessageList() {
       {/* Interleaved user commands (right) and inbox messages (left) */}
       {timeline.map((entry, i) => {
         if (entry.kind === "user") {
+          const isSlashCommand = entry.text.startsWith("/");
           // User command → right bubble (B-1)
+          // Slash commands get a distinct badge style
           return (
             <div key={`u-${i}`} className="flex justify-end">
-              <div className="max-w-[75%] bg-sky-600 rounded-xl rounded-tr-sm px-3 py-1.5">
+              <div
+                className={`max-w-[75%] rounded-xl rounded-tr-sm px-3 py-1.5 ${
+                  isSlashCommand
+                    ? "bg-violet-700/80 border border-violet-500/40"
+                    : "bg-sky-600"
+                }`}
+              >
                 <span className="text-[11px] text-white font-mono">
-                  $ {entry.text}
+                  {isSlashCommand ? "🔧 " : "$ "}
+                  {entry.text}
                 </span>
-                <div className="text-[9px] text-sky-200 text-right mt-0.5">
+                <div
+                  className={`text-[9px] text-right mt-0.5 ${
+                    isSlashCommand ? "text-violet-300" : "text-sky-200"
+                  }`}
+                >
                   {entry.time}
                 </div>
               </div>
@@ -128,7 +142,7 @@ export function MessageList() {
               </div>
               <div className="bg-amber-900/30 border border-amber-700/40 rounded-xl rounded-tl-sm px-3 py-1.5">
                 <span className="text-[10px] text-amber-300 font-medium">
-                  {entry.from}から連絡
+                  {entry.from ? getAgentDisplayName(entry.from) : "不明"}から連絡
                 </span>
                 <p className="text-[11px] text-slate-300 mt-0.5">
                   {entry.text}
