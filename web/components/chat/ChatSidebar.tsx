@@ -61,7 +61,7 @@ export function ChatSidebar() {
     .find((a) => a.id === selectedAgent);
 
   return (
-    <div className="w-40 border-r border-slate-700/50 flex flex-col bg-slate-900/80 shrink-0">
+    <div className="w-full h-full border-r border-slate-700/50 flex flex-col bg-slate-900/80 shrink-0">
       <div className="flex-1 overflow-y-auto py-1 scrollbar-hide">
         {clusters.map((cl) => {
           const isOpen = !collapsed[cl.id];
