@@ -69,15 +69,15 @@ export function MessageList() {
     return entries;
   }, [userMsgs, inboxMessages, selectedAgent]);
 
-  // Auto-scroll when new entries arrive or output changes
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [timeline.length, parsedSegments.length, output, selectedAgent]);
-
   const parsedSegments = useMemo(
     () => parseCapturePaneOutput(output),
     [output]
   );
+
+  // Auto-scroll when new entries arrive or output changes
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [timeline.length, parsedSegments.length, output, selectedAgent]);
 
   return (
     <div className="flex-1 flex flex-col overflow-y-auto px-3 py-3 space-y-2">
