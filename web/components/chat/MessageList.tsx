@@ -3,26 +3,8 @@
 import { useEffect, useRef, useMemo } from "react";
 import { useAppStore } from "@/lib/store";
 import { Avatar } from "@/components/shared/Avatar";
-
-/** Strip tmux input prompt line from capture-pane output (B-3) */
-function stripPromptLine(output: string): string {
-  const lines = output.split("\n");
-  // Remove trailing empty lines and the last prompt line (typically ends with ❯, $, %, or >)
-  while (lines.length > 0) {
-    const last = lines[lines.length - 1].trim();
-    if (last === "") {
-      lines.pop();
-      continue;
-    }
-    // Common prompt patterns: ends with ❯, $, %, >, or contains typical prompt chars
-    if (/[❯$%>]\s*$/.test(last) || /^\s*[\w.~\/-]*[❯$%>]\s*$/.test(last)) {
-      lines.pop();
-      break;
-    }
-    break;
-  }
-  return lines.join("\n");
-}
+import { parseCapturePaneOutput } from "@/lib/capture-pane-parser";
+import { ParsedOutput } from "@/components/chat/ParsedOutput";
 
 /** Unified chat entry for timeline display */
 interface ChatEntry {
@@ -74,16 +56,11 @@ export function MessageList() {
           hour: "2-digit",
           minute: "2-digit",
         });
-        // Summarize: first 60 chars of content
-        const summary =
-          m.content.length > 60
-            ? m.content.slice(0, 60) + "…"
-            : m.content;
         entries.push({
           kind: "inbox",
           time: timeStr,
           sortKey: t.getTime(),
-          text: summary,
+          text: m.content,
           from: m.from,
         });
       });
@@ -96,29 +73,30 @@ export function MessageList() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [timeline.length, output, selectedAgent]);
 
-  const cleanOutput = useMemo(() => stripPromptLine(output), [output]);
+  const parsedSegments = useMemo(
+    () => parseCapturePaneOutput(output),
+    [output]
+  );
 
   return (
     <div className="flex-1 flex flex-col overflow-y-auto px-3 py-3 space-y-2">
       {/* No output placeholder */}
-      {!cleanOutput && timeline.length === 0 && (
+      {parsedSegments.length === 0 && timeline.length === 0 && (
         <div className="flex flex-col items-center justify-center flex-1 text-slate-600">
           <Avatar id={agent?.id ?? "anzu"} size="w-12 h-12 text-[18px]" />
           <p className="text-[12px] mt-3">{agent?.name} の出力待ち...</p>
         </div>
       )}
 
-      {/* Agent terminal output — left bubble with <pre> (B-1) */}
-      {cleanOutput && (
+      {/* Agent terminal output — structured parsed view */}
+      {parsedSegments.length > 0 && (
         <div className="flex items-start gap-2 max-w-[90%]">
           <Avatar
             id={agent?.id ?? "anzu"}
             size="w-6 h-6 text-[9px]"
           />
-          <div className="bg-slate-800 rounded-xl rounded-tl-sm px-3 py-2 min-w-0">
-            <pre className="text-[11px] leading-[1.4] text-slate-300 font-mono whitespace-pre-wrap break-words max-h-[60vh] overflow-y-auto">
-              {cleanOutput}
-            </pre>
+          <div className="bg-slate-800 rounded-xl rounded-tl-sm px-3 py-2 min-w-0 flex-1 max-h-[60vh] overflow-y-auto">
+            <ParsedOutput segments={parsedSegments} />
           </div>
         </div>
       )}
