@@ -3,8 +3,30 @@
 import { useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { Avatar } from "@/components/shared/Avatar";
+import type { AgentStatus } from "@/types/agent";
 
 const STUCK_THRESHOLD = 5;
+
+const STATUS_CONFIG: Record<
+  AgentStatus,
+  { label: string; bg: string; text: string }
+> = {
+  active: { label: "稼働", bg: "bg-emerald-900/50", text: "text-emerald-300" },
+  idle: { label: "待機", bg: "bg-slate-700/50", text: "text-slate-400" },
+  error: { label: "エラー", bg: "bg-red-900/50", text: "text-red-300" },
+  stuck: { label: "停滞", bg: "bg-orange-900/50", text: "text-orange-300" },
+};
+
+function StatusBadge({ status }: { status: AgentStatus }) {
+  const cfg = STATUS_CONFIG[status];
+  return (
+    <span
+      className={`text-[8px] px-1 py-px rounded ${cfg.bg} ${cfg.text} shrink-0`}
+    >
+      {cfg.label}
+    </span>
+  );
+}
 
 export function ChatSidebar() {
   const clusters = useAppStore((s) => s.clusters);
@@ -87,6 +109,7 @@ export function ChatSidebar() {
                         >
                           {a.name}
                         </span>
+                        <StatusBadge status={a.status} />
                         {a.stuck >= STUCK_THRESHOLD && (
                           <span className="text-[9px] px-1 rounded bg-orange-500/20 text-orange-300">
                             {a.stuck}m
