@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 const NAV: { id: ViewId; label: string; icon: string }[] = [
   { id: "chat", label: "チャット", icon: "\ud83d\udcac" },
+  { id: "messages", label: "メッセージ", icon: "\ud83d\udce8" },
   { id: "agents", label: "状態", icon: "\ud83d\udcca" },
   { id: "git", label: "Git", icon: "\ud83d\udd00" },
   { id: "progress", label: "進捗", icon: "\ud83d\udcc8" },

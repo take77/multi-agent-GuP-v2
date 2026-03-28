@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import type { Agent, Cluster, ChatMessage } from "@/types/agent";
+import type { InboxMessage, MessageFilter } from "@/types/message";
 
-export type ViewId = "chat" | "agents" | "git" | "progress";
+export type ViewId = "chat" | "agents" | "git" | "progress" | "messages";
 
 // Initial empty state — populated by SSE /api/sse/agents
 const INITIAL_CLUSTERS: Cluster[] = [];
@@ -22,6 +23,13 @@ interface AppState {
   setSelectedAgent: (id: string) => void;
   messages: Record<string, ChatMessage[]>;
   addMessage: (agentId: string, msg: ChatMessage) => void;
+
+  // Inbox messages
+  inboxMessages: InboxMessage[];
+  setInboxMessages: (msgs: InboxMessage[]) => void;
+  addInboxMessage: (msg: InboxMessage) => void;
+  messageFilter: MessageFilter;
+  setMessageFilter: (f: MessageFilter) => void;
 
   // SSE connection
   connected: boolean;
@@ -45,6 +53,16 @@ export const useAppStore = create<AppState>((set) => ({
         [agentId]: [...(s.messages[agentId] ?? []), msg],
       },
     })),
+
+  inboxMessages: [],
+  setInboxMessages: (msgs) => set({ inboxMessages: msgs }),
+  addInboxMessage: (msg) =>
+    set((s) => {
+      if (s.inboxMessages.some((m) => m.id === msg.id)) return s;
+      return { inboxMessages: [...s.inboxMessages, msg] };
+    }),
+  messageFilter: "all",
+  setMessageFilter: (f) => set({ messageFilter: f }),
 
   connected: false,
   setConnected: (v) => set({ connected: v }),
