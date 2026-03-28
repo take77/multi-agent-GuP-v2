@@ -70,6 +70,18 @@ export function sendKeys(paneId: string, command: string): void {
 }
 
 /**
+ * Send Escape key to a tmux pane (no Enter).
+ * Used for interrupting running processes in Claude Code agents.
+ */
+export function sendEscape(paneId: string): void {
+  execFileSync(
+    "tmux",
+    ["send-keys", "-t", paneId, "Escape"],
+    EXEC_OPTIONS
+  );
+}
+
+/**
  * Build a mapping from agentId to paneId for quick lookups.
  */
 export function buildAgentPaneMap(): Map<string, string> {
