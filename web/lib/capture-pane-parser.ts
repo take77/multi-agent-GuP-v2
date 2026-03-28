@@ -44,6 +44,13 @@ const RE_SEPARATOR = /^[─]{4,}/;
 const RE_STATUS_BAR = /^⏵⏵\s+/;
 const RE_INBOX_NUDGE = /^inbox\d+$/;
 
+// Session start / banner patterns → status (hidden)
+const RE_BOX_BORDER = /^[╭╰├╮╯┤│╠╣╦╩╪]{1}/;
+const RE_REMOTE_URL = /^https?:\/\//;
+const RE_QUESTION_PROMPT = /^\?\s+/;
+const RE_SESSION_LINE = /^(?:Human turn|claude-code|Claude Code|Session|Loading|Initializing)/i;
+const RE_TOGGLE_LINE = /^(?:Bypass permissions|Auto-accept|Fast mode|Model:)\s/i;
+
 /**
  * capture-pane 出力を構造化セグメントの配列にパースする。
  */
@@ -266,6 +273,19 @@ export function parseCapturePaneOutput(raw: string): ParsedSegment[] {
 
     // ⏵⏵ status bar
     if (RE_STATUS_BAR.test(trimmed)) {
+      segments.push({ kind: "status-bar", text: trimmed });
+      i++;
+      continue;
+    }
+
+    // Session start / banner lines → status-bar (hidden)
+    if (
+      RE_BOX_BORDER.test(trimmed) ||
+      RE_REMOTE_URL.test(trimmed) ||
+      RE_QUESTION_PROMPT.test(trimmed) ||
+      RE_SESSION_LINE.test(trimmed) ||
+      RE_TOGGLE_LINE.test(trimmed)
+    ) {
       segments.push({ kind: "status-bar", text: trimmed });
       i++;
       continue;
