@@ -1,9 +1,13 @@
 "use client";
 
+interface ImageItem {
+  file: File;
+  preview: string;
+}
+
 interface ImagePreviewProps {
-  src: string;
-  fileName: string;
-  onRemove: () => void;
+  images: ImageItem[];
+  onRemove: (index: number) => void;
 }
 
 function formatFileSize(bytes: number): string {
@@ -12,27 +16,29 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
-export default function ImagePreview({ src, fileName, onRemove }: ImagePreviewProps) {
+export default function ImagePreview({ images, onRemove }: ImagePreviewProps) {
   return (
-    <div className="flex gap-2 flex-wrap">
-      <div className="relative shrink-0 group">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt={fileName}
-          className="h-[64px] w-auto rounded border border-slate-600 object-cover"
-        />
-        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-[9px] text-slate-300 px-0.5 py-px truncate rounded-b">
-          {fileName}
+    <div className="flex gap-2 flex-wrap max-h-[80px] overflow-y-auto">
+      {images.map(({ file, preview }, index) => (
+        <div key={index} className="relative shrink-0 group">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={preview}
+            alt={file.name}
+            className="h-[64px] w-auto rounded border border-slate-600 object-cover"
+          />
+          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-[9px] text-slate-300 px-0.5 py-px truncate rounded-b">
+            {file.name} · {formatFileSize(file.size)}
+          </div>
+          <button
+            onClick={() => onRemove(index)}
+            className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-slate-700 hover:bg-red-600 rounded-full text-[10px] text-slate-300 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            aria-label={`${file.name}を削除`}
+          >
+            ✕
+          </button>
         </div>
-        <button
-          onClick={onRemove}
-          className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-slate-700 hover:bg-red-600 rounded-full text-[10px] text-slate-300 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-          aria-label={`${fileName}を削除`}
-        >
-          ✕
-        </button>
-      </div>
+      ))}
     </div>
   );
 }

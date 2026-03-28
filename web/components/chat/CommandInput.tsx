@@ -31,8 +31,8 @@ export function CommandInput() {
     message: string;
   } | null>(null);
   const [historyIdx, setHistoryIdx] = useState(-1);
-  const [pendingImage, setPendingImage] = useState<File | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [pendingImages, setPendingImages] = useState<File[]>([]);
+  const [pendingPreviews, setPendingPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,16 +63,12 @@ export function CommandInput() {
     adjustHeight();
   }, [input, adjustHeight]);
 
-  // Generate preview URL for pending image
+  // Generate preview URLs for pending images, revoke on cleanup
   useEffect(() => {
-    if (!pendingImage) {
-      setImagePreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(pendingImage);
-    setImagePreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [pendingImage]);
+    const urls = pendingImages.map((f) => URL.createObjectURL(f));
+    setPendingPreviews(urls);
+    return () => urls.forEach((url) => URL.revokeObjectURL(url));
+  }, [pendingImages]);
 
   const uploadImage = useCallback(async (file: File): Promise<string | null> => {
     const token =
@@ -133,19 +129,22 @@ export function CommandInput() {
     const cmd = input.trim();
 
     // Image upload flow
-    if (pendingImage) {
+    if (pendingImages.length > 0) {
       setUploading(true);
-      const uploadedPath = await uploadImage(pendingImage);
-      setUploading(false);
-
-      if (!uploadedPath) {
-        setError({ message: "画像のアップロードに失敗しました" });
-        return;
+      const paths: string[] = [];
+      for (const file of pendingImages) {
+        const uploadedPath = await uploadImage(file);
+        if (!uploadedPath) {
+          setUploading(false);
+          setError({ message: "画像のアップロードに失敗しました" });
+          return;
+        }
+        paths.push(uploadedPath);
       }
-
-      setPendingImage(null);
-      // Send the image path as command (with optional text)
-      const imageCmd = cmd ? `${cmd}\n${uploadedPath}` : uploadedPath;
+      setUploading(false);
+      setPendingImages([]);
+      // Send all image paths as command (with optional text)
+      const imageCmd = cmd ? `${cmd}\n${paths.join("\n")}` : paths.join("\n");
       setInput("");
       setHistoryIdx(-1);
       doSend(imageCmd);
@@ -159,7 +158,7 @@ export function CommandInput() {
 
     // All commands sent directly — D001-D012 blocking is handled server-side
     doSend(cmd);
-  }, [input, pendingImage, doSend, uploadImage]);
+  }, [input, pendingImages, doSend, uploadImage]);
 
   const handleQuickAction = useCallback(
     (command: string) => {
@@ -196,13 +195,16 @@ export function CommandInput() {
   // Clipboard paste handler
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = e.clipboardData.items;
+    const imageFiles: File[] = [];
     for (let i = 0; i < items.length; i++) {
       if (ACCEPTED_IMAGE_TYPES.includes(items[i].type)) {
-        e.preventDefault();
         const file = items[i].getAsFile();
-        if (file) setPendingImage(file);
-        return;
+        if (file) imageFiles.push(file);
       }
+    }
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      setPendingImages((prev) => [...prev, ...imageFiles]);
     }
   }, []);
 
@@ -210,20 +212,21 @@ export function CommandInput() {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDrag(false);
-    const files = e.dataTransfer.files;
-    for (let i = 0; i < files.length; i++) {
-      if (ACCEPTED_IMAGE_TYPES.includes(files[i].type)) {
-        setPendingImage(files[i]);
-        return;
-      }
+    const files = Array.from(e.dataTransfer.files).filter((f) =>
+      ACCEPTED_IMAGE_TYPES.includes(f.type)
+    );
+    if (files.length > 0) {
+      setPendingImages((prev) => [...prev, ...files]);
     }
   }, []);
 
   // File input handler
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-      setPendingImage(file);
+    const files = Array.from(e.target.files ?? []).filter((f) =>
+      ACCEPTED_IMAGE_TYPES.includes(f.type)
+    );
+    if (files.length > 0) {
+      setPendingImages((prev) => [...prev, ...files]);
     }
     // Reset input so same file can be selected again
     e.target.value = "";
@@ -250,12 +253,11 @@ export function CommandInput() {
       )}
 
       {/* Image Preview */}
-      {imagePreviewUrl && pendingImage && (
+      {pendingImages.length > 0 && (
         <div className="mb-2">
           <ImagePreview
-            src={imagePreviewUrl}
-            fileName={pendingImage.name}
-            onRemove={() => setPendingImage(null)}
+            images={pendingImages.map((file, i) => ({ file, preview: pendingPreviews[i] ?? "" }))}
+            onRemove={(i) => setPendingImages((prev) => prev.filter((_, idx) => idx !== i))}
           />
         </div>
       )}
@@ -302,6 +304,7 @@ export function CommandInput() {
           ref={fileInputRef}
           type="file"
           accept="image/png,image/jpeg,image/gif,image/webp"
+          multiple
           className="hidden"
           onChange={handleFileSelect}
         />
@@ -324,10 +327,10 @@ export function CommandInput() {
         ) : (
           <button
             onClick={handleSend}
-            disabled={!input.trim() && !pendingImage}
+            disabled={!input.trim() && pendingImages.length === 0}
             title="送信 (Ctrl+Enter)"
             className={`px-3 py-1.5 rounded-lg text-[12px] font-medium shrink-0 ${
-              (input.trim() || pendingImage)
+              (input.trim() || pendingImages.length > 0)
                 ? "bg-sky-600 hover:bg-sky-500 text-white"
                 : "bg-slate-800 text-slate-600"
             }`}
