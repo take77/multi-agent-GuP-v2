@@ -1,16 +1,57 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAppStore } from "@/lib/store";
 import { Avatar } from "@/components/shared/Avatar";
 import { StuckAlert } from "./StuckAlert";
 import { AgentCard } from "./AgentCard";
+import type { Cluster } from "@/types/agent";
 
 const STUCK_THRESHOLD = 5;
+const SSE_URL = "/api/sse/agents";
+const RECONNECT_DELAY = 3000;
 
 export function AgentGrid() {
-  const { clusters } = useAppStore();
+  const { clusters, setClusters } = useAppStore();
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+
+  // SSE connection for live agent status updates
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function connect() {
+      eventSource = new EventSource(SSE_URL);
+
+      eventSource.addEventListener("agent-status", (e) => {
+        try {
+          const data = JSON.parse(e.data) as { clusters: Cluster[] };
+          if (data.clusters) {
+            setClusters(data.clusters);
+          }
+        } catch {
+          // ignore parse errors
+        }
+      });
+
+      eventSource.onopen = () => setConnected(true);
+
+      eventSource.onerror = () => {
+        setConnected(false);
+        eventSource?.close();
+        reconnectTimer = setTimeout(connect, RECONNECT_DELAY);
+      };
+    }
+
+    connect();
+
+    return () => {
+      eventSource?.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      setConnected(false);
+    };
+  }, [setClusters]);
 
   const allAgents = clusters.flatMap((c) => c.agents);
 
@@ -28,7 +69,7 @@ export function AgentGrid() {
             onClick={() => setExpanded(null)}
             className="text-slate-500 hover:text-white text-[13px]"
           >
-            \u2190 戻る
+            ← 戻る
           </button>
           <Avatar
             id={agent?.id ?? ""}
@@ -37,15 +78,20 @@ export function AgentGrid() {
           />
           <span className="text-sm font-medium text-white">{agent?.name}</span>
           <span className="text-[11px] text-slate-500">
-            \u2014 {cluster?.name} / {agent?.task}
+            — {cluster?.name} / {agent?.task}
           </span>
+          {agent?.model && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-400">
+              {agent.model}
+            </span>
+          )}
         </div>
         <div className="flex-1 bg-black font-mono text-[12px] leading-[1.7] p-4 overflow-y-auto text-emerald-400">
           <div className="text-emerald-300">
-            \u276f Terminal output for {agent?.name}
+            ❯ Terminal output for {agent?.name}
           </div>
           <div className="text-slate-400">
-            (Live terminal output will appear here in Phase 2)
+            (Live terminal output will appear here)
           </div>
           <span className="inline-block w-2 h-4 bg-slate-400 animate-pulse" />
         </div>
@@ -56,6 +102,15 @@ export function AgentGrid() {
   return (
     <div className="overflow-y-auto h-full">
       <StuckAlert agents={allAgents} onSelect={setExpanded} />
+
+      {/* Connection status */}
+      <div className="px-4 pt-3 flex items-center gap-2">
+        <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-emerald-400" : "bg-red-400 animate-pulse"}`} />
+        <span className="text-[10px] text-slate-600">
+          {connected ? "ライブ接続中" : "再接続中..."}
+        </span>
+      </div>
+
       <div className="p-4 space-y-5">
         {clusters.map((cl) => (
           <div key={cl.id}>
@@ -73,7 +128,7 @@ export function AgentGrid() {
               </span>
               {cl.agents.some((a) => a.stuck >= STUCK_THRESHOLD) && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-900/40 text-orange-300 border border-orange-700/40">
-                  \u26a0 停滞
+                  ⚠ 停滞
                 </span>
               )}
             </div>
