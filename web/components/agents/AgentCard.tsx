@@ -29,7 +29,14 @@ export function AgentCard({
           <span className="text-[13px] font-medium text-slate-300 group-hover:text-white block truncate">
             {agent.name}
           </span>
-          <span className="text-[10px] text-slate-500">{agent.role}</span>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-slate-500">{agent.role}</span>
+            {agent.model && (
+              <span className="text-[9px] px-1 rounded bg-slate-700/60 text-slate-400">
+                {agent.model}
+              </span>
+            )}
+          </div>
         </div>
         {isStuck && (
           <span className="text-[9px] px-1 rounded bg-orange-500/20 text-orange-300 ml-auto">

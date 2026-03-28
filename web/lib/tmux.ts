@@ -6,6 +6,8 @@ export interface PaneInfo {
   agentId: string;
   agentRole: string;
   agentName: string;
+  modelName: string;
+  currentTask: string;
 }
 
 const EXEC_OPTIONS = { encoding: "utf-8" as const, timeout: 5000 };
@@ -17,7 +19,7 @@ const EXEC_OPTIONS = { encoding: "utf-8" as const, timeout: 5000 };
 export function listPanes(): PaneInfo[] {
   try {
     const format =
-      "#{pane_id}\t#{session_name}\t#{@agent_id}\t#{@agent_role}\t#{@agent_name}";
+      "#{pane_id}\t#{session_name}\t#{@agent_id}\t#{@agent_role}\t#{@agent_name}\t#{@model_name}\t#{@current_task}";
     const output = execFileSync(
       "tmux",
       ["list-panes", "-a", "-F", format],
@@ -28,9 +30,9 @@ export function listPanes(): PaneInfo[] {
       .split("\n")
       .filter((line) => line.trim())
       .map((line) => {
-        const [paneId, sessionName, agentId, agentRole, agentName] =
+        const [paneId, sessionName, agentId, agentRole, agentName, modelName, currentTask] =
           line.split("\t");
-        return { paneId, sessionName, agentId, agentRole, agentName };
+        return { paneId, sessionName, agentId, agentRole, agentName, modelName: modelName || "", currentTask: currentTask || "" };
       })
       .filter((p) => p.agentId); // Only panes with @agent_id set
   } catch {

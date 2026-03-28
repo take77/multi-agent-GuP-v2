@@ -2,7 +2,7 @@ import { createHash } from "crypto";
 import { listPanes, capturePaneContent, type PaneInfo } from "./tmux";
 import { eventBus } from "./event-bus";
 
-interface PaneState {
+export interface PaneState {
   hash: string;
   lastChange: number;
   active: boolean;
@@ -14,7 +14,7 @@ const IDLE_THRESHOLD = 10000; // 10s without change → idle
 
 let streaming = false;
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
-const paneStates = new Map<string, PaneState>();
+export const paneStates = new Map<string, PaneState>();
 
 function hashContent(content: string): string {
   return createHash("sha256").update(content).digest("hex");

@@ -118,6 +118,7 @@ export async function GET() {
       status: pane ? "active" : "idle",
       task: taskInfo?.task || "待機中",
       stuck: 0,
+      model: pane?.modelName || "",
       paneId: pane?.paneId || null,
       sessionName: pane?.sessionName || null,
     };
@@ -148,6 +149,7 @@ export async function GET() {
           status: pane ? "active" : "idle",
           task: taskInfo?.task || "待機中",
           stuck: 0,
+          model: pane?.modelName || "",
           paneId: pane?.paneId || null,
           sessionName: pane?.sessionName || null,
         };

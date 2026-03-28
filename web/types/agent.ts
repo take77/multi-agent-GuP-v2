@@ -9,6 +9,7 @@ export interface Agent {
   status: AgentStatus;
   task: string;
   stuck: number; // minutes of inactivity
+  model?: string;
   paneId?: string;
   sessionName?: string;
 }
