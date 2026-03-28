@@ -1,25 +1,38 @@
 "use client";
 
-// Stub — will be replaced by dedicated member's implementation
-export default function ImagePreview({
-  src,
-  fileName,
-  onRemove,
-}: {
+interface ImagePreviewProps {
   src: string;
   fileName: string;
   onRemove: () => void;
-}) {
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+export default function ImagePreview({ src, fileName, onRemove }: ImagePreviewProps) {
   return (
-    <div className="flex items-center gap-2 p-1.5 rounded-lg bg-slate-800 border border-slate-700">
-      <img src={src} alt={fileName} className="h-10 w-10 object-cover rounded" />
-      <span className="text-[11px] text-slate-400 truncate">{fileName}</span>
-      <button
-        onClick={onRemove}
-        className="ml-auto text-slate-500 hover:text-slate-300 text-[11px] shrink-0"
-      >
-        ✕
-      </button>
+    <div className="flex gap-2 flex-wrap">
+      <div className="relative shrink-0 group">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt={fileName}
+          className="h-[64px] w-auto rounded border border-slate-600 object-cover"
+        />
+        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-[9px] text-slate-300 px-0.5 py-px truncate rounded-b">
+          {fileName}
+        </div>
+        <button
+          onClick={onRemove}
+          className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-slate-700 hover:bg-red-600 rounded-full text-[10px] text-slate-300 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          aria-label={`${fileName}を削除`}
+        >
+          ✕
+        </button>
+      </div>
     </div>
   );
 }
