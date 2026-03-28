@@ -1,8 +1,9 @@
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import { parse as parseYaml } from "yaml";
 import { join } from "path";
 import { listPanes, type PaneInfo } from "@/lib/tmux";
 import { paneStates } from "@/lib/pane-streamer";
+import type { ClusterStatus } from "@/types/agent";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -96,6 +97,28 @@ function determineStatus(pane: PaneInfo | undefined, stuckMin: number, _taskStat
   return "active";
 }
 
+function hasUnreadInbox(agentId: string): boolean {
+  try {
+    const content = readFileSync(join(PROJECT_ROOT, `queue/inbox/${agentId}.yaml`), "utf-8");
+    const data = parseYaml(content) as { messages?: Array<{ read?: boolean }> };
+    if (!data?.messages) return false;
+    return data.messages.some((m) => m.read === false);
+  } catch {
+    return false;
+  }
+}
+
+function computeClusterStatus(agents: Array<{ id: string; status: string }>): ClusterStatus {
+  const hasActive = agents.some((a) => a.status === "active");
+  if (hasActive) return "active";
+
+  // All idle/stuck/error — check inbox for unread messages
+  const hasUnread = agents.some((a) => hasUnreadInbox(a.id));
+  if (hasUnread) return "attention";
+
+  return "idle";
+}
+
 function buildClusters() {
   const panes = listPanes();
   const paneMap = new Map<string, PaneInfo>();
@@ -124,7 +147,7 @@ function buildClusters() {
     };
   });
 
-  clusters.push({ id: "command", ...CLUSTER_META.command, agents: commandAgents });
+  clusters.push({ id: "command", ...CLUSTER_META.command, agents: commandAgents, clusterStatus: computeClusterStatus(commandAgents) });
 
   // Squad clusters
   if (squads) {
@@ -153,7 +176,7 @@ function buildClusters() {
       });
 
       const meta = CLUSTER_META[squadId] || { name: squadId, color: "#6b7280" };
-      clusters.push({ id: squadId, ...meta, agents });
+      clusters.push({ id: squadId, ...meta, agents, clusterStatus: computeClusterStatus(agents) });
     }
   }
 

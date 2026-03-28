@@ -5,8 +5,18 @@ import { useAppStore } from "@/lib/store";
 import { Avatar } from "@/components/shared/Avatar";
 import { StuckAlert } from "./StuckAlert";
 import { AgentCard } from "./AgentCard";
+import type { ClusterStatus } from "@/types/agent";
 
 const STUCK_THRESHOLD = 5;
+
+const CLUSTER_STATUS_CONFIG: Record<
+  ClusterStatus,
+  { label: string; bg: string; text: string; border: string }
+> = {
+  active: { label: "稼働中", bg: "bg-emerald-900/40", text: "text-emerald-300", border: "border-emerald-700/40" },
+  idle: { label: "待機中", bg: "bg-slate-700/40", text: "text-slate-400", border: "border-slate-600/40" },
+  attention: { label: "要注意", bg: "bg-orange-900/40", text: "text-orange-300", border: "border-orange-700/40" },
+};
 
 export function AgentGrid() {
   const { clusters } = useAppStore();
@@ -86,11 +96,14 @@ export function AgentGrid() {
                 {cl.agents.filter((a) => a.status === "active").length}/
                 {cl.agents.length}
               </span>
-              {cl.agents.some((a) => a.stuck >= STUCK_THRESHOLD) && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-900/40 text-orange-300 border border-orange-700/40">
-                  ⚠ 停滞
-                </span>
-              )}
+              {(() => {
+                const cfg = CLUSTER_STATUS_CONFIG[cl.clusterStatus];
+                return (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${cfg.bg} ${cfg.text} border ${cfg.border}`}>
+                    {cfg.label}
+                  </span>
+                );
+              })()}
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
               {cl.agents.map((a) => (

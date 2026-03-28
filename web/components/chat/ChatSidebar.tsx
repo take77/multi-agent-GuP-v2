@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { Avatar } from "@/components/shared/Avatar";
-import type { AgentStatus } from "@/types/agent";
+import type { AgentStatus, ClusterStatus } from "@/types/agent";
 
 const STUCK_THRESHOLD = 5;
 
@@ -23,6 +23,24 @@ function StatusBadge({ status }: { status: AgentStatus }) {
     <span
       className={`text-[8px] px-1 py-px rounded ${cfg.bg} ${cfg.text} shrink-0`}
     >
+      {cfg.label}
+    </span>
+  );
+}
+
+const CLUSTER_STATUS_CONFIG: Record<
+  ClusterStatus,
+  { label: string; bg: string; text: string }
+> = {
+  active: { label: "稼働中", bg: "bg-emerald-900/50", text: "text-emerald-300" },
+  idle: { label: "待機中", bg: "bg-slate-700/50", text: "text-slate-400" },
+  attention: { label: "要注意", bg: "bg-orange-900/50", text: "text-orange-300" },
+};
+
+function ClusterStatusBadge({ status }: { status: ClusterStatus }) {
+  const cfg = CLUSTER_STATUS_CONFIG[status];
+  return (
+    <span className={`text-[8px] px-1 py-px rounded ${cfg.bg} ${cfg.text} shrink-0`}>
       {cfg.label}
     </span>
   );
@@ -82,6 +100,7 @@ export function ChatSidebar() {
                 <span className="text-[10px] font-medium text-slate-500 truncate">
                   {cl.name}
                 </span>
+                <ClusterStatusBadge status={cl.clusterStatus} />
                 <span className="text-[9px] text-slate-600 ml-auto">
                   {activeN}/{cl.agents.length}
                 </span>

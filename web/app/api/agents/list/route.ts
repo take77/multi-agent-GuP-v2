@@ -4,6 +4,7 @@ import { parse as parseYaml } from "yaml";
 import { join } from "path";
 import { listPanes, type PaneInfo } from "@/lib/tmux";
 import { paneStates } from "@/lib/pane-streamer";
+import type { ClusterStatus } from "@/types/agent";
 
 const PROJECT_ROOT = process.cwd().replace(/\/web$/, "");
 
@@ -112,6 +113,25 @@ function computeStatus(agentId: string, pane: PaneInfo | undefined): { status: "
   return { status: "active", stuckMin: 0 };
 }
 
+function hasUnreadInbox(agentId: string): boolean {
+  try {
+    const content = readFileSync(join(PROJECT_ROOT, `queue/inbox/${agentId}.yaml`), "utf-8");
+    const data = parseYaml(content) as { messages?: Array<{ read?: boolean }> };
+    if (!data?.messages) return false;
+    return data.messages.some((m) => m.read === false);
+  } catch {
+    return false;
+  }
+}
+
+function computeClusterStatus(agents: Array<{ id: string; status: string }>): ClusterStatus {
+  const hasActive = agents.some((a) => a.status === "active");
+  if (hasActive) return "active";
+  const hasUnread = agents.some((a) => hasUnreadInbox(a.id));
+  if (hasUnread) return "attention";
+  return "idle";
+}
+
 export async function GET() {
   const panes = listPanes();
   const paneMap = new Map<string, PaneInfo>();
@@ -144,6 +164,7 @@ export async function GET() {
     id: "command",
     ...CLUSTER_META.command,
     agents: commandAgents,
+    clusterStatus: computeClusterStatus(commandAgents),
   });
 
   // Squad clusters
@@ -176,7 +197,7 @@ export async function GET() {
         name: squadId,
         color: "#6b7280",
       };
-      clusters.push({ id: squadId, ...meta, agents });
+      clusters.push({ id: squadId, ...meta, agents, clusterStatus: computeClusterStatus(agents) });
     }
   }
 

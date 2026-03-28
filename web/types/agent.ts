@@ -1,4 +1,5 @@
 export type AgentStatus = "active" | "idle" | "error" | "stuck";
+export type ClusterStatus = "active" | "idle" | "attention";
 
 export type AgentRole = "総司令" | "参謀長" | "隊長" | "副隊長" | "隊員";
 
@@ -25,6 +26,7 @@ export interface Cluster {
   name: string;
   color: string;
   agents: Agent[];
+  clusterStatus: ClusterStatus;
 }
 
 export interface ChatMessage {
