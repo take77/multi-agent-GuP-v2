@@ -62,7 +62,7 @@ export function ChatSidebar() {
 
   return (
     <div className="w-40 border-r border-slate-700/50 flex flex-col bg-slate-900/80 shrink-0">
-      <div className="flex-1 overflow-y-auto py-1">
+      <div className="flex-1 overflow-y-auto py-1 scrollbar-hide">
         {clusters.map((cl) => {
           const isOpen = !collapsed[cl.id];
           const activeN = cl.agents.filter(
@@ -129,7 +129,7 @@ export function ChatSidebar() {
                           {a.name}
                         </span>
                         <StatusBadge status={a.status} />
-                        {a.stuck >= STUCK_THRESHOLD && (
+                        {a.status !== "idle" && a.stuck >= STUCK_THRESHOLD && (
                           <span className="text-[9px] px-1 rounded bg-orange-500/20 text-orange-300">
                             {a.stuck}m
                           </span>

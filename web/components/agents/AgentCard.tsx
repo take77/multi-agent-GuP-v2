@@ -38,7 +38,7 @@ export function AgentCard({
             )}
           </div>
         </div>
-        {isStuck && (
+        {isStuck && agent.status !== "idle" && (
           <span className="text-[9px] px-1 rounded bg-orange-500/20 text-orange-300 ml-auto">
             {agent.stuck}m
           </span>
