@@ -212,11 +212,16 @@ function tokenize(raw: string): Token[] {
 
       const inputLines = [userMatch[1]];
       i++;
+      // 空行があっても次の●/❯/ツールマーカーまでを1ブロックとして収集
       while (i < lines.length) {
         const next = lines[i].trim();
-        if (next === "" || isMarkerLine(next)) break;
-        inputLines.push(next);
+        if (isMarkerLine(next)) break;
+        inputLines.push(lines[i]);
         i++;
+      }
+      // 末尾の空行を除去
+      while (inputLines.length > 0 && inputLines[inputLines.length - 1].trim() === "") {
+        inputLines.pop();
       }
       tokens.push({ type: "user-input", text: inputLines.join("\n") });
       continue;

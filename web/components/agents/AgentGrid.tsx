@@ -62,6 +62,18 @@ export function AgentGrid() {
     );
   }
 
+  // Loading state: waiting for first SSE data
+  if (clusters.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-600">
+        <div className="w-5 h-5 border-2 border-slate-600 border-t-sky-500 rounded-full animate-spin" />
+        <span className="text-[12px]">
+          {connected ? "エージェント情報を取得中..." : "接続中..."}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-y-auto h-full">
       <StuckAlert agents={allAgents} onSelect={setExpanded} />
