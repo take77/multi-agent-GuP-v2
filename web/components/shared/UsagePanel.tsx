@@ -60,7 +60,7 @@ export function UsagePanel() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 60_000); // poll every 60s
+    const interval = setInterval(fetchData, 300_000); // poll every 5 min
     return () => clearInterval(interval);
   }, [fetchData]);
 

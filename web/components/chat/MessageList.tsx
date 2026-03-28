@@ -1,18 +1,22 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { useAppStore } from "@/lib/store";
 import { Avatar } from "@/components/shared/Avatar";
 
 export function MessageList() {
-  const { selectedAgent, messages, latestOutput, clusters } = useAppStore();
+  const selectedAgent = useAppStore((s) => s.selectedAgent);
+  const output = useAppStore((s) => s.latestOutput[s.selectedAgent] ?? "");
+  const userMsgs = useAppStore(
+    (s) => s.messages[s.selectedAgent] ?? []
+  );
+  const clusters = useAppStore((s) => s.clusters);
   const bottomRef = useRef<HTMLDivElement>(null);
   const outputRef = useRef<HTMLPreElement>(null);
-  const userMsgs = messages[selectedAgent] ?? [];
-  const output = latestOutput[selectedAgent] ?? "";
-  const agent = clusters
-    .flatMap((c) => c.agents)
-    .find((a) => a.id === selectedAgent);
+  const agent = useMemo(
+    () => clusters.flatMap((c) => c.agents).find((a) => a.id === selectedAgent),
+    [clusters, selectedAgent]
+  );
 
   // Auto-scroll terminal output to bottom on update
   useEffect(() => {

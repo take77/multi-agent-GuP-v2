@@ -17,7 +17,8 @@ function getAuthToken(): string {
 }
 
 export function useSSE() {
-  const { setConnected, setLatestOutput } = useAppStore();
+  const setConnected = useAppStore((s) => s.setConnected);
+  const setLatestOutput = useAppStore((s) => s.setLatestOutput);
 
   useEffect(() => {
     let eventSource: EventSource | null = null;

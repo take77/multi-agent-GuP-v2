@@ -63,7 +63,15 @@ export const useAppStore = create<AppState>((set) => ({
   setClusters: (c) => set({ clusters: c }),
 
   selectedAgent: "anzu",
-  setSelectedAgent: (id) => set({ selectedAgent: id }),
+  setSelectedAgent: (id) => {
+    set({ selectedAgent: id });
+    // Notify server so pane-streamer adjusts polling frequency
+    fetch("/api/agents/active", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agentId: id }),
+    }).catch(() => {});
+  },
   messages: INITIAL_CHATS,
   addMessage: (agentId, msg) =>
     set((s) => ({
