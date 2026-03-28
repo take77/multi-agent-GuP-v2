@@ -1,15 +1,194 @@
 "use client";
 
+import { useEffect, useCallback, useRef } from "react";
+import { useGitStore } from "@/lib/git-store";
+import type { Branch, Repository, MergeEntry } from "@/types/git";
+import BranchTree from "@/components/git/BranchTree";
+import BranchList from "@/components/git/BranchList";
+import BranchDetail from "@/components/git/BranchDetail";
+import MergeHistory from "@/components/git/MergeHistory";
+
+// Build flat tree ordering (DFS)
+function flattenTree(branches: Branch[]): Branch[] {
+  const flat: Branch[] = [];
+  const walk = (id: string | null) => {
+    const node = branches.find((b) => b.id === id);
+    if (!node) return;
+    flat.push(node);
+    branches.filter((b) => b.parent === id).forEach((child) => walk(child.id));
+  };
+  // Start from root (no parent)
+  const roots = branches.filter((b) => !b.parent);
+  roots.forEach((r) => walk(r.id));
+  // Add orphans (branches whose parent isn't in the list)
+  for (const b of branches) {
+    if (!flat.includes(b)) flat.push(b);
+  }
+  return flat;
+}
+
+// Extract merge history from branch commits
+function extractMergeHistory(branches: Branch[]): MergeEntry[] {
+  const entries: MergeEntry[] = [];
+  for (const b of branches) {
+    const m = b.commit.match(/^Merge\s+(\S+)/i);
+    if (m) {
+      entries.push({ from: m[1], to: b.name, time: b.time });
+    }
+  }
+  return entries;
+}
+
 export default function GitPage() {
+  const {
+    repositories, setRepositories,
+    selectedRepoId, setSelectedRepoId,
+    branches, setBranches,
+    selectedBranchId, setSelectedBranchId,
+    loading, setLoading,
+  } = useGitStore();
+
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchRepos = useCallback(async () => {
+    try {
+      const res = await fetch("/api/git/_repos/branches");
+      const data = await res.json();
+      if (data.repositories) {
+        setRepositories(data.repositories);
+        if (!selectedRepoId && data.repositories.length > 0) {
+          setSelectedRepoId(data.repositories[0].id);
+        }
+      }
+    } catch { /* */ }
+  }, [setRepositories, setSelectedRepoId, selectedRepoId]);
+
+  const fetchBranches = useCallback(async (repoId: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/git/${repoId}/branches`);
+      const data = await res.json();
+      if (data.branches) {
+        setBranches(data.branches);
+      }
+    } catch { /* */ }
+    setLoading(false);
+  }, [setBranches, setLoading]);
+
+  // Initial load
+  useEffect(() => {
+    fetchRepos();
+  }, [fetchRepos]);
+
+  // Fetch branches on repo change + polling
+  useEffect(() => {
+    if (!selectedRepoId) return;
+    fetchBranches(selectedRepoId);
+
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      fetchBranches(selectedRepoId);
+    }, 5000);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [selectedRepoId, fetchBranches]);
+
+  const flat = flattenTree(branches);
+  const selectedBranch = branches.find((b) => b.id === selectedBranchId);
+  const mergeHistory = extractMergeHistory(branches);
+  const featureCount = flat.filter((b) => b.type === "feature").length;
+  const selectedRepo = repositories.find((r: Repository) => r.id === selectedRepoId);
+
+  const handleSelect = (id: string) => {
+    setSelectedBranchId(id);
+  };
+
   return (
-    <div className="flex items-center justify-center h-full text-slate-500">
-      <div className="text-center">
-        <div className="text-4xl mb-4">\ud83d\udd00</div>
-        <h2 className="text-lg font-medium text-slate-300 mb-2">Git View</h2>
-        <p className="text-[13px]">Phase 3 で実装予定</p>
-        <p className="text-[11px] text-slate-600 mt-1">
-          マルチリポジトリ対応 SVG ブランチツリー
-        </p>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Repo tabs */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-700/50 bg-slate-900/30 overflow-x-auto">
+        {repositories.map((r: Repository) => {
+          const isActive = selectedRepoId === r.id;
+          return (
+            <button
+              key={r.id}
+              onClick={() => setSelectedRepoId(r.id)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] border shrink-0 transition-colors ${
+                isActive
+                  ? "bg-slate-700 border-slate-600 text-white"
+                  : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+              }`}
+            >
+              <span className="font-mono">{r.name}</span>
+            </button>
+          );
+        })}
+        <div className="ml-auto flex items-center gap-2 text-[9px] text-slate-500 shrink-0">
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-slate-400" />
+            保護
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-cyan-400" />
+            統合
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            作業中
+          </span>
+        </div>
+      </div>
+
+      {/* Repo info subheader */}
+      {selectedRepo && (
+        <div className="px-4 py-1.5 border-b border-slate-800/50 bg-slate-900/20 flex items-center gap-2">
+          <span className="text-[11px] text-slate-500">{selectedRepo.desc}</span>
+          <span className="text-[10px] text-slate-600">{selectedRepo.lang}</span>
+          <span className="text-[10px] text-slate-600 ml-auto">
+            {featureCount} ブランチ稼働中
+          </span>
+        </div>
+      )}
+
+      {/* Main content */}
+      <div className="flex flex-1 overflow-hidden">
+        {loading && flat.length === 0 ? (
+          <div className="flex items-center justify-center flex-1 text-slate-500 text-[13px]">
+            読み込み中...
+          </div>
+        ) : flat.length === 0 ? (
+          <div className="flex items-center justify-center flex-1 text-slate-500 text-[13px]">
+            ブランチが見つかりません
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto">
+            <div className="flex">
+              <BranchTree
+                branches={branches}
+                flat={flat}
+                selectedId={selectedBranchId}
+                onSelect={handleSelect}
+              />
+              <BranchList
+                flat={flat}
+                selectedId={selectedBranchId}
+                onSelect={handleSelect}
+              />
+            </div>
+            <MergeHistory entries={mergeHistory} />
+          </div>
+        )}
+
+        {/* Detail panel */}
+        {selectedBranch && (
+          <BranchDetail
+            branch={selectedBranch}
+            allBranches={branches}
+            onClose={() => setSelectedBranchId(null)}
+          />
+        )}
       </div>
     </div>
   );

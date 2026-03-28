@@ -21,4 +21,12 @@ export interface Repository {
   name: string;
   desc: string;
   lang: string;
+  path: string;
+}
+
+export interface MergeEntry {
+  from: string;
+  to: string;
+  time: string;
+  tag?: string;
 }
