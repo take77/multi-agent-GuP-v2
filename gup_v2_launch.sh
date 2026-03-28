@@ -197,6 +197,20 @@ launch_darjeeling_cluster() {
         "captain,vice_captain,member,member,member,member,member" \
         "magenta,red,blue,blue,blue,blue,blue"
 }
+setup_darjeeling_cluster() {
+    setup_squad_cluster "darjeeling" "🫖" "ダージリン隊" \
+        "darjeeling,pekoe,hana,rosehip,marie,oshida,andou" \
+        "ダージリン,オレンジペコ,五十鈴華,ローズヒップ,マリー,押田,安藤" \
+        "captain,vice_captain,member,member,member,member,member" \
+        "magenta,red,blue,blue,blue,blue,blue" "$AGENT_TEAMS_MODE"
+}
+start_darjeeling_claude() {
+    start_squad_claude "darjeeling" "🫖" "ダージリン隊" \
+        "darjeeling,pekoe,hana,rosehip,marie,oshida,andou" \
+        "ダージリン,オレンジペコ,五十鈴華,ローズヒップ,マリー,押田,安藤" \
+        "captain,vice_captain,member,member,member,member,member" \
+        "$AGENT_TEAMS_MODE"
+}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # カチューシャ隊クラスタ起動関数
@@ -207,6 +221,20 @@ launch_katyusha_cluster() {
         "カチューシャ,ノンナ,クラーラ,冷泉麻子,エルヴィン,カエサル,武部沙織" \
         "captain,vice_captain,member,member,member,member,member" \
         "magenta,red,blue,blue,blue,blue,blue"
+}
+setup_katyusha_cluster() {
+    setup_squad_cluster "katyusha" "🪆" "カチューシャ隊" \
+        "katyusha,nonna,klara,mako,erwin,caesar,saori" \
+        "カチューシャ,ノンナ,クラーラ,冷泉麻子,エルヴィン,カエサル,武部沙織" \
+        "captain,vice_captain,member,member,member,member,member" \
+        "magenta,red,blue,blue,blue,blue,blue" "$AGENT_TEAMS_MODE"
+}
+start_katyusha_claude() {
+    start_squad_claude "katyusha" "🪆" "カチューシャ隊" \
+        "katyusha,nonna,klara,mako,erwin,caesar,saori" \
+        "カチューシャ,ノンナ,クラーラ,冷泉麻子,エルヴィン,カエサル,武部沙織" \
+        "captain,vice_captain,member,member,member,member,member" \
+        "$AGENT_TEAMS_MODE"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -219,6 +247,20 @@ launch_kay_cluster() {
         "captain,vice_captain,member,member,member,member,member" \
         "magenta,red,blue,blue,blue,blue,blue"
 }
+setup_kay_cluster() {
+    setup_squad_cluster "kay" "🦅" "ケイ隊" \
+        "kay,arisa,naomi,anchovy,pepperoni,carpaccio,yukari" \
+        "ケイ,アリサ,ナオミ,アンチョビ,ペパロニ,カルパッチョ,秋山優花里" \
+        "captain,vice_captain,member,member,member,member,member" \
+        "magenta,red,blue,blue,blue,blue,blue" "$AGENT_TEAMS_MODE"
+}
+start_kay_claude() {
+    start_squad_claude "kay" "🦅" "ケイ隊" \
+        "kay,arisa,naomi,anchovy,pepperoni,carpaccio,yukari" \
+        "ケイ,アリサ,ナオミ,アンチョビ,ペパロニ,カルパッチョ,秋山優花里" \
+        "captain,vice_captain,member,member,member,member,member" \
+        "$AGENT_TEAMS_MODE"
+}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 西住まほ隊クラスタ起動関数
@@ -229,6 +271,20 @@ launch_maho_cluster() {
         "西住まほ,逸見エリカ,ミカ,アキ,ミッコ,西絹代,福田" \
         "captain,vice_captain,member,member,member,member,member" \
         "magenta,red,blue,blue,blue,blue,blue"
+}
+setup_maho_cluster() {
+    setup_squad_cluster "maho" "🖤" "西住まほ隊" \
+        "maho,erika,mika,aki,mikko,kinuyo,fukuda" \
+        "西住まほ,逸見エリカ,ミカ,アキ,ミッコ,西絹代,福田" \
+        "captain,vice_captain,member,member,member,member,member" \
+        "magenta,red,blue,blue,blue,blue,blue" "$AGENT_TEAMS_MODE"
+}
+start_maho_claude() {
+    start_squad_claude "maho" "🖤" "西住まほ隊" \
+        "maho,erika,mika,aki,mikko,kinuyo,fukuda" \
+        "西住まほ,逸見エリカ,ミカ,アキ,ミッコ,西絹代,福田" \
+        "captain,vice_captain,member,member,member,member,member" \
+        "$AGENT_TEAMS_MODE"
 }
 
 # バナー表示実行
@@ -734,30 +790,39 @@ if [ "$SETUP_ONLY" = false ]; then
     echo ""
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # STEP 6.7.5: 各隊クラスタ起動（4隊並列）
+    # STEP 6.7.5: 各隊クラスタ起動（フェーズ1: 順次setup → フェーズ2: 並列Claude召喚）
     # ═══════════════════════════════════════════════════════════════════════════
-    log_war "⚡ 全4隊クラスタを並列起動中..."
+    # フェーズ1: セッション作成・ペイン分割を順次実行（メインプロセスから呼ぶのでtmuxがターミナルサイズを正しく検出）
+    log_war "🏗️ 全4隊クラスタを構築中（順次）..."
+    setup_darjeeling_cluster
+    setup_katyusha_cluster
+    setup_kay_cluster
+    setup_maho_cluster
+    log_success "✅ 全4隊クラスタ構築完了"
+
+    # フェーズ2: Claude Code召喚を並列実行（セッションは既存のため端末サイズ問題なし）
+    log_war "⚡ 全4隊Claude Codeを並列召喚中..."
 
     # 一時ディレクトリ（ログバッファ用）
     _parallel_log_dir=$(mktemp -d)
     trap "rm -rf '$_parallel_log_dir'" EXIT
 
-    launch_darjeeling_cluster > "$_parallel_log_dir/darjeeling.log" 2>&1 &
+    start_darjeeling_claude > "$_parallel_log_dir/darjeeling.log" 2>&1 &
     _pid_darjeeling=$!
-    launch_katyusha_cluster  > "$_parallel_log_dir/katyusha.log"  2>&1 &
+    start_katyusha_claude   > "$_parallel_log_dir/katyusha.log"  2>&1 &
     _pid_katyusha=$!
-    launch_kay_cluster       > "$_parallel_log_dir/kay.log"       2>&1 &
+    start_kay_claude        > "$_parallel_log_dir/kay.log"       2>&1 &
     _pid_kay=$!
-    launch_maho_cluster      > "$_parallel_log_dir/maho.log"      2>&1 &
+    start_maho_claude       > "$_parallel_log_dir/maho.log"      2>&1 &
     _pid_maho=$!
 
-    # 全隊の起動完了を待機
+    # 全隊のClaude召喚完了を待機
     _parallel_fail=0
     for _pid_label in "darjeeling:$_pid_darjeeling" "katyusha:$_pid_katyusha" "kay:$_pid_kay" "maho:$_pid_maho"; do
         _label="${_pid_label%%:*}"
         _pid="${_pid_label##*:}"
         if ! wait "$_pid"; then
-            log_error "  └─ ${_label} クラスタ起動失敗"
+            log_error "  └─ ${_label} Claude召喚失敗"
             _parallel_fail=1
         fi
     done
@@ -766,17 +831,17 @@ if [ "$SETUP_ONLY" = false ]; then
     for _cluster_name in darjeeling katyusha kay maho; do
         echo ""
         echo "  ┌── ${_cluster_name} ──"
-        cat "$_parallel_log_dir/${_cluster_name}.log" | sed 's/^/  │ /'
+        sed 's/^/  │ /' "$_parallel_log_dir/${_cluster_name}.log"
         echo "  └──"
     done
     rm -rf "$_parallel_log_dir"
 
     if [ "$_parallel_fail" -eq 1 ]; then
-        log_error "一部クラスタの起動に失敗しました"
+        log_error "一部クラスタのClaude召喚に失敗しました"
         exit 1
     fi
 
-    log_success "✅ 全4隊クラスタ並列起動完了"
+    log_success "✅ 全4隊Claude Code並列召喚完了"
 
     # ═══════════════════════════════════════════════════════════════════════════
     # STEP 6.6: watcher_supervisor起動（全隊のClaude Code起動完了後）

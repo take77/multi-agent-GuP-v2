@@ -21,6 +21,10 @@ log_war() {
     echo -e "\033[1;31m【戦】\033[0m $1"
 }
 
+log_error() {
+    echo -e "\033[1;31m【誤】\033[0m $1" >&2
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # プロンプト生成関数（bash/zsh対応）
 # ───────────────────────────────────────────────────────────────────────────────
@@ -123,7 +127,9 @@ show_battle_cry() {
 #     "magenta,red,blue,blue,blue,blue,blue"
 #     true  # ← 8番目: agent_teams_mode（省略時 false）
 # ═══════════════════════════════════════════════════════════════════════════════
-launch_squad_cluster() {
+# setup_squad_cluster: セッション作成・ペイン分割・環境変数注入のみ（Claude起動なし）
+# メインプロセス（端末あり）から順次呼ぶことでtmuxがターミナルサイズを自動検出できる
+setup_squad_cluster() {
     local CLUSTER_ID="$1"
     local EMOJI="$2"
     local LABEL="$3"
@@ -133,7 +139,7 @@ launch_squad_cluster() {
     IFS=',' read -ra AGENT_NAMES <<< "$5"
     IFS=',' read -ra AGENT_ROLES <<< "$6"
     IFS=',' read -ra AGENT_COLORS <<< "$7"
-    local AGENT_TEAMS_MODE="${8:-false}"  # Agent Teams モード（省略時 false）
+    local AGENT_TEAMS_MODE="${8:-false}"
 
     local AGENT_COUNT=${#AGENT_IDS[@]}
 
@@ -142,12 +148,12 @@ launch_squad_cluster() {
         mkdir -p "$SCRIPT_DIR/clusters/$CLUSTER_ID/queue/"{tasks,reports,briefings,inbox}
     fi
 
-    log_war "${EMOJI} ${LABEL}クラスタを起動中..."
+    log_war "${EMOJI} ${LABEL}クラスタを構築中..."
 
     # 既存セッションをクリーンアップ
     tmux kill-session -t "$CLUSTER_ID" 2>/dev/null || true
 
-    # tmuxセッション作成
+    # tmuxセッション作成（端末ありのメインプロセスから呼ぶのでサイズ自動検出）
     if ! tmux new-session -d -s "$CLUSTER_ID" -n "agents"; then
         echo "エラー: tmuxセッション '$CLUSTER_ID' の作成に失敗しました"
         exit 1
@@ -218,9 +224,27 @@ launch_squad_cluster() {
     tmux set-option -t "$CLUSTER_ID" -w pane-border-status top
     tmux set-option -t "$CLUSTER_ID" -w pane-border-format '#{?pane_active,#[reverse],}#[bold]#{@agent_name}#[default] (#{@agent_role}/#{@model_name}) #{@current_task}'
 
-    # Claude Code起動（10秒間隔でstaggered launch）
+    log_success "✅ ${LABEL}クラスタ構築完了"
+}
+
+# start_squad_claude: Claude Code召喚のみ（staggered launch）
+# バックグラウンド並列実行可能（tmuxセッションは既に存在するのでサイズ問題なし）
+start_squad_claude() {
+    local CLUSTER_ID="$1"
+    local EMOJI="$2"
+    local LABEL="$3"
+
+    # CSV を配列に変換（COLORSは不要）
+    IFS=',' read -ra AGENT_IDS <<< "$4"
+    IFS=',' read -ra AGENT_NAMES <<< "$5"
+    IFS=',' read -ra AGENT_ROLES <<< "$6"
+    local AGENT_TEAMS_MODE="${7:-false}"
+
+    local AGENT_COUNT=${#AGENT_IDS[@]}
+    local PANE_BASE=$(tmux show-options -gv pane-base-index 2>/dev/null || echo 0)
+
     if [ "$SETUP_ONLY" = false ]; then
-        log_war "${EMOJI} ${LABEL}にClaude Codeを召喚中（10秒間隔）..."
+        log_war "${EMOJI} ${LABEL}にClaude Codeを召喚中（3秒間隔）..."
 
         for i in $(seq 0 $((AGENT_COUNT - 1))); do
             local p=$((PANE_BASE + i))
@@ -256,15 +280,18 @@ launch_squad_cluster() {
         done
     fi
 
-    log_success "✅ ${LABEL}クラスタ起動完了！"
-
-    # inbox_watcherはwatcher_supervisorが一括管理するためここでは起動しない
-    # (STEP 6.6でwatcher_supervisor.shが全エージェントを自動検出・起動)
+    log_success "✅ ${LABEL}Claude Code召喚完了"
 
     echo ""
     echo "  接続方法:"
     echo "    tmux attach-session -t ${CLUSTER_ID}"
     echo ""
+}
+
+# launch_squad_cluster: setup + start の一括実行（--cluster 単独モード用）
+launch_squad_cluster() {
+    setup_squad_cluster "$1" "$2" "$3" "$4" "$5" "$6" "$7" "${8:-false}"
+    start_squad_claude  "$1" "$2" "$3" "$4" "$5" "$6" "${8:-false}"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
