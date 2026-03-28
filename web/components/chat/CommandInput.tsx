@@ -20,8 +20,11 @@ export function CommandInput() {
     clusters,
     addMessage,
     sendCommand,
+    sendEscapeCommand,
     addCommandHistory,
     commandHistory,
+    draftMessages,
+    setDraftMessage,
   } = useAppStore();
   const [input, setInput] = useState("");
   const [drag, setDrag] = useState(false);
@@ -62,6 +65,12 @@ export function CommandInput() {
   useEffect(() => {
     adjustHeight();
   }, [input, adjustHeight]);
+
+  // Restore draft when selected agent changes
+  useEffect(() => {
+    setInput(draftMessages[selectedAgent] ?? "");
+    setHistoryIdx(-1);
+  }, [selectedAgent, draftMessages]);
 
   // Generate preview URLs for pending images, revoke on cleanup
   useEffect(() => {
@@ -146,6 +155,7 @@ export function CommandInput() {
       // Send all image paths as command (with optional text)
       const imageCmd = cmd ? `${cmd}\n${paths.join("\n")}` : paths.join("\n");
       setInput("");
+      setDraftMessage(selectedAgent, "");
       setHistoryIdx(-1);
       doSend(imageCmd);
       return;
@@ -154,6 +164,7 @@ export function CommandInput() {
     if (!cmd) return;
 
     setInput("");
+    setDraftMessage(selectedAgent, "");
     setHistoryIdx(-1);
 
     // All commands sent directly — D001-D012 blocking is handled server-side
@@ -316,12 +327,20 @@ export function CommandInput() {
           value={input}
           onChange={(e) => {
             setInput(e.target.value);
+            setDraftMessage(selectedAgent, e.target.value);
             setHistoryIdx(-1);
           }}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           disabled={isProcessing}
         />
+        <button
+          onClick={() => sendEscapeCommand(selectedAgent)}
+          title="割り込み (Escape)"
+          className="px-2 py-1.5 rounded-lg text-[12px] font-medium shrink-0 bg-red-700/70 hover:bg-red-600 text-red-200"
+        >
+          ⏹
+        </button>
         {isProcessing ? (
           <StopButton agentId={selectedAgent} />
         ) : (

@@ -37,11 +37,16 @@ interface AppState {
   commandHistory: Record<string, string[]>;
   addCommandHistory: (agentId: string, command: string) => void;
 
+  // Draft messages (per agent — persisted across agent switches)
+  draftMessages: Record<string, string>;
+  setDraftMessage: (agentId: string, text: string) => void;
+
   // Command sending
   sendCommand: (
     agentId: string,
     command: string
   ) => Promise<{ success: boolean; error?: CommandError }>;
+  sendEscapeCommand: (agentId: string) => Promise<{ success: boolean; error?: CommandError }>;
 
   // Inbox messages
   inboxMessages: InboxMessage[];
@@ -98,6 +103,12 @@ export const useAppStore = create<AppState>((set) => ({
       },
     })),
 
+  draftMessages: {},
+  setDraftMessage: (agentId, text) =>
+    set((s) => ({
+      draftMessages: { ...s.draftMessages, [agentId]: text },
+    })),
+
   commandHistory: {},
   addCommandHistory: (agentId, command) =>
     set((s) => {
@@ -149,6 +160,38 @@ export const useAppStore = create<AppState>((set) => ({
         success: false,
         error: { message: "ネットワークエラー — サーバーに接続できません" },
       };
+    }
+  },
+
+  sendEscapeCommand: async (agentId) => {
+    try {
+      const token =
+        typeof window !== "undefined"
+          ? document.cookie
+              .split("; ")
+              .find((c) => c.startsWith("auth_token="))
+              ?.split("=")[1] ?? ""
+          : "";
+
+      const res = await fetch("/api/agents/command", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ agentId, type: "escape" }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        return {
+          success: false,
+          error: { message: body.message ?? body.error ?? `HTTP ${res.status}` },
+        };
+      }
+      return { success: true };
+    } catch {
+      return { success: false, error: { message: "ネットワークエラー" } };
     }
   },
 
