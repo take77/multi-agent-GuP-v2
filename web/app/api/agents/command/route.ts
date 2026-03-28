@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { buildAgentPaneMap, sendKeys } from "@/lib/tmux";
 
 export async function POST(req: Request) {
   try {
@@ -11,17 +12,27 @@ export async function POST(req: Request) {
       );
     }
 
-    // Phase 1: stub response
-    // Phase 2: tmux send-keys integration
+    const paneMap = buildAgentPaneMap();
+    const paneId = paneMap.get(agentId);
+
+    if (!paneId) {
+      return NextResponse.json(
+        { error: `Agent '${agentId}' not found or has no active pane` },
+        { status: 404 }
+      );
+    }
+
+    sendKeys(paneId, command);
+
     return NextResponse.json({
       success: true,
       agentId,
-      message: "Command queued (Phase 1 stub)",
+      paneId,
     });
   } catch {
     return NextResponse.json(
-      { error: "Invalid request body" },
-      { status: 400 }
+      { error: "Failed to send command" },
+      { status: 500 }
     );
   }
 }

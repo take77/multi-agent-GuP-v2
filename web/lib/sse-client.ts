@@ -7,7 +7,7 @@ const SSE_URL = "/api/agents/stream";
 const RECONNECT_DELAY = 3000;
 
 export function useSSE() {
-  const { setConnected } = useAppStore();
+  const { setConnected, addMessage } = useAppStore();
 
   useEffect(() => {
     let eventSource: EventSource | null = null;
@@ -23,8 +23,16 @@ export function useSSE() {
       eventSource.addEventListener("agent-output", (e) => {
         try {
           const data = JSON.parse(e.data);
-          // Future: update store with agent output
-          console.log("[SSE] agent-output:", data);
+          if (data.agentId && data.output) {
+            // Add the captured output as an agent message
+            const now = new Date();
+            const time = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+            addMessage(data.agentId, {
+              role: "agent",
+              text: data.output.slice(-2000), // Last 2000 chars to avoid overflow
+              time,
+            });
+          }
         } catch {
           // ignore parse errors
         }
@@ -32,8 +40,8 @@ export function useSSE() {
 
       eventSource.addEventListener("agent-status", (e) => {
         try {
-          const data = JSON.parse(e.data);
-          console.log("[SSE] agent-status:", data);
+          JSON.parse(e.data);
+          // Future: update agent status in store
         } catch {
           // ignore parse errors
         }
@@ -57,5 +65,5 @@ export function useSSE() {
       if (reconnectTimer) clearTimeout(reconnectTimer);
       setConnected(false);
     };
-  }, [setConnected]);
+  }, [setConnected, addMessage]);
 }

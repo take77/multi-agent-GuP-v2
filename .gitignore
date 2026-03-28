@@ -196,3 +196,12 @@ scripts/monitor/node_modules/
 
 # Queue pending tasks template (cmd_102)
 !queue/tasks/pending.yaml
+
+# Web UI (cmd_134)
+!web/
+!web/**
+web/node_modules/
+web/.next/
+
+# Agent config (avatar definitions for Web UI)
+!config/agents.yaml
