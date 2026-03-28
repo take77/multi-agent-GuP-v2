@@ -1,14 +1,19 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useAppStore } from "@/lib/store";
 import { isWhitelistedCommand } from "@/lib/command-sanitizer";
+import StopButton from "./StopButton";
+import ImagePreview from "./ImagePreview";
 
 const QUICK_ACTIONS = [
   { label: "/clear", command: "/clear" },
   { label: "Sonnet", command: "/model sonnet" },
   { label: "Opus", command: "/model opus" },
 ];
+
+const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+const MAX_TEXTAREA_ROWS = 6;
 
 export function CommandInput() {
   const {
@@ -26,9 +31,12 @@ export function CommandInput() {
     rule?: string;
     message: string;
   } | null>(null);
-  const [confirm, setConfirm] = useState<string | null>(null);
   const [historyIdx, setHistoryIdx] = useState(-1);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const agent = clusters
     .flatMap((c) => c.agents)
@@ -41,6 +49,56 @@ export function CommandInput() {
       hour: "2-digit",
       minute: "2-digit",
     });
+
+  // Auto-resize textarea
+  const adjustHeight = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const lineHeight = 18; // approx line height at text-[12px]
+    const maxHeight = lineHeight * MAX_TEXTAREA_ROWS + 12; // + padding
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+  }, []);
+
+  useEffect(() => {
+    adjustHeight();
+  }, [input, adjustHeight]);
+
+  // Generate preview URL for pending image
+  useEffect(() => {
+    if (!pendingImage) {
+      setImagePreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(pendingImage);
+    setImagePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pendingImage]);
+
+  const uploadImage = useCallback(async (file: File): Promise<string | null> => {
+    const token =
+      typeof window !== "undefined"
+        ? document.cookie
+            .split("; ")
+            .find((c) => c.startsWith("auth_token="))
+            ?.split("=")[1] ?? ""
+        : "";
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/agents/upload", {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.path ?? null;
+  }, []);
 
   const doSend = useCallback(
     async (command: string) => {
@@ -72,33 +130,37 @@ export function CommandInput() {
     [selectedAgent, addMessage, addCommandHistory, sendCommand]
   );
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     const cmd = input.trim();
+
+    // Image upload flow
+    if (pendingImage) {
+      setUploading(true);
+      const uploadedPath = await uploadImage(pendingImage);
+      setUploading(false);
+
+      if (!uploadedPath) {
+        setError({ message: "画像のアップロードに失敗しました" });
+        return;
+      }
+
+      setPendingImage(null);
+      // Send the image path as command (with optional text)
+      const imageCmd = cmd ? `${cmd}\n${uploadedPath}` : uploadedPath;
+      setInput("");
+      setHistoryIdx(-1);
+      doSend(imageCmd);
+      return;
+    }
+
     if (!cmd) return;
 
     setInput("");
     setHistoryIdx(-1);
 
-    // Whitelisted commands → send immediately
-    if (isWhitelistedCommand(cmd)) {
-      doSend(cmd);
-      return;
-    }
-
-    // Non-whitelisted → show confirmation dialog
-    setConfirm(cmd);
-  }, [input, doSend]);
-
-  const handleConfirm = useCallback(() => {
-    if (!confirm) return;
-    const cmd = confirm;
-    setConfirm(null);
+    // All commands sent directly — D001-D012 blocking is handled server-side
     doSend(cmd);
-  }, [confirm, doSend]);
-
-  const handleCancel = useCallback(() => {
-    setConfirm(null);
-  }, []);
+  }, [input, pendingImage, doSend, uploadImage]);
 
   const handleQuickAction = useCallback(
     (command: string) => {
@@ -107,17 +169,18 @@ export function CommandInput() {
     [doSend]
   );
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
       handleSend();
-    } else if (e.key === "ArrowUp") {
+    } else if (e.key === "ArrowUp" && !input) {
       e.preventDefault();
       if (history.length === 0) return;
       const newIdx =
         historyIdx === -1 ? history.length - 1 : Math.max(0, historyIdx - 1);
       setHistoryIdx(newIdx);
       setInput(history[newIdx]);
-    } else if (e.key === "ArrowDown") {
+    } else if (e.key === "ArrowDown" && !input) {
       e.preventDefault();
       if (historyIdx === -1) return;
       if (historyIdx >= history.length - 1) {
@@ -128,12 +191,46 @@ export function CommandInput() {
         setHistoryIdx(newIdx);
         setInput(history[newIdx]);
       }
-    } else if (e.key === "Escape") {
-      if (confirm) {
-        handleCancel();
-      }
     }
   };
+
+  // Clipboard paste handler
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (ACCEPTED_IMAGE_TYPES.includes(items[i].type)) {
+        e.preventDefault();
+        const file = items[i].getAsFile();
+        if (file) setPendingImage(file);
+        return;
+      }
+    }
+  }, []);
+
+  // Drag & drop handler
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDrag(false);
+    const files = e.dataTransfer.files;
+    for (let i = 0; i < files.length; i++) {
+      if (ACCEPTED_IMAGE_TYPES.includes(files[i].type)) {
+        setPendingImage(files[i]);
+        return;
+      }
+    }
+  }, []);
+
+  // File input handler
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      setPendingImage(file);
+    }
+    // Reset input so same file can be selected again
+    e.target.value = "";
+  }, []);
+
+  const isProcessing = sending || uploading;
 
   return (
     <div
@@ -145,40 +242,22 @@ export function CommandInput() {
         setDrag(true);
       }}
       onDragLeave={() => setDrag(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDrag(false);
-      }}
+      onDrop={handleDrop}
     >
       {drag && (
         <div className="text-center text-sky-300 text-[12px] py-2 mb-2 border border-dashed border-sky-600 rounded-lg bg-sky-900/30">
-          📎 ドロップでアップロード
+          画像をドロップでアップロード
         </div>
       )}
 
-      {/* Confirmation Dialog */}
-      {confirm && (
-        <div className="mb-2 p-2.5 rounded-lg bg-amber-900/30 border border-amber-700/40">
-          <p className="text-[11px] text-amber-300 mb-1.5">
-            以下のコマンドを送信しますか？
-          </p>
-          <pre className="text-[11px] text-slate-200 bg-slate-800 rounded px-2 py-1 mb-2 overflow-x-auto">
-            {confirm}
-          </pre>
-          <div className="flex gap-1.5 justify-end">
-            <button
-              onClick={handleCancel}
-              className="px-2.5 py-1 rounded text-[11px] text-slate-400 hover:text-slate-200 hover:bg-slate-700"
-            >
-              キャンセル
-            </button>
-            <button
-              onClick={handleConfirm}
-              className="px-2.5 py-1 rounded text-[11px] bg-amber-600 hover:bg-amber-500 text-white"
-            >
-              実行
-            </button>
-          </div>
+      {/* Image Preview */}
+      {imagePreviewUrl && pendingImage && (
+        <div className="mb-2">
+          <ImagePreview
+            src={imagePreviewUrl}
+            fileName={pendingImage.name}
+            onRemove={() => setPendingImage(null)}
+          />
         </div>
       )}
 
@@ -199,10 +278,11 @@ export function CommandInput() {
       )}
 
       {/* Input Row */}
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 items-end">
         <button
           className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 shrink-0"
-          title="添付"
+          title="画像を添付"
+          onClick={() => fileInputRef.current?.click()}
         >
           <svg
             width="16"
@@ -220,8 +300,16 @@ export function CommandInput() {
           </svg>
         </button>
         <input
-          ref={inputRef}
-          className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-[12px] text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-500"
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
+        <textarea
+          ref={textareaRef}
+          rows={1}
+          className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-[12px] text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-500 resize-none overflow-y-auto leading-[18px]"
           placeholder={`${agent?.name ?? ""} にコマンド送信...`}
           value={input}
           onChange={(e) => {
@@ -229,19 +317,24 @@ export function CommandInput() {
             setHistoryIdx(-1);
           }}
           onKeyDown={handleKeyDown}
-          disabled={sending}
+          onPaste={handlePaste}
+          disabled={isProcessing}
         />
-        <button
-          onClick={handleSend}
-          disabled={sending || !input.trim()}
-          className={`px-3 py-1.5 rounded-lg text-[12px] font-medium shrink-0 ${
-            input.trim() && !sending
-              ? "bg-sky-600 hover:bg-sky-500 text-white"
-              : "bg-slate-800 text-slate-600"
-          }`}
-        >
-          {sending ? "..." : "送信"}
-        </button>
+        {isProcessing ? (
+          <StopButton agentId={selectedAgent} />
+        ) : (
+          <button
+            onClick={handleSend}
+            disabled={!input.trim() && !pendingImage}
+            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium shrink-0 ${
+              (input.trim() || pendingImage)
+                ? "bg-sky-600 hover:bg-sky-500 text-white"
+                : "bg-slate-800 text-slate-600"
+            }`}
+          >
+            送信
+          </button>
+        )}
       </div>
 
       {/* Quick Actions */}
@@ -250,7 +343,7 @@ export function CommandInput() {
           <button
             key={qa.command}
             onClick={() => handleQuickAction(qa.command)}
-            disabled={sending}
+            disabled={isProcessing}
             className="px-2 py-0.5 rounded text-[10px] text-slate-500 hover:text-slate-300 hover:bg-slate-800 border border-slate-700/50 disabled:opacity-50"
           >
             {qa.label}
