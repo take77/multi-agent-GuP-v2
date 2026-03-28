@@ -74,10 +74,14 @@ function getAccessToken(): string | null {
     process.env.ANTHROPIC_ACCESS_TOKEN ?? process.env.CLAUDE_ACCESS_TOKEN;
   if (envToken) return envToken;
 
-  // 2. Credentials file
-  const credPath = `${process.env.HOME}/.config/claude/credentials.json`;
+  // 2. Credentials file (check multiple known paths)
+  const candidatePaths = [
+    `${process.env.HOME}/.claude/.credentials.json`,
+    `${process.env.HOME}/.config/claude/credentials.json`,
+  ];
+  const credPath = candidatePaths.find((p) => existsSync(p)) ?? "";
   try {
-    if (!existsSync(credPath)) return null;
+    if (!credPath || !existsSync(credPath)) return null;
     const raw = require("fs").readFileSync(credPath, "utf-8");
 
     let parsed: Record<string, unknown>;
