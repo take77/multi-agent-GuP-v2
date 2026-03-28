@@ -44,7 +44,8 @@ interface AppState {
   // Command sending
   sendCommand: (
     agentId: string,
-    command: string
+    command: string,
+    force?: boolean
   ) => Promise<{ success: boolean; error?: CommandError }>;
   sendEscapeCommand: (agentId: string) => Promise<{ success: boolean; error?: CommandError }>;
 
@@ -123,7 +124,7 @@ export const useAppStore = create<AppState>((set) => ({
       };
     }),
 
-  sendCommand: async (agentId, command) => {
+  sendCommand: async (agentId, command, force) => {
     try {
       const token =
         typeof window !== "undefined"
@@ -139,7 +140,7 @@ export const useAppStore = create<AppState>((set) => ({
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ agentId, command }),
+        body: JSON.stringify({ agentId, command, ...(force ? { force: true } : {}) }),
       });
 
       if (!res.ok) {
@@ -147,7 +148,7 @@ export const useAppStore = create<AppState>((set) => ({
         return {
           success: false,
           error: {
-            rule: body.rule,
+            rule: body.error === "agent_active" ? "agent_active" : body.rule,
             message:
               body.message ?? body.error ?? `HTTP ${res.status}`,
           },

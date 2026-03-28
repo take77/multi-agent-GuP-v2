@@ -2,10 +2,15 @@ import { NextResponse } from "next/server";
 import { buildAgentPaneMap, sendKeys, sendEscape } from "@/lib/tmux";
 import { sanitizeCommand } from "@/lib/command-sanitizer";
 import { writeAuditLog } from "@/lib/audit-log";
+import { paneStates } from "@/lib/pane-streamer";
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export async function POST(req: Request) {
   try {
-    const { agentId, command, type } = await req.json();
+    const { agentId, command, type, force } = await req.json();
 
     if (!agentId) {
       return NextResponse.json(
@@ -89,6 +94,27 @@ export async function POST(req: Request) {
     if (command === "ESCAPE_KEY") {
       sendEscape(paneId);
     } else {
+      // Check agent state before sending
+      const state = paneStates.get(agentId);
+      const isIdle = !state || state.hasPrompt;
+
+      if (!isIdle && !force) {
+        // Agent is active — reject unless force flag is set
+        return NextResponse.json(
+          {
+            error: "agent_active",
+            message: "エージェントがアクティブです。強制送信するには再送信してください。",
+          },
+          { status: 409 }
+        );
+      }
+
+      if (!isIdle && force) {
+        // Force send: interrupt first, then send command
+        sendEscape(paneId);
+        await sleep(200);
+      }
+
       sendKeys(paneId, command);
     }
 

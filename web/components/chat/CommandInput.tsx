@@ -32,7 +32,9 @@ export function CommandInput() {
   const [error, setError] = useState<{
     rule?: string;
     message: string;
+    isAgentActive?: boolean;
   } | null>(null);
+  const [pendingForceCommand, setPendingForceCommand] = useState<string | null>(null);
   const [historyIdx, setHistoryIdx] = useState(-1);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [pendingPreviews, setPendingPreviews] = useState<string[]>([]);
@@ -105,34 +107,51 @@ export function CommandInput() {
   }, []);
 
   const doSend = useCallback(
-    async (command: string) => {
+    async (command: string, force?: boolean) => {
       setSending(true);
       setError(null);
+      setPendingForceCommand(null);
 
-      addMessage(selectedAgent, {
-        role: "user",
-        text: command,
-        time: timeStr(),
-      });
-      addCommandHistory(selectedAgent, command);
-
-      const result = await sendCommand(selectedAgent, command);
-
-      if (!result.success && result.error) {
-        setError(result.error);
+      if (!force) {
         addMessage(selectedAgent, {
-          role: "agent",
-          text: result.error.rule
-            ? `[${result.error.rule}] ${result.error.message}`
-            : `エラー: ${result.error.message}`,
+          role: "user",
+          text: command,
           time: timeStr(),
         });
+        addCommandHistory(selectedAgent, command);
+      }
+
+      const result = await sendCommand(selectedAgent, command, force);
+
+      if (!result.success && result.error) {
+        if (result.error.rule === "agent_active") {
+          // Agent is active — offer force send
+          setPendingForceCommand(command);
+          setError({
+            ...result.error,
+            isAgentActive: true,
+          });
+        } else {
+          setError(result.error);
+          addMessage(selectedAgent, {
+            role: "agent",
+            text: result.error.rule
+              ? `[${result.error.rule}] ${result.error.message}`
+              : `エラー: ${result.error.message}`,
+            time: timeStr(),
+          });
+        }
       }
 
       setSending(false);
     },
     [selectedAgent, addMessage, addCommandHistory, sendCommand]
   );
+
+  const handleForceSend = useCallback(() => {
+    if (!pendingForceCommand) return;
+    doSend(pendingForceCommand, true);
+  }, [pendingForceCommand, doSend]);
 
   const handleSend = useCallback(async () => {
     const cmd = input.trim();
@@ -275,17 +294,57 @@ export function CommandInput() {
 
       {/* Error Display */}
       {error && (
-        <div className="mb-2 px-2.5 py-1.5 rounded-lg bg-red-900/30 border border-red-700/40 flex items-start gap-2">
-          <span className="text-red-400 text-[11px] shrink-0">
-            {error.rule ? `[${error.rule}]` : "Error"}
+        <div className={`mb-2 px-2.5 py-1.5 rounded-lg flex items-start gap-2 ${
+          error.isAgentActive
+            ? "bg-amber-900/30 border border-amber-700/40"
+            : "bg-red-900/30 border border-red-700/40"
+        }`}>
+          <span className={`text-[11px] shrink-0 ${
+            error.isAgentActive ? "text-amber-400" : "text-red-400"
+          }`}>
+            {error.isAgentActive ? "⚠" : error.rule ? `[${error.rule}]` : "Error"}
           </span>
-          <span className="text-[11px] text-red-300">{error.message}</span>
+          <span className={`text-[11px] ${
+            error.isAgentActive ? "text-amber-300" : "text-red-300"
+          }`}>{error.message}</span>
+          {error.isAgentActive && pendingForceCommand && (
+            <button
+              onClick={handleForceSend}
+              className="ml-auto px-2 py-0.5 rounded text-[10px] font-medium bg-amber-600 hover:bg-amber-500 text-white shrink-0"
+            >
+              強制送信
+            </button>
+          )}
           <button
-            onClick={() => setError(null)}
-            className="ml-auto text-red-500 hover:text-red-300 text-[11px] shrink-0"
+            onClick={() => { setError(null); setPendingForceCommand(null); }}
+            className={`${error.isAgentActive ? "" : "ml-auto"} text-[11px] shrink-0 ${
+              error.isAgentActive ? "text-amber-500 hover:text-amber-300" : "text-red-500 hover:text-red-300"
+            }`}
           >
             ✕
           </button>
+        </div>
+      )}
+
+      {/* Agent Status Indicator */}
+      {agent && agent.status !== "idle" && (
+        <div className={`mb-1.5 px-2.5 py-1 rounded-lg flex items-center gap-2 text-[11px] ${
+          agent.status === "active"
+            ? "bg-amber-900/20 border border-amber-700/30 text-amber-300"
+            : agent.status === "stuck"
+            ? "bg-red-900/20 border border-red-700/30 text-red-300"
+            : "bg-slate-800 border border-slate-700/30 text-slate-400"
+        }`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${
+            agent.status === "active"
+              ? "bg-amber-400 animate-pulse"
+              : agent.status === "stuck"
+              ? "bg-red-400"
+              : "bg-slate-500"
+          }`} />
+          {agent.status === "active" && "生成中... 送信すると割り込みになります"}
+          {agent.status === "stuck" && `停滞中 (${agent.stuck}分) — Escape で復帰を試みてください`}
+          {agent.status === "error" && "エラー状態"}
         </div>
       )}
 
@@ -347,14 +406,16 @@ export function CommandInput() {
           <button
             onClick={handleSend}
             disabled={!input.trim() && pendingImages.length === 0}
-            title="送信 (Ctrl+Enter)"
+            title={agent?.status === "active" ? "割り込み送信 (Ctrl+Enter)" : "送信 (Ctrl+Enter)"}
             className={`px-3 py-1.5 rounded-lg text-[12px] font-medium shrink-0 ${
-              (input.trim() || pendingImages.length > 0)
-                ? "bg-sky-600 hover:bg-sky-500 text-white"
-                : "bg-slate-800 text-slate-600"
+              !(input.trim() || pendingImages.length > 0)
+                ? "bg-slate-800 text-slate-600"
+                : agent?.status === "active"
+                ? "bg-amber-600 hover:bg-amber-500 text-white"
+                : "bg-sky-600 hover:bg-sky-500 text-white"
             }`}
           >
-            送信
+            {agent?.status === "active" ? "割込送信" : "送信"}
           </button>
         )}
       </div>
