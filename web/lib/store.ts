@@ -29,6 +29,10 @@ interface AppState {
   messages: Record<string, ChatMessage[]>;
   addMessage: (agentId: string, msg: ChatMessage) => void;
 
+  // Terminal output (latest capture-pane, replaced on each update)
+  latestOutput: Record<string, string>;
+  setLatestOutput: (agentId: string, output: string) => void;
+
   // Command history (per agent)
   commandHistory: Record<string, string[]>;
   addCommandHistory: (agentId: string, command: string) => void;
@@ -66,6 +70,15 @@ export const useAppStore = create<AppState>((set) => ({
       messages: {
         ...s.messages,
         [agentId]: [...(s.messages[agentId] ?? []), msg],
+      },
+    })),
+
+  latestOutput: {},
+  setLatestOutput: (agentId, output) =>
+    set((s) => ({
+      latestOutput: {
+        ...s.latestOutput,
+        [agentId]: output,
       },
     })),
 

@@ -17,7 +17,7 @@ function getAuthToken(): string {
 }
 
 export function useSSE() {
-  const { setConnected, addMessage } = useAppStore();
+  const { setConnected, setLatestOutput } = useAppStore();
 
   useEffect(() => {
     let eventSource: EventSource | null = null;
@@ -38,14 +38,8 @@ export function useSSE() {
         try {
           const data = JSON.parse(e.data);
           if (data.agentId && data.output) {
-            // Add the captured output as an agent message
-            const now = new Date();
-            const time = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
-            addMessage(data.agentId, {
-              role: "agent",
-              text: data.output.slice(-2000), // Last 2000 chars to avoid overflow
-              time,
-            });
+            // Replace latest output (not append) — capture-pane is a full snapshot
+            setLatestOutput(data.agentId, data.output);
           }
         } catch {
           // ignore parse errors
@@ -79,5 +73,5 @@ export function useSSE() {
       if (reconnectTimer) clearTimeout(reconnectTimer);
       setConnected(false);
     };
-  }, [setConnected, addMessage]);
+  }, [setConnected, setLatestOutput]);
 }

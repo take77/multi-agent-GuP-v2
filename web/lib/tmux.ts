@@ -42,13 +42,13 @@ export function listPanes(): PaneInfo[] {
 
 /**
  * Capture the last 500 lines of a tmux pane's output.
- * Uses -e to include escape sequences (for future ANSI rendering).
+ * Plain text (no ANSI escape sequences) for chat/text display.
  */
 export function capturePaneContent(paneId: string): string {
   try {
     return execFileSync(
       "tmux",
-      ["capture-pane", "-p", "-t", paneId, "-e", "-S", "-500"],
+      ["capture-pane", "-p", "-t", paneId, "-S", "-500"],
       EXEC_OPTIONS
     );
   } catch {
