@@ -4,7 +4,8 @@ import { useEffect, useRef, useMemo } from "react";
 import { useAppStore } from "@/lib/store";
 import { Avatar } from "@/components/shared/Avatar";
 import { parseCapturePaneOutput } from "@/lib/capture-pane-parser";
-import { ParsedOutput } from "@/components/chat/ParsedOutput";
+import { segmentsToBlocks } from "@/lib/segment-to-block";
+import { BlockRenderer } from "@/components/chat/BlockRenderer";
 import { getAgentDisplayName } from "@/lib/agent-names";
 
 /** Unified chat entry for timeline display */
@@ -69,37 +70,35 @@ export function MessageList() {
     return entries;
   }, [userMsgs, inboxMessages, selectedAgent]);
 
-  const parsedSegments = useMemo(
-    () => parseCapturePaneOutput(output),
-    [output]
-  );
+  const agentDisplayName = agent?.name ?? getAgentDisplayName(selectedAgent);
+
+  const parsedBlocks = useMemo(() => {
+    const segments = parseCapturePaneOutput(output);
+    return segmentsToBlocks(segments, agentDisplayName);
+  }, [output, agentDisplayName]);
 
   // Auto-scroll when new entries arrive or output changes
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [timeline.length, parsedSegments.length, output, selectedAgent]);
+  }, [timeline.length, parsedBlocks.length, output, selectedAgent]);
 
   return (
     <div className="flex-1 flex flex-col overflow-y-auto px-3 py-3 space-y-2">
       {/* No output placeholder */}
-      {parsedSegments.length === 0 && timeline.length === 0 && (
+      {parsedBlocks.length === 0 && timeline.length === 0 && (
         <div className="flex flex-col items-center justify-center flex-1 text-slate-600">
           <Avatar id={agent?.id ?? "anzu"} size="w-12 h-12 text-[18px]" />
           <p className="text-[12px] mt-3">{agent?.name} の出力待ち...</p>
         </div>
       )}
 
-      {/* Agent terminal output — structured parsed view */}
-      {parsedSegments.length > 0 && (
-        <div className="flex items-start gap-2 max-w-[90%]">
-          <Avatar
-            id={agent?.id ?? "anzu"}
-            size="w-6 h-6 text-[9px]"
-          />
-          <div className="bg-slate-800 rounded-xl rounded-tl-sm px-3 py-2 min-w-0 flex-1 max-h-[60vh] overflow-y-auto">
-            <ParsedOutput segments={parsedSegments} />
-          </div>
-        </div>
+      {/* Agent terminal output — block-based rendered view */}
+      {parsedBlocks.length > 0 && (
+        <BlockRenderer
+          blocks={parsedBlocks}
+          agentId={agent?.id ?? selectedAgent}
+          agentName={agentDisplayName}
+        />
       )}
 
       {/* Interleaved user commands (right) and inbox messages (left) */}
