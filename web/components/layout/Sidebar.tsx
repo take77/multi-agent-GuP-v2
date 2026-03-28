@@ -49,7 +49,7 @@ export function Sidebar() {
   const restCount = activeCount - leaders.length;
 
   return (
-    <nav className="w-36 flex flex-col border-r border-slate-700/50 bg-slate-900 shrink-0">
+    <nav className="w-full h-full flex flex-col border-r border-slate-700/50 bg-slate-900 shrink-0">
       {/* Logo */}
       <div className="h-11 flex items-center px-3 border-b border-slate-700/50 gap-2">
         <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-[10px] font-bold text-black shrink-0">
