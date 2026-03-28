@@ -7,6 +7,7 @@ export interface PaneState {
   lastChange: number;
   lastPoll: number;
   active: boolean;
+  hasPrompt: boolean;
 }
 
 const ACTIVE_INTERVAL = 200;
@@ -30,6 +31,17 @@ export function getActiveAgent(): string | null {
 
 function hashContent(content: string): string {
   return createHash("sha256").update(content).digest("hex");
+}
+
+/**
+ * Detect if the capture-pane output shows a Claude Code prompt (❯).
+ * The prompt line is `❯ ` (U+276F) near the end of the output.
+ */
+function detectPrompt(content: string): boolean {
+  // Check the last 10 non-empty lines for the ❯ prompt
+  const lines = content.split("\n");
+  const tail = lines.slice(-15);
+  return tail.some((line) => line.trimStart().startsWith("❯"));
 }
 
 function pollPanes() {
@@ -57,6 +69,8 @@ function pollPanes() {
     const content = capturePaneContent(pane.paneId);
     const hash = hashContent(content);
 
+    const hasPrompt = detectPrompt(content);
+
     if (!prev || prev.hash !== hash) {
       // Content changed
       paneStates.set(pane.agentId, {
@@ -64,6 +78,7 @@ function pollPanes() {
         lastChange: now,
         lastPoll: now,
         active: true,
+        hasPrompt,
       });
 
       eventBus.emit("agent-output", {
@@ -81,6 +96,7 @@ function pollPanes() {
         ...prev,
         lastPoll: now,
         active: wasActive && !isIdle,
+        hasPrompt,
       });
     }
   }

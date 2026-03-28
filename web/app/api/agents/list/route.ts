@@ -3,6 +3,7 @@ import { readFileSync } from "fs";
 import { parse as parseYaml } from "yaml";
 import { join } from "path";
 import { listPanes, type PaneInfo } from "@/lib/tmux";
+import { paneStates } from "@/lib/pane-streamer";
 
 const PROJECT_ROOT = process.cwd().replace(/\/web$/, "");
 
@@ -97,6 +98,20 @@ function getTaskInfo(
   }
 }
 
+function computeStatus(agentId: string, pane: PaneInfo | undefined): { status: "active" | "idle" | "stuck" | "error"; stuckMin: number } {
+  if (!pane) return { status: "idle", stuckMin: 0 };
+
+  const state = paneStates.get(agentId);
+  if (!state) return { status: "idle", stuckMin: 0 };
+
+  const stuckMin = Math.floor((Date.now() - state.lastChange) / 60000);
+
+  if (state.active) return { status: "active", stuckMin: 0 };
+  if (state.hasPrompt) return { status: "idle", stuckMin: 0 };
+  if (stuckMin >= 5) return { status: "stuck", stuckMin };
+  return { status: "active", stuckMin: 0 };
+}
+
 export async function GET() {
   const panes = listPanes();
   const paneMap = new Map<string, PaneInfo>();
@@ -111,13 +126,14 @@ export async function GET() {
   const commandAgents = ["anzu", "miho"].map((id) => {
     const pane = paneMap.get(id);
     const taskInfo = getTaskInfo(id);
+    const { status, stuckMin } = computeStatus(id, pane);
     return {
       id,
       name: AGENT_NAMES[id] || id,
       role: id === "anzu" ? "総司令" : "参謀長",
-      status: pane ? "active" : "idle",
+      status,
       task: taskInfo?.task || "待機中",
-      stuck: 0,
+      stuck: stuckMin,
       model: pane?.modelName || "",
       paneId: pane?.paneId || null,
       sessionName: pane?.sessionName || null,
@@ -142,13 +158,14 @@ export async function GET() {
       const agents = allMembers.map(({ id, role }) => {
         const pane = paneMap.get(id);
         const taskInfo = getTaskInfo(id);
+        const { status, stuckMin } = computeStatus(id, pane);
         return {
           id,
           name: AGENT_NAMES[id] || id,
           role: ROLE_LABELS[role] || role,
-          status: pane ? "active" : "idle",
+          status,
           task: taskInfo?.task || "待機中",
-          stuck: 0,
+          stuck: stuckMin,
           model: pane?.modelName || "",
           paneId: pane?.paneId || null,
           sessionName: pane?.sessionName || null,

@@ -78,11 +78,22 @@ function computeStuckMinutes(agentId: string): number {
   return Math.floor(elapsed / 60000);
 }
 
-function determineStatus(pane: PaneInfo | undefined, stuckMin: number, taskStatus: string): "active" | "idle" | "stuck" | "error" {
+function determineStatus(pane: PaneInfo | undefined, stuckMin: number, _taskStatus: string, agentId: string): "active" | "idle" | "stuck" | "error" {
   if (!pane) return "idle";
+
+  const state = paneStates.get(agentId);
+
+  // If pane-streamer considers the output actively changing → active
+  if (state?.active) return "active";
+
+  // If prompt (❯) is visible → agent is idle (normal wait state)
+  if (state?.hasPrompt) return "idle";
+
+  // No output change for 5+ min AND no prompt → stuck
   if (stuckMin >= 5) return "stuck";
-  if (taskStatus === "assigned" || taskStatus === "in_progress") return "active";
-  return "idle";
+
+  // Brief inactivity without prompt — still could be processing (e.g. long tool call)
+  return "active";
 }
 
 function buildClusters() {
@@ -104,7 +115,7 @@ function buildClusters() {
       id,
       name: AGENT_NAMES[id] || id,
       role: id === "anzu" ? "総司令" : "参謀長",
-      status: determineStatus(pane, stuckMin, taskInfo?.status || "idle"),
+      status: determineStatus(pane, stuckMin, taskInfo?.status || "idle", id),
       task: taskInfo?.task || "待機中",
       stuck: stuckMin,
       model: pane?.modelName || "",
@@ -132,7 +143,7 @@ function buildClusters() {
           id,
           name: AGENT_NAMES[id] || id,
           role: ROLE_LABELS[role] || role,
-          status: determineStatus(pane, stuckMin, taskInfo?.status || "idle"),
+          status: determineStatus(pane, stuckMin, taskInfo?.status || "idle", id),
           task: taskInfo?.task || "待機中",
           stuck: stuckMin,
           model: pane?.modelName || "",
