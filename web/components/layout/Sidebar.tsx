@@ -2,6 +2,7 @@
 
 import { useAppStore, type ViewId } from "@/lib/store";
 import { Avatar } from "@/components/shared/Avatar";
+import { UsagePanel } from "@/components/shared/UsagePanel";
 import { useEffect, useState } from "react";
 
 const NAV: { id: ViewId; label: string; icon: string }[] = [
@@ -107,24 +108,8 @@ export function Sidebar() {
 
       <div className="flex-1" />
 
-      {/* Claude usage placeholder */}
-      <div className="px-2.5 py-2 border-t border-slate-700/50">
-        <div className="text-[10px] text-slate-600 mb-1.5">Claude 使用量</div>
-        <div className="space-y-1.5">
-          <div>
-            <div className="flex items-center justify-between mb-0.5">
-              <span className="text-[10px] text-slate-500">5時間枠</span>
-              <span className="text-[10px] text-slate-400 font-mono">-- / --</span>
-            </div>
-            <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-sky-500 to-violet-500"
-                style={{ width: "0%" }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Claude usage */}
+      <UsagePanel />
 
       {/* Connection status */}
       <div className="px-2.5 py-2 border-t border-slate-700/50 text-[10px] text-slate-600">

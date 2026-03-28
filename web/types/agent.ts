@@ -31,3 +31,14 @@ export interface ChatMessage {
   text: string;
   time: string;
 }
+
+export interface UsageWindow {
+  utilization: number; // 0-100 percentage
+  resets_at: string; // ISO8601 timestamp
+}
+
+export interface UsageData {
+  five_hour: UsageWindow;
+  seven_day: UsageWindow;
+  fetched_at: number; // unix epoch seconds
+}
