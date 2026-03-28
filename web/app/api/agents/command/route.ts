@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildAgentPaneMap, sendKeys } from "@/lib/tmux";
+import { sanitizeCommand } from "@/lib/command-sanitizer";
+import { writeAuditLog } from "@/lib/audit-log";
 
 export async function POST(req: Request) {
   try {
@@ -11,6 +13,46 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+
+    // Extract client IP for audit
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      req.headers.get("x-real-ip") ??
+      "unknown";
+
+    const timestamp = new Date().toISOString();
+
+    // D001-D012 command sanitization
+    const result = sanitizeCommand(command);
+
+    if (!result.allowed) {
+      writeAuditLog({
+        timestamp,
+        agentId,
+        command,
+        action: "blocked",
+        rule: result.rule,
+        ip,
+      });
+
+      return NextResponse.json(
+        {
+          error: "BLOCKED",
+          rule: result.rule,
+          message: result.message,
+        },
+        { status: 403 }
+      );
+    }
+
+    // Audit: allowed command
+    writeAuditLog({
+      timestamp,
+      agentId,
+      command,
+      action: "allowed",
+      ip,
+    });
 
     const paneMap = buildAgentPaneMap();
     const paneId = paneMap.get(agentId);
