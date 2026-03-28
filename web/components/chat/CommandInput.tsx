@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useAppStore } from "@/lib/store";
-import { isWhitelistedCommand } from "@/lib/command-sanitizer";
 import StopButton from "./StopButton";
 import ImagePreview from "./ImagePreview";
 
