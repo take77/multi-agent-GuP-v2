@@ -16,6 +16,12 @@ const AGENT_NAME_MAP: Record<string, string> = {
   captain: "隊長",
   vice_captain: "副隊長",
 
+  // captain_xxx 形式の複合ID
+  captain_darjeeling: "ダージリン（ダージリン隊隊長）",
+  captain_katyusha: "カチューシャ（カチューシャ隊隊長）",
+  captain_kay: "ケイ（ケイ隊隊長）",
+  captain_maho: "まほ（まほ隊隊長）",
+
   // ダージリン隊
   darjeeling: "ダージリン（隊長）",
   pekoe: "ペコ（副隊長）",

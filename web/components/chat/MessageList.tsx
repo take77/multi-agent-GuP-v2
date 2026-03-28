@@ -17,6 +17,7 @@ interface ChatEntry {
   sortKey: number;
   text: string;
   from?: string;
+  to?: string;
   agentId?: string;
 }
 
@@ -63,6 +64,7 @@ export function MessageList() {
           sortKey: t.getTime(),
           text: m.content,
           from: m.from,
+          to: m.to,
         };
       });
   }, [inboxMessages, selectedAgent]);
@@ -183,30 +185,53 @@ export function MessageList() {
               </div>
             )}
 
-            {inboxEntries.map((entry, i) => (
-              <div
-                key={`inbox-${i}`}
-                className="flex items-start gap-2 max-w-[85%]"
-              >
-                <div className="w-6 h-6 rounded-full bg-amber-600/30 flex items-center justify-center text-[12px] shrink-0">
-                  📩
-                </div>
-                <div className="bg-amber-900/30 border border-amber-700/40 rounded-xl rounded-tl-sm px-3 py-1.5">
-                  <span className="text-[12px] text-amber-300 font-medium">
-                    {entry.from
-                      ? getAgentDisplayName(entry.from)
-                      : "不明"}
-                    から連絡
-                  </span>
-                  <p className="text-[13px] text-slate-300 mt-0.5">
-                    {entry.text}
-                  </p>
-                  <div className="text-[11px] text-amber-400/60 text-right mt-0.5">
-                    {entry.time}
+            {inboxEntries.map((entry, i) => {
+              const isSent = entry.from === selectedAgent;
+              return isSent ? (
+                // 送信メッセージ → 右側
+                <div key={`inbox-${i}`} className="flex justify-end">
+                  <div className="max-w-[85%] bg-slate-700/60 border border-slate-600/40 rounded-xl rounded-tr-sm px-3 py-1.5">
+                    <span className="text-[12px] text-slate-400 font-medium">
+                      📤{" "}
+                      {entry.to
+                        ? getAgentDisplayName(entry.to)
+                        : "不明"}
+                      への連絡
+                    </span>
+                    <p className="text-[13px] text-slate-300 mt-0.5">
+                      {entry.text}
+                    </p>
+                    <div className="text-[11px] text-slate-500 text-right mt-0.5">
+                      {entry.time}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ) : (
+                // 受信メッセージ → 左側
+                <div
+                  key={`inbox-${i}`}
+                  className="flex items-start gap-2 max-w-[85%]"
+                >
+                  <div className="w-6 h-6 rounded-full bg-amber-600/30 flex items-center justify-center text-[12px] shrink-0">
+                    📩
+                  </div>
+                  <div className="bg-amber-900/30 border border-amber-700/40 rounded-xl rounded-tl-sm px-3 py-1.5">
+                    <span className="text-[12px] text-amber-300 font-medium">
+                      {entry.from
+                        ? getAgentDisplayName(entry.from)
+                        : "不明"}
+                      から連絡
+                    </span>
+                    <p className="text-[13px] text-slate-300 mt-0.5">
+                      {entry.text}
+                    </p>
+                    <div className="text-[11px] text-amber-400/60 text-right mt-0.5">
+                      {entry.time}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </>
         )}
 

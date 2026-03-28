@@ -202,6 +202,14 @@ function tokenize(raw: string): Token[] {
     // ❯ user input (multi-line)
     const userMatch = trimmed.match(RE_USER_INPUT);
     if (userMatch) {
+      const capturedText = userMatch[1].trim();
+
+      // ❯ inbox1 等の inbox_watcher nudge はスキップ
+      if (/^inbox\d+$/.test(capturedText)) {
+        i++;
+        continue;
+      }
+
       const inputLines = [userMatch[1]];
       i++;
       while (i < lines.length) {
