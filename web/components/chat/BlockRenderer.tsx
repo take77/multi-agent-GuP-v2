@@ -23,7 +23,7 @@ const AssistantBubble = memo(function AssistantBubble({
       <Avatar id={agentId} size="w-6 h-6 text-[9px]" />
       <div className="bg-slate-800 rounded-xl rounded-tl-sm px-3 py-2 min-w-0 flex-1">
         <span className="text-[10px] text-slate-500 font-medium">{agentName}</span>
-        <div className="prose prose-invert prose-sm max-w-none text-[13px] leading-[1.5] text-slate-300 mt-0.5 [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_code]:bg-slate-700/50 [&_code]:px-1 [&_code]:rounded [&_code]:text-[12px] [&_pre]:bg-slate-900/50 [&_pre]:p-2 [&_pre]:rounded [&_pre]:text-[12px] [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs [&_a]:text-sky-400 [&_table]:w-full [&_table]:border-collapse [&_table]:my-2 [&_table]:text-[12px] [&_th]:border [&_th]:border-slate-600 [&_th]:px-2 [&_th]:py-1 [&_th]:bg-slate-700/50 [&_th]:text-left [&_th]:font-semibold [&_td]:border [&_td]:border-slate-600 [&_td]:px-2 [&_td]:py-0.5 [&_tr:nth-child(even)]:bg-slate-800/30">
+        <div className="prose prose-invert prose-sm max-w-none text-[13px] leading-[1.5] text-slate-300 mt-0.5 break-words [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_code]:bg-slate-700/50 [&_code]:px-1 [&_code]:rounded [&_code]:text-[12px] [&_pre]:bg-slate-900/50 [&_pre]:p-2 [&_pre]:rounded [&_pre]:text-[12px] [&_pre]:overflow-x-auto [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs [&_a]:text-sky-400 [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full [&_table]:border-collapse [&_table]:my-2 [&_table]:text-[12px] [&_th]:border [&_th]:border-slate-600 [&_th]:px-2 [&_th]:py-1 [&_th]:bg-slate-700/50 [&_th]:text-left [&_th]:font-semibold [&_th]:whitespace-nowrap [&_td]:border [&_td]:border-slate-600 [&_td]:px-2 [&_td]:py-0.5 [&_tr:nth-child(even)]:bg-slate-800/30 [&_hr]:max-w-full [&_hr]:border-slate-700">
           <Markdown remarkPlugins={[remarkGfm, remarkBreaks]}>{content}</Markdown>
         </div>
       </div>
@@ -132,7 +132,7 @@ const RawFallback = memo(function RawFallback({
   content: string;
 }) {
   return (
-    <pre className="text-[12px] leading-[1.4] text-slate-500 font-mono whitespace-pre-wrap break-words bg-slate-800/30 rounded px-2 py-1 my-0.5">
+    <pre className="text-[12px] leading-[1.4] text-slate-500 font-mono whitespace-pre-wrap break-words bg-slate-800/30 rounded px-2 py-1 my-0.5 max-w-full overflow-x-auto">
       {content}
     </pre>
   );
