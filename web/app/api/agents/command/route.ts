@@ -5,20 +5,41 @@ import { writeAuditLog } from "@/lib/audit-log";
 
 export async function POST(req: Request) {
   try {
-    const { agentId, command } = await req.json();
+    const { agentId, command, type } = await req.json();
 
-    if (!agentId || !command) {
+    if (!agentId) {
       return NextResponse.json(
-        { error: "agentId and command are required" },
+        { error: "agentId is required" },
         { status: 400 }
       );
     }
 
-    // Extract client IP for audit
     const ip =
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
       req.headers.get("x-real-ip") ??
       "unknown";
+
+    // Escape: skip command validation — send Escape key to pane
+    if (type === "escape") {
+      const paneMap = buildAgentPaneMap();
+      const paneId = paneMap.get(agentId);
+      if (!paneId) {
+        return NextResponse.json(
+          { error: `Agent '${agentId}' not found or has no active pane` },
+          { status: 404 }
+        );
+      }
+      writeAuditLog({ timestamp: new Date().toISOString(), agentId, command: "ESCAPE", action: "allowed", ip });
+      sendEscape(paneId);
+      return NextResponse.json({ success: true, agentId, paneId });
+    }
+
+    if (!command) {
+      return NextResponse.json(
+        { error: "command is required" },
+        { status: 400 }
+      );
+    }
 
     const timestamp = new Date().toISOString();
 
@@ -64,7 +85,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // ESCAPE_KEY: send Escape without Enter (for stopping running processes)
+    // ESCAPE_KEY: legacy support for StopButton
     if (command === "ESCAPE_KEY") {
       sendEscape(paneId);
     } else {
