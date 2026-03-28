@@ -169,7 +169,7 @@ export function CommandInput() {
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       handleSend();
     } else if (e.key === "ArrowUp" && !input) {
@@ -325,6 +325,7 @@ export function CommandInput() {
           <button
             onClick={handleSend}
             disabled={!input.trim() && !pendingImage}
+            title="送信 (Ctrl+Enter)"
             className={`px-3 py-1.5 rounded-lg text-[12px] font-medium shrink-0 ${
               (input.trim() || pendingImage)
                 ? "bg-sky-600 hover:bg-sky-500 text-white"
