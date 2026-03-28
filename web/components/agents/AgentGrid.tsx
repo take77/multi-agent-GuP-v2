@@ -5,6 +5,7 @@ import { useAppStore } from "@/lib/store";
 import { Avatar } from "@/components/shared/Avatar";
 import { StuckAlert } from "./StuckAlert";
 import { AgentCard } from "./AgentCard";
+import { TerminalLogView } from "./TerminalLogView";
 import type { ClusterStatus } from "@/types/agent";
 
 const STUCK_THRESHOLD = 5;
@@ -56,15 +57,7 @@ export function AgentGrid() {
             </span>
           )}
         </div>
-        <div className="flex-1 bg-black font-mono text-[12px] leading-[1.7] p-4 overflow-y-auto text-emerald-400">
-          <div className="text-emerald-300">
-            ❯ Terminal output for {agent?.name}
-          </div>
-          <div className="text-slate-400">
-            (Live terminal output will appear here)
-          </div>
-          <span className="inline-block w-2 h-4 bg-slate-400 animate-pulse" />
-        </div>
+        <TerminalLogView agentId={expanded} />
       </div>
     );
   }
