@@ -10,6 +10,12 @@ const AGENT_NAME_MAP: Record<string, string> = {
   anzu: "杏（大隊長）",
   miho: "みほ（参謀長）",
 
+  // ロール名のフォールバック（inbox等でロール名が使われる場合）
+  battalion_commander: "杏（大隊長）",
+  chief_of_staff: "みほ（参謀長）",
+  captain: "隊長",
+  vice_captain: "副隊長",
+
   // ダージリン隊
   darjeeling: "ダージリン（隊長）",
   pekoe: "ペコ（副隊長）",
