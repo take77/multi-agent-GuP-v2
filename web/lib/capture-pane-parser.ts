@@ -1,10 +1,17 @@
 /**
  * capture-pane-parser.ts
  *
- * Claude Code の capture-pane 出力を構造化セグメントに分割するパーサー。
+ * Claude Code の capture-pane 出力を構造化ブロックに分割するパーサー。
+ * トークナイザ → ブロックビルダー の2段階パイプライン。
  * 純粋関数として実装し、副作用を持たない。
  */
 
+import type { ParsedBlock, ToolCall } from "@/types/parsed-blocks";
+
+// Re-export types for UI consumption
+export type { ParsedBlock, ToolCall } from "@/types/parsed-blocks";
+
+// ── Legacy exports (backward compat until UI is updated by subtask_140_b) ──
 export type SegmentKind =
   | "user-input"
   | "assistant-text"
@@ -23,139 +30,162 @@ export interface ParsedSegment {
   filePath?: string;
 }
 
-// ── Pattern matchers ──
+// ═══════════════════════════════════════════════════════════════
+// Stage 1: Token definitions
+// ═══════════════════════════════════════════════════════════════
 
-const RE_USER_INPUT = /^❯\s+(.*)$/;
-const RE_ASSISTANT_TEXT = /^●\s(.*)$/;
-const RE_TOOL_RESULT = /^⎿\s(.*)$/;
-const RE_BASH_CALL = /^Bash\((.+)\)\s*$/;
-const RE_READ_CALL = /^Read\((.+)\)\s*$/;
-const RE_READING_FILES = /^Reading?\s+\d+\s+file/;
-const RE_READ_COLLAPSED = /^Read\s+\d+\s+file.*\(ctrl\+o/i;
-const RE_UPDATE_CALL = /^Update\((.+)\)\s*$/;
-const RE_WRITE_CALL = /^Write\((.+)\)\s*$/;
-const RE_EDIT_CALL = /^Edit\((.+)\)\s*$/;
-const RE_GLOB_CALL = /^Glob\((.+)\)\s*$/;
-const RE_GREP_CALL = /^Grep\((.+)\)\s*$/;
-const RE_AGENT_CALL = /^Agent\((.+)\)\s*$/;
-const RE_TODO_CALL = /^Todo(?:Write|Read)\((.+)\)\s*$/;
-const RE_TOOL_SEARCH_CALL = /^ToolSearch\((.+)\)\s*$/;
-const RE_COGITATE = /^✻\s+(?:Cogitated|Churned)\s+for\s+/;
-const RE_SEPARATOR = /^[─]{4,}/;
-const RE_STATUS_BAR = /^⏵⏵\s+/;
-const RE_INBOX_NUDGE = /^inbox\d+$/;
+type Token =
+  | { type: "assistant-text"; text: string }
+  | { type: "tool-call"; call: ToolCall }
+  | { type: "tool-result"; text: string }
+  | { type: "user-input"; text: string }
+  | { type: "skip" }
+  | { type: "raw"; text: string };
 
-// Session start / banner patterns → status (hidden)
-// Only match rounded-corner chars used by Claude Code's session banner (╭╮╰╯)
-// Table chars (┌├│└┐┤┘┬┴┼) are NOT hidden — they appear in data tables
-const RE_BOX_BORDER = /^[╭╰╮╯╠╣╦╩╪]{1}/;
-const RE_REMOTE_URL = /^https?:\/\//;
-const RE_QUESTION_PROMPT = /^\?\s+/;
-const RE_SESSION_LINE = /^(?:Human turn|claude-code|Claude Code|Session|Loading|Initializing)/i;
-const RE_TOGGLE_LINE = /^(?:Bypass permissions|Auto-accept|Fast mode|Model:)\s/i;
+// ═══════════════════════════════════════════════════════════════
+// Stage 1: Pattern matchers
+// ═══════════════════════════════════════════════════════════════
 
-/**
- * Check if a trimmed line is a known marker that should break continuation.
- */
-function isMarkerLine(trimmed: string): boolean {
-  return (
-    RE_USER_INPUT.test(trimmed) ||
-    RE_ASSISTANT_TEXT.test(trimmed) ||
-    RE_SEPARATOR.test(trimmed) ||
-    RE_STATUS_BAR.test(trimmed) ||
-    RE_INBOX_NUDGE.test(trimmed) ||
-    RE_COGITATE.test(trimmed)
-  );
+// ── Skip patterns (completely filtered out) ──
+const SKIP_PATTERNS = [
+  /^[─━]{4,}/,                       // separator lines
+  /^⏵⏵\s+/,                         // status bar
+  /^▐▛/,                              // Claude Code ASCII banner
+  /^\/remote-control/,                // session info
+  /^[╭╰╮╯╠╣╦╩╪]/,                    // session banner frame (rounded corners)
+  /^inbox\d+$/,                       // inbox nudge
+  /^https?:\/\//,                     // remote URLs in session start
+  /^\?\s+/,                           // question prompts
+  /^(?:Human turn|claude-code|Claude Code|Session|Loading|Initializing)/i,
+  /^(?:Bypass permissions|Auto-accept|Fast mode|Model:)\s/i,
+  /^✻\s+Worked\s+for\s+/,            // "Worked for X" status line
+];
+
+function isSkipLine(trimmed: string): boolean {
+  return SKIP_PATTERNS.some((re) => re.test(trimmed));
 }
 
+// ── Tool call patterns ──
+
+interface ToolPattern {
+  re: RegExp;
+  icon: string;
+  label: string;
+  extractDetail: (match: RegExpMatchArray) => string;
+}
+
+const TOOL_PATTERNS: ToolPattern[] = [
+  { re: /^Bash\((.+)\)\s*$/, icon: "💻", label: "Bash", extractDetail: (m) => m[1] },
+  { re: /^Read\((.+)\)\s*$/, icon: "📖", label: "Read", extractDetail: (m) => m[1] },
+  { re: /^Update\((.+)\)\s*$/, icon: "📝", label: "Update", extractDetail: (m) => m[1] },
+  { re: /^Write\((.+)\)\s*$/, icon: "📝", label: "Write", extractDetail: (m) => m[1] },
+  { re: /^Edit\((.+)\)\s*$/, icon: "📝", label: "Edit", extractDetail: (m) => m[1] },
+  { re: /^Glob\((.+)\)\s*$/, icon: "🔍", label: "Glob", extractDetail: (m) => m[1] },
+  { re: /^Grep\((.+)\)\s*$/, icon: "🔍", label: "Grep", extractDetail: (m) => m[1] },
+  { re: /^Agent\((.+)\)\s*$/, icon: "🤖", label: "Agent", extractDetail: (m) => m[1] },
+  { re: /^ToolSearch\((.+)\)\s*$/, icon: "🔧", label: "ToolSearch", extractDetail: (m) => m[1] },
+  { re: /^Todo(?:Write|Read)\((.+)\)\s*$/, icon: "📋", label: "Todo", extractDetail: (m) => m[1] },
+];
+
+// Multi-line tool call prefix (no closing paren)
+const RE_TOOL_PREFIX = /^(Bash|Read|Update|Write|Edit|Glob|Grep|Agent|ToolSearch|TodoWrite|TodoRead)\((.*)$/;
+
+// New-format tool indicators
+const RE_NEW_TOOL_BASH = /^▶\s+\$\s+(.*)$/;
+const RE_NEW_TOOL_EDIT = /^▶\s+🖊\s+Edit\s+(.*)$/;
+
+// Read N file(s) patterns
+const RE_READ_FILES = /^Read(?:ing)?\s+(\d+)\s+file/;
+
+// Cogitate/think time
+const RE_COGITATE = /^✻\s+(?:Cogitated|Churned|Crunched)\s+for\s+(.+)$/;
+
+// Core markers
+const RE_USER_INPUT = /^❯\s+(.*)$/;
+const RE_ASSISTANT_TEXT = /^●\s(.*)$/;
+const RE_TOOL_RESULT = /^⎿\s?(.*)$/;
+
 /**
- * Try to parse a line as a tool call. Returns a ParsedSegment or null.
+ * Try to parse a trimmed line as a ToolCall.
  */
-function tryParseToolCall(trimmed: string): ParsedSegment | null {
-  const bashMatch = trimmed.match(RE_BASH_CALL);
-  if (bashMatch) {
-    return { kind: "tool-call", text: trimmed, tool: "bash", command: bashMatch[1] };
+function tryParseToolCall(trimmed: string): ToolCall | null {
+  for (const tp of TOOL_PATTERNS) {
+    const m = trimmed.match(tp.re);
+    if (m) {
+      return { icon: tp.icon, label: tp.label, detail: tp.extractDetail(m) };
+    }
   }
 
-  const readMatch = trimmed.match(RE_READ_CALL);
-  if (readMatch) {
-    return { kind: "tool-call", text: trimmed, tool: "read", filePath: readMatch[1] };
-  }
-
-  if (RE_READING_FILES.test(trimmed) || RE_READ_COLLAPSED.test(trimmed)) {
-    return { kind: "tool-call", text: trimmed, tool: "read" };
-  }
-
-  const updateMatch = trimmed.match(RE_UPDATE_CALL);
-  if (updateMatch) {
-    return { kind: "tool-call", text: trimmed, tool: "edit", filePath: updateMatch[1] };
-  }
-
-  const writeMatch = trimmed.match(RE_WRITE_CALL);
-  if (writeMatch) {
-    return { kind: "tool-call", text: trimmed, tool: "edit", filePath: writeMatch[1] };
-  }
-
-  const editMatch = trimmed.match(RE_EDIT_CALL);
-  if (editMatch) {
-    return { kind: "tool-call", text: trimmed, tool: "edit", filePath: editMatch[1] };
-  }
-
-  const globMatch = trimmed.match(RE_GLOB_CALL);
-  if (globMatch) {
-    return { kind: "tool-call", text: trimmed, tool: "read" };
-  }
-
-  const grepMatch = trimmed.match(RE_GREP_CALL);
-  if (grepMatch) {
-    return { kind: "tool-call", text: trimmed, tool: "read" };
-  }
-
-  if (RE_AGENT_CALL.test(trimmed) || RE_TODO_CALL.test(trimmed) || RE_TOOL_SEARCH_CALL.test(trimmed)) {
-    return { kind: "tool-call", text: trimmed, tool: "bash" };
-  }
-
-  // Multi-line tool calls: tool name + open paren without closing paren on same line
-  // e.g., "Bash(bash scripts/inbox_write.sh miho "very long command..."
-  const multiLineMatch = trimmed.match(/^(Bash|Read|Update|Write|Edit|Glob|Grep|Agent|ToolSearch|TodoWrite|TodoRead)\((.*)$/);
-  if (multiLineMatch) {
-    const toolName = multiLineMatch[1].toLowerCase();
-    const toolMap: Record<string, string> = {
-      bash: "bash", read: "read", update: "edit", write: "edit",
-      edit: "edit", glob: "read", grep: "read", agent: "bash",
-      toolsearch: "bash", todowrite: "bash", todoread: "bash",
+  // Multi-line tool call (open paren, no close)
+  const prefixMatch = trimmed.match(RE_TOOL_PREFIX);
+  if (prefixMatch) {
+    const name = prefixMatch[1];
+    const iconMap: Record<string, string> = {
+      Bash: "💻", Read: "📖", Update: "📝", Write: "📝", Edit: "📝",
+      Glob: "🔍", Grep: "🔍", Agent: "🤖", ToolSearch: "🔧",
+      TodoWrite: "📋", TodoRead: "📋",
     };
-    return {
-      kind: "tool-call",
-      text: trimmed,
-      tool: toolMap[toolName] || "bash",
-      command: toolName === "bash" ? multiLineMatch[2] : undefined,
-      filePath: ["update", "write", "edit", "read"].includes(toolName) ? multiLineMatch[2].replace(/\)\s*$/, "") : undefined,
-    };
+    return { icon: iconMap[name] || "🔧", label: name, detail: prefixMatch[2] };
+  }
+
+  // New-format: ▶ $ command
+  const newBashMatch = trimmed.match(RE_NEW_TOOL_BASH);
+  if (newBashMatch) {
+    return { icon: "💻", label: "Bash", detail: newBashMatch[1] };
+  }
+
+  // New-format: ▶ 🖊 Edit file
+  const newEditMatch = trimmed.match(RE_NEW_TOOL_EDIT);
+  if (newEditMatch) {
+    return { icon: "📝", label: "Edit", detail: newEditMatch[1] };
+  }
+
+  // Read N file(s)
+  const readFilesMatch = trimmed.match(RE_READ_FILES);
+  if (readFilesMatch) {
+    return { icon: "📖", label: "Read", detail: `${readFilesMatch[1]} file(s)` };
+  }
+
+  // Cogitate/think
+  const cogMatch = trimmed.match(RE_COGITATE);
+  if (cogMatch) {
+    return { icon: "⏱", label: "Cogitated", detail: cogMatch[1] };
   }
 
   return null;
 }
 
 /**
- * capture-pane 出力を構造化セグメントの配列にパースする。
+ * Check if a trimmed line is a known marker (breaks assistant-text / user-input continuation).
  */
-export function parseCapturePaneOutput(raw: string): ParsedSegment[] {
+function isMarkerLine(trimmed: string): boolean {
+  return (
+    RE_USER_INPUT.test(trimmed) ||
+    RE_ASSISTANT_TEXT.test(trimmed) ||
+    RE_TOOL_RESULT.test(trimmed) ||
+    isSkipLine(trimmed) ||
+    RE_COGITATE.test(trimmed) ||
+    tryParseToolCall(trimmed) !== null
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Stage 1: Tokenizer
+// ═══════════════════════════════════════════════════════════════
+
+function tokenize(raw: string): Token[] {
   const lines = raw.split("\n");
-  const segments: ParsedSegment[] = [];
+  const tokens: Token[] = [];
   let i = 0;
 
-  // Strip trailing prompt line (❯ or similar)
+  // Strip trailing prompt + status bar
   while (lines.length > 0) {
     const last = lines[lines.length - 1].trim();
-    if (last === "") {
-      lines.pop();
-      continue;
-    }
+    if (last === "") { lines.pop(); continue; }
     if (/[❯$%>]\s*$/.test(last) || /^\s*[\w.~\/-]*[❯$%>]\s*$/.test(last)) {
-      lines.pop();
-      break;
+      lines.pop(); break;
     }
+    if (/^⏵⏵/.test(last)) { lines.pop(); continue; }
     break;
   }
 
@@ -163,127 +193,88 @@ export function parseCapturePaneOutput(raw: string): ParsedSegment[] {
     const line = lines[i];
     const trimmed = line.trim();
 
-    // Skip empty lines
-    if (trimmed === "") {
-      i++;
-      continue;
-    }
+    // Skip empty lines (handled in block builder for paragraph detection)
+    if (trimmed === "") { i++; continue; }
 
-    // Skip inbox nudge patterns
-    if (RE_INBOX_NUDGE.test(trimmed)) {
-      i++;
-      continue;
-    }
+    // Skip patterns
+    if (isSkipLine(trimmed)) { i++; continue; }
 
-    // ❯ command → user input (may span multiple lines)
+    // ❯ user input (multi-line)
     const userMatch = trimmed.match(RE_USER_INPUT);
     if (userMatch) {
       const inputLines = [userMatch[1]];
       i++;
-      // Continuation: lines that don't start with a known marker
       while (i < lines.length) {
         const next = lines[i].trim();
-        if (next === "" || isMarkerLine(next) || tryParseToolCall(next)) {
-          break;
-        }
-        // Check if it's a tool result (⎿) — that means agent started responding
-        if (RE_TOOL_RESULT.test(next)) break;
-        inputLines.push(lines[i].trim());
+        if (next === "" || isMarkerLine(next)) break;
+        inputLines.push(next);
         i++;
       }
-      segments.push({ kind: "user-input", text: inputLines.join("\n") });
+      tokens.push({ type: "user-input", text: inputLines.join("\n") });
       continue;
     }
 
-    // ● text → assistant text OR tool call prefixed with ●
+    // ● assistant text or ● tool call
     const assistantMatch = trimmed.match(RE_ASSISTANT_TEXT);
     if (assistantMatch) {
       const content = assistantMatch[1];
 
-      // Check if ● is followed by a tool call pattern (e.g., "● Bash(...)")
-      const toolSeg = tryParseToolCall(content);
-      if (toolSeg) {
-        // Collect indented continuation lines for multi-line tool calls
-        const callLines = [content];
+      // Check if ● is followed by a tool call
+      const toolCall = tryParseToolCall(content);
+      if (toolCall) {
+        // Collect indented continuation for multi-line calls
         i++;
+        const contLines = [content];
         while (i < lines.length) {
           const next = lines[i];
           const nextTrimmed = next.trim();
-          if (/^\s{4,}/.test(next) && !RE_TOOL_RESULT.test(nextTrimmed) && !isMarkerLine(nextTrimmed)) {
-            callLines.push(nextTrimmed);
+          if (/^\s{4,}/.test(next) && !RE_TOOL_RESULT.test(nextTrimmed) && !isSkipLine(nextTrimmed) && !RE_USER_INPUT.test(nextTrimmed) && !RE_ASSISTANT_TEXT.test(nextTrimmed)) {
+            contLines.push(nextTrimmed);
             i++;
           } else {
             break;
           }
         }
-        if (callLines.length > 1) {
-          toolSeg.text = callLines.join(" ");
-          if (toolSeg.command) {
-            toolSeg.command = callLines.join(" ").replace(/^Bash\(/, "").replace(/\)\s*$/, "");
-          }
+        if (contLines.length > 1) {
+          toolCall.detail = contLines.join(" ").replace(/^(?:Bash|Read|Update|Write|Edit|Glob|Grep|Agent|ToolSearch|TodoWrite|TodoRead)\(/, "").replace(/\)\s*$/, "");
         }
-        segments.push(toolSeg);
+        tokens.push({ type: "tool-call", call: toolCall });
         continue;
       }
 
-      // Regular assistant text — collect continuation lines (including across empty lines)
+      // Regular assistant text — collect continuation
       const textLines = [content];
       i++;
       while (i < lines.length) {
         const next = lines[i].trim();
-
-        // Marker lines always break continuation
         if (isMarkerLine(next)) break;
 
-        // Tool call patterns break continuation
-        if (tryParseToolCall(next)) break;
-
-        // ⎿ tool result breaks continuation
-        if (RE_TOOL_RESULT.test(next)) break;
-
-        // Empty line: peek ahead to decide if this is a paragraph break within
-        // the same assistant message, or the end of the assistant block
+        // Empty line: peek ahead
         if (next === "") {
-          // Look ahead for the next non-empty line
           let peek = i + 1;
           while (peek < lines.length && lines[peek].trim() === "") peek++;
           if (peek >= lines.length) break;
-          const peekTrimmed = lines[peek].trim();
-          // If next non-empty is a marker or tool call → end here
-          if (isMarkerLine(peekTrimmed) || tryParseToolCall(peekTrimmed) || RE_TOOL_RESULT.test(peekTrimmed)) {
-            break;
-          }
-          // Otherwise, include the empty line as paragraph separator
+          if (isMarkerLine(lines[peek].trim())) break;
           textLines.push("");
           i++;
           continue;
         }
 
-        // Box border / session lines: these break if at the start of a new section
-        if (
-          RE_BOX_BORDER.test(next) ||
-          RE_SESSION_LINE.test(next) ||
-          RE_TOGGLE_LINE.test(next)
-        ) {
-          break;
-        }
-
         textLines.push(lines[i]);
         i++;
       }
-      segments.push({ kind: "assistant-text", text: textLines.join("\n") });
+      tokens.push({ type: "assistant-text", text: textLines.join("\n") });
       continue;
     }
 
-    // ⎿ text → tool result (may have indented continuation)
-    const toolResultMatch = trimmed.match(RE_TOOL_RESULT);
-    if (toolResultMatch) {
-      const resultLines = [toolResultMatch[1]];
+    // ⎿ tool result
+    const resultMatch = trimmed.match(RE_TOOL_RESULT);
+    if (resultMatch) {
+      const resultLines = [resultMatch[1]];
       i++;
       while (i < lines.length) {
         const next = lines[i];
         const nextTrimmed = next.trim();
-        // Continuation: indented lines or lines starting with ⎿
         if (/^\s{2,}/.test(next) || /^⎿/.test(nextTrimmed)) {
           const m = nextTrimmed.match(RE_TOOL_RESULT);
           resultLines.push(m ? m[1] : next);
@@ -292,76 +283,179 @@ export function parseCapturePaneOutput(raw: string): ParsedSegment[] {
           break;
         }
       }
-      segments.push({ kind: "tool-result", text: resultLines.join("\n") });
+      tokens.push({ type: "tool-result", text: resultLines.join("\n") });
       continue;
     }
 
-    // Standalone tool calls (without ● prefix — less common but possible)
-    const toolCallSeg = tryParseToolCall(trimmed);
-    if (toolCallSeg) {
-      // Collect indented continuation lines (multi-line tool calls)
-      const callLines = [trimmed];
+    // Standalone tool call (without ● prefix)
+    const standaloneToolCall = tryParseToolCall(trimmed);
+    if (standaloneToolCall) {
+      // Multi-line continuation
       i++;
+      const contLines = [trimmed];
       while (i < lines.length) {
         const next = lines[i];
         const nextTrimmed = next.trim();
-        // Indented continuation of the tool call (not ⎿ result, not a new marker)
-        if (/^\s{4,}/.test(next) && !RE_TOOL_RESULT.test(nextTrimmed) && !isMarkerLine(nextTrimmed)) {
-          callLines.push(nextTrimmed);
+        if (/^\s{4,}/.test(next) && !RE_TOOL_RESULT.test(nextTrimmed) && !isSkipLine(nextTrimmed)) {
+          contLines.push(nextTrimmed);
           i++;
         } else {
           break;
         }
       }
-      if (callLines.length > 1) {
-        toolCallSeg.text = callLines.join(" ");
-        if (toolCallSeg.command) {
-          toolCallSeg.command = callLines.join(" ").replace(/^Bash\(/, "").replace(/\)\s*$/, "");
-        }
+      if (contLines.length > 1) {
+        standaloneToolCall.detail = contLines.join(" ").replace(/^(?:Bash|Read|Update|Write|Edit|Glob|Grep|Agent|ToolSearch|TodoWrite|TodoRead)\(/, "").replace(/\)\s*$/, "");
       }
-      segments.push(toolCallSeg);
-      continue;
-    }
-
-    // ✻ Cogitated/Churned → status
-    if (RE_COGITATE.test(trimmed)) {
-      segments.push({ kind: "status", text: trimmed });
-      i++;
-      continue;
-    }
-
-    // ──── separator
-    if (RE_SEPARATOR.test(trimmed)) {
-      segments.push({ kind: "separator", text: trimmed });
-      i++;
-      continue;
-    }
-
-    // ⏵⏵ status bar
-    if (RE_STATUS_BAR.test(trimmed)) {
-      segments.push({ kind: "status-bar", text: trimmed });
-      i++;
-      continue;
-    }
-
-    // Session start / banner lines → status-bar (hidden)
-    // Note: │ (table cell) is NOT matched here — only session frame characters
-    if (
-      RE_BOX_BORDER.test(trimmed) ||
-      RE_REMOTE_URL.test(trimmed) ||
-      RE_QUESTION_PROMPT.test(trimmed) ||
-      RE_SESSION_LINE.test(trimmed) ||
-      RE_TOGGLE_LINE.test(trimmed)
-    ) {
-      segments.push({ kind: "status-bar", text: trimmed });
-      i++;
+      tokens.push({ type: "tool-call", call: standaloneToolCall });
       continue;
     }
 
     // Fallback → raw
-    segments.push({ kind: "raw", text: line });
+    tokens.push({ type: "raw", text: line });
     i++;
+  }
+
+  return tokens;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Stage 2: Block builder
+// ═══════════════════════════════════════════════════════════════
+
+function buildBlocks(tokens: Token[]): ParsedBlock[] {
+  const blocks: ParsedBlock[] = [];
+
+  let i = 0;
+  while (i < tokens.length) {
+    const tok = tokens[i];
+
+    switch (tok.type) {
+      case "assistant-text": {
+        // Merge consecutive assistant-text tokens
+        const texts = [tok.text];
+        i++;
+        while (i < tokens.length && tokens[i].type === "assistant-text") {
+          texts.push((tokens[i] as { type: "assistant-text"; text: string }).text);
+          i++;
+        }
+        blocks.push({ type: "assistant-text", content: texts.join("\n\n") });
+        break;
+      }
+
+      case "tool-call": {
+        // Merge consecutive tool-call + tool-result tokens into one tool-execution block
+        const tools: ToolCall[] = [];
+        while (i < tokens.length) {
+          const cur = tokens[i];
+          if (cur.type === "tool-call") {
+            const call = { ...cur.call };
+            i++;
+            // Attach following tool-result to this call
+            if (i < tokens.length && tokens[i].type === "tool-result") {
+              call.result = (tokens[i] as { type: "tool-result"; text: string }).text;
+              i++;
+            }
+            tools.push(call);
+          } else {
+            break;
+          }
+        }
+        blocks.push({ type: "tool-execution", tools, agentName: "" });
+        break;
+      }
+
+      case "tool-result": {
+        // Orphaned tool result (no preceding tool-call) → raw
+        blocks.push({ type: "raw", content: `⎿ ${tok.text}` });
+        i++;
+        break;
+      }
+
+      case "user-input": {
+        blocks.push({ type: "user-input", content: tok.text });
+        i++;
+        break;
+      }
+
+      case "raw": {
+        // Merge consecutive raw tokens
+        const rawLines = [tok.text];
+        i++;
+        while (i < tokens.length && tokens[i].type === "raw") {
+          rawLines.push((tokens[i] as { type: "raw"; text: string }).text);
+          i++;
+        }
+        blocks.push({ type: "raw", content: rawLines.join("\n") });
+        break;
+      }
+
+      case "skip":
+        i++;
+        break;
+    }
+  }
+
+  return blocks;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Public API
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * capture-pane 出力を構造化ブロックの配列にパースする。
+ * 新しい ParsedBlock[] 型を返す。
+ */
+export function parseCapturePane(raw: string): ParsedBlock[] {
+  const tokens = tokenize(raw);
+  return buildBlocks(tokens);
+}
+
+/**
+ * Legacy API — 旧 ParsedSegment[] を返す。
+ * subtask_140_b で UI が更新されるまでの互換レイヤー。
+ */
+export function parseCapturePaneOutput(raw: string): ParsedSegment[] {
+  const blocks = parseCapturePane(raw);
+  const segments: ParsedSegment[] = [];
+
+  for (const block of blocks) {
+    switch (block.type) {
+      case "assistant-text":
+        segments.push({ kind: "assistant-text", text: block.content });
+        break;
+
+      case "tool-execution":
+        for (const tool of block.tools) {
+          const toolType = tool.label === "Bash" ? "bash"
+            : ["Read", "Glob", "Grep"].includes(tool.label) ? "read"
+            : ["Update", "Write", "Edit"].includes(tool.label) ? "edit"
+            : "bash";
+          segments.push({
+            kind: "tool-call",
+            text: `${tool.label}(${tool.detail})`,
+            tool: toolType,
+            command: tool.label === "Bash" ? tool.detail : undefined,
+            filePath: ["Read", "Update", "Write", "Edit"].includes(tool.label) ? tool.detail : undefined,
+          });
+          if (tool.result) {
+            segments.push({ kind: "tool-result", text: tool.result });
+          }
+        }
+        break;
+
+      case "user-input":
+        segments.push({ kind: "user-input", text: block.content });
+        break;
+
+      case "raw":
+        segments.push({ kind: "raw", text: block.content });
+        break;
+    }
   }
 
   return segments;
 }
+
+// Export tokenize for testing
+export { tokenize as _tokenize, buildBlocks as _buildBlocks };
