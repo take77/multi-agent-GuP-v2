@@ -3,8 +3,18 @@
 import { useEffect } from "react";
 import { useAppStore } from "./store";
 
-const SSE_URL = "/api/agents/stream";
+const SSE_BASE_URL = "/api/agents/stream";
 const RECONNECT_DELAY = 3000;
+
+function getAuthToken(): string {
+  if (typeof document === "undefined") return "";
+  return (
+    document.cookie
+      .split("; ")
+      .find((c) => c.startsWith("auth_token="))
+      ?.split("=")[1] ?? ""
+  );
+}
 
 export function useSSE() {
   const { setConnected, addMessage } = useAppStore();
@@ -14,7 +24,11 @@ export function useSSE() {
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
     function connect() {
-      eventSource = new EventSource(SSE_URL);
+      const token = getAuthToken();
+      const url = token
+        ? `${SSE_BASE_URL}?token=${encodeURIComponent(token)}`
+        : SSE_BASE_URL;
+      eventSource = new EventSource(url);
 
       eventSource.onopen = () => {
         setConnected(true);

@@ -9,6 +9,11 @@ const INITIAL_CLUSTERS: Cluster[] = [];
 
 const INITIAL_CHATS: Record<string, ChatMessage[]> = {};
 
+export interface CommandError {
+  rule?: string;
+  message: string;
+}
+
 interface AppState {
   // Navigation
   view: ViewId;
@@ -23,6 +28,16 @@ interface AppState {
   setSelectedAgent: (id: string) => void;
   messages: Record<string, ChatMessage[]>;
   addMessage: (agentId: string, msg: ChatMessage) => void;
+
+  // Command history (per agent)
+  commandHistory: Record<string, string[]>;
+  addCommandHistory: (agentId: string, command: string) => void;
+
+  // Command sending
+  sendCommand: (
+    agentId: string,
+    command: string
+  ) => Promise<{ success: boolean; error?: CommandError }>;
 
   // Inbox messages
   inboxMessages: InboxMessage[];
@@ -53,6 +68,60 @@ export const useAppStore = create<AppState>((set) => ({
         [agentId]: [...(s.messages[agentId] ?? []), msg],
       },
     })),
+
+  commandHistory: {},
+  addCommandHistory: (agentId, command) =>
+    set((s) => {
+      const prev = s.commandHistory[agentId] ?? [];
+      // Dedupe consecutive duplicates, keep last 50
+      if (prev[prev.length - 1] === command) return s;
+      return {
+        commandHistory: {
+          ...s.commandHistory,
+          [agentId]: [...prev, command].slice(-50),
+        },
+      };
+    }),
+
+  sendCommand: async (agentId, command) => {
+    try {
+      const token =
+        typeof window !== "undefined"
+          ? document.cookie
+              .split("; ")
+              .find((c) => c.startsWith("auth_token="))
+              ?.split("=")[1] ?? ""
+          : "";
+
+      const res = await fetch("/api/agents/command", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ agentId, command }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        return {
+          success: false,
+          error: {
+            rule: body.rule,
+            message:
+              body.message ?? body.error ?? `HTTP ${res.status}`,
+          },
+        };
+      }
+
+      return { success: true };
+    } catch {
+      return {
+        success: false,
+        error: { message: "ネットワークエラー — サーバーに接続できません" },
+      };
+    }
+  },
 
   inboxMessages: [],
   setInboxMessages: (msgs) => set({ inboxMessages: msgs }),

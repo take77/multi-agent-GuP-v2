@@ -24,23 +24,29 @@ export function middleware(request: NextRequest) {
     );
   }
 
+  // Accept token from Authorization header or query param (for EventSource/SSE)
   const authHeader = request.headers.get("authorization");
-  if (!authHeader) {
+  const queryToken = request.nextUrl.searchParams.get("token");
+
+  let provided: string | null = null;
+
+  if (authHeader) {
+    const match = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (match) {
+      provided = match[1];
+    }
+  }
+
+  if (!provided && queryToken) {
+    provided = queryToken;
+  }
+
+  if (!provided) {
     return NextResponse.json(
       { error: "Missing Authorization header" },
       { status: 401 }
     );
   }
-
-  const match = authHeader.match(/^Bearer\s+(.+)$/i);
-  if (!match) {
-    return NextResponse.json(
-      { error: "Invalid Authorization format" },
-      { status: 401 }
-    );
-  }
-
-  const provided = match[1];
 
   // Constant-time comparison
   if (provided.length !== token.length) {

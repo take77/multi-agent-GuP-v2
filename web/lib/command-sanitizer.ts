@@ -74,8 +74,12 @@ const RULES: Rule[] = [
         if (part === ";" || part === "&&" || part === "||" || part === "|")
           break;
         // Absolute paths outside project tree are suspect
-        if (part.startsWith("/") && !part.startsWith("/home/")) {
-          return true; // Broad catch for absolute paths to system dirs
+        if (part.startsWith("/")) {
+          // Only allow paths within the project working directory
+          const projectDir = process.cwd();
+          if (!part.startsWith(projectDir + "/") && part !== projectDir) {
+            return true;
+          }
         }
         if (
           part.startsWith("/mnt/") ||

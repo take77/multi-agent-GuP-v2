@@ -1,6 +1,5 @@
 import { readFile, writeFile, mkdir, rmdir, stat } from "fs/promises";
 import { existsSync } from "fs";
-import { execSync } from "child_process";
 import type { UsageData } from "@/types/agent";
 
 const CACHE_FILE = "/tmp/claude-usage-cache.json";
@@ -86,10 +85,8 @@ function getAccessToken(): string | null {
       // Plain JSON
       parsed = JSON.parse(raw);
     } else {
-      // Hex-encoded
-      const decoded = execSync(`echo "${raw}" | xxd -r -p`, {
-        encoding: "utf-8",
-      });
+      // Hex-encoded — pure Node.js decoding (no shell expansion)
+      const decoded = Buffer.from(raw.trim(), "hex").toString("utf-8");
       parsed = JSON.parse(decoded);
     }
 
