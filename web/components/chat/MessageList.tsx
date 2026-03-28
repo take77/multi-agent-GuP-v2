@@ -72,7 +72,7 @@ export function MessageList() {
   // Auto-scroll when new entries arrive or output changes
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [timeline.length, output, selectedAgent]);
+  }, [timeline.length, parsedSegments.length, output, selectedAgent]);
 
   const parsedSegments = useMemo(
     () => parseCapturePaneOutput(output),
@@ -117,12 +117,12 @@ export function MessageList() {
                     : "bg-sky-600"
                 }`}
               >
-                <span className="text-[11px] text-white font-mono">
+                <span className="text-[13px] text-white font-mono">
                   {isSlashCommand ? "🔧 " : "$ "}
                   {entry.text}
                 </span>
                 <div
-                  className={`text-[9px] text-right mt-0.5 ${
+                  className={`text-[11px] text-right mt-0.5 ${
                     isSlashCommand ? "text-violet-300" : "text-sky-200"
                   }`}
                 >
@@ -141,13 +141,13 @@ export function MessageList() {
                 📩
               </div>
               <div className="bg-amber-900/30 border border-amber-700/40 rounded-xl rounded-tl-sm px-3 py-1.5">
-                <span className="text-[10px] text-amber-300 font-medium">
+                <span className="text-[12px] text-amber-300 font-medium">
                   {entry.from ? getAgentDisplayName(entry.from) : "不明"}から連絡
                 </span>
-                <p className="text-[11px] text-slate-300 mt-0.5">
+                <p className="text-[13px] text-slate-300 mt-0.5">
                   {entry.text}
                 </p>
-                <div className="text-[9px] text-amber-400/60 text-right mt-0.5">
+                <div className="text-[11px] text-amber-400/60 text-right mt-0.5">
                   {entry.time}
                 </div>
               </div>

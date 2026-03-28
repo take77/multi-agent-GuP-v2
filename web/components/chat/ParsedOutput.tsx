@@ -48,14 +48,14 @@ function ToolCallBlock({
     <div className="my-1">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-200 transition-colors font-mono cursor-pointer w-full text-left"
+        className="flex items-center gap-1 text-[12px] text-slate-400 hover:text-slate-200 transition-colors font-mono cursor-pointer w-full text-left"
       >
-        <span className="text-[10px] select-none">{open ? "▼" : "▶"}</span>
+        <span className="text-[11px] select-none">{open ? "▼" : "▶"}</span>
         <span className="opacity-70">{toolIcon(segment.tool)}</span>
         <span className="truncate">{toolLabel(segment)}</span>
       </button>
       {open && result && (
-        <pre className="mt-1 ml-4 text-[10px] leading-[1.3] text-slate-500 font-mono whitespace-pre-wrap break-words max-h-[30vh] overflow-y-auto border-l border-slate-700 pl-2">
+        <pre className="mt-1 ml-4 text-[11px] leading-[1.3] text-slate-500 font-mono whitespace-pre-wrap break-words max-h-[30vh] overflow-y-auto border-l border-slate-700 pl-2">
           {result.text}
         </pre>
       )}
@@ -82,7 +82,7 @@ export function ParsedOutput({ segments }: { segments: ParsedSegment[] }) {
         elements.push(
           <div key={i} className="flex justify-end my-1">
             <div className="max-w-[75%] bg-sky-600 rounded-xl rounded-tr-sm px-3 py-1.5">
-              <span className="text-[11px] text-white font-mono">
+              <span className="text-[13px] text-white font-mono">
                 $ {seg.text}
               </span>
             </div>
@@ -95,7 +95,7 @@ export function ParsedOutput({ segments }: { segments: ParsedSegment[] }) {
         elements.push(
           <div
             key={i}
-            className="prose prose-invert prose-sm max-w-none text-[12px] leading-[1.5] text-slate-300 [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_code]:bg-slate-700/50 [&_code]:px-1 [&_code]:rounded [&_code]:text-[11px] [&_pre]:bg-slate-900/50 [&_pre]:p-2 [&_pre]:rounded [&_pre]:text-[11px] [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs [&_a]:text-sky-400 [&_table]:w-full [&_table]:border-collapse [&_table]:my-2 [&_table]:text-[11px] [&_th]:border [&_th]:border-slate-600 [&_th]:px-2 [&_th]:py-1 [&_th]:bg-slate-700/50 [&_th]:text-left [&_th]:font-semibold [&_td]:border [&_td]:border-slate-600 [&_td]:px-2 [&_td]:py-0.5 [&_tr:nth-child(even)]:bg-slate-800/30"
+            className="prose prose-invert prose-sm max-w-none text-[13px] leading-[1.5] text-slate-300 [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_code]:bg-slate-700/50 [&_code]:px-1 [&_code]:rounded [&_code]:text-[12px] [&_pre]:bg-slate-900/50 [&_pre]:p-2 [&_pre]:rounded [&_pre]:text-[12px] [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs [&_a]:text-sky-400 [&_table]:w-full [&_table]:border-collapse [&_table]:my-2 [&_table]:text-[12px] [&_th]:border [&_th]:border-slate-600 [&_th]:px-2 [&_th]:py-1 [&_th]:bg-slate-700/50 [&_th]:text-left [&_th]:font-semibold [&_td]:border [&_td]:border-slate-600 [&_td]:px-2 [&_td]:py-0.5 [&_tr:nth-child(even)]:bg-slate-800/30"
           >
             <Markdown remarkPlugins={[remarkGfm, remarkBreaks]}>{seg.text}</Markdown>
           </div>
@@ -120,7 +120,7 @@ export function ParsedOutput({ segments }: { segments: ParsedSegment[] }) {
         elements.push(
           <pre
             key={i}
-            className="text-[10px] leading-[1.3] text-slate-500 font-mono whitespace-pre-wrap break-words ml-4 border-l border-slate-700 pl-2 max-h-[20vh] overflow-y-auto"
+            className="text-[11px] leading-[1.3] text-slate-500 font-mono whitespace-pre-wrap break-words ml-4 border-l border-slate-700 pl-2 max-h-[20vh] overflow-y-auto"
           >
             {seg.text}
           </pre>
@@ -132,7 +132,7 @@ export function ParsedOutput({ segments }: { segments: ParsedSegment[] }) {
         elements.push(
           <div
             key={i}
-            className="text-[10px] text-slate-600 italic my-0.5"
+            className="text-[11px] text-slate-600 italic my-0.5"
           >
             {seg.text}
           </div>
@@ -149,7 +149,7 @@ export function ParsedOutput({ segments }: { segments: ParsedSegment[] }) {
         elements.push(
           <pre
             key={i}
-            className="text-[11px] leading-[1.4] text-slate-400 font-mono whitespace-pre-wrap break-words"
+            className="text-[13px] leading-[1.4] text-slate-400 font-mono whitespace-pre-wrap break-words"
           >
             {seg.text}
           </pre>
