@@ -18,11 +18,32 @@ let streaming = false;
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 export const paneStates = new Map<string, PaneState>();
 
+// Cache last captured content per agent for re-emission on agent switch
+const lastCapture = new Map<
+  string,
+  { content: string; paneId: string; sessionName: string }
+>();
+
 // Track which agent the frontend is currently viewing
 let activeAgentId: string | null = null;
 
 export function setActiveAgent(agentId: string | null): void {
+  const prev = activeAgentId;
   activeAgentId = agentId;
+
+  // Force re-emit cached content when switching to a different agent
+  if (agentId && agentId !== prev) {
+    const cached = lastCapture.get(agentId);
+    if (cached) {
+      eventBus.emit("agent-output", {
+        agentId,
+        output: cached.content,
+        paneId: cached.paneId,
+        sessionName: cached.sessionName,
+        timestamp: Date.now(),
+      });
+    }
+  }
 }
 
 export function getActiveAgent(): string | null {
@@ -68,8 +89,14 @@ function pollPanes() {
 
     const content = capturePaneContent(pane.paneId);
     const hash = hashContent(content);
-
     const hasPrompt = detectPrompt(content);
+
+    // Always update content cache for re-emission on agent switch
+    lastCapture.set(pane.agentId, {
+      content,
+      paneId: pane.paneId,
+      sessionName: pane.sessionName,
+    });
 
     if (!prev || prev.hash !== hash) {
       // Content changed
@@ -117,6 +144,7 @@ export function stopPaneStreaming(): void {
     intervalHandle = null;
   }
   paneStates.clear();
+  lastCapture.clear();
 }
 
 export function isStreaming(): boolean {
