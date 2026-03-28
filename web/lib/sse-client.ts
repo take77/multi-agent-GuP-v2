@@ -2,8 +2,10 @@
 
 import { useEffect } from "react";
 import { useAppStore } from "./store";
+import type { Cluster } from "@/types/agent";
 
 const SSE_BASE_URL = "/api/agents/stream";
+const SSE_AGENTS_URL = "/api/sse/agents";
 const RECONNECT_DELAY = 3000;
 
 function getAuthToken(): string {
@@ -19,7 +21,9 @@ function getAuthToken(): string {
 export function useSSE() {
   const setConnected = useAppStore((s) => s.setConnected);
   const setLatestOutput = useAppStore((s) => s.setLatestOutput);
+  const setClusters = useAppStore((s) => s.setClusters);
 
+  // Terminal output SSE
   useEffect(() => {
     let eventSource: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -75,4 +79,37 @@ export function useSSE() {
       setConnected(false);
     };
   }, [setConnected, setLatestOutput]);
+
+  // Agent status SSE — provides cluster/agent data to all views
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function connect() {
+      eventSource = new EventSource(SSE_AGENTS_URL);
+
+      eventSource.addEventListener("agent-status", (e) => {
+        try {
+          const data = JSON.parse(e.data) as { clusters: Cluster[] };
+          if (data.clusters) {
+            setClusters(data.clusters);
+          }
+        } catch {
+          // ignore parse errors
+        }
+      });
+
+      eventSource.onerror = () => {
+        eventSource?.close();
+        reconnectTimer = setTimeout(connect, RECONNECT_DELAY);
+      };
+    }
+
+    connect();
+
+    return () => {
+      eventSource?.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+    };
+  }, [setClusters]);
 }

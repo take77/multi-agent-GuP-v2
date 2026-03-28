@@ -1,57 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { Avatar } from "@/components/shared/Avatar";
 import { StuckAlert } from "./StuckAlert";
 import { AgentCard } from "./AgentCard";
-import type { Cluster } from "@/types/agent";
 
 const STUCK_THRESHOLD = 5;
-const SSE_URL = "/api/sse/agents";
-const RECONNECT_DELAY = 3000;
 
 export function AgentGrid() {
-  const { clusters, setClusters } = useAppStore();
+  const { clusters } = useAppStore();
+  const connected = useAppStore((s) => s.connected);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [connected, setConnected] = useState(false);
-
-  // SSE connection for live agent status updates
-  useEffect(() => {
-    let eventSource: EventSource | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-
-    function connect() {
-      eventSource = new EventSource(SSE_URL);
-
-      eventSource.addEventListener("agent-status", (e) => {
-        try {
-          const data = JSON.parse(e.data) as { clusters: Cluster[] };
-          if (data.clusters) {
-            setClusters(data.clusters);
-          }
-        } catch {
-          // ignore parse errors
-        }
-      });
-
-      eventSource.onopen = () => setConnected(true);
-
-      eventSource.onerror = () => {
-        setConnected(false);
-        eventSource?.close();
-        reconnectTimer = setTimeout(connect, RECONNECT_DELAY);
-      };
-    }
-
-    connect();
-
-    return () => {
-      eventSource?.close();
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      setConnected(false);
-    };
-  }, [setClusters]);
 
   const allAgents = clusters.flatMap((c) => c.agents);
 
