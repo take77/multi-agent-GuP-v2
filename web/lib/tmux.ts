@@ -1,4 +1,7 @@
 import { execFileSync } from "child_process";
+import { writeFileSync, unlinkSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
 export interface PaneInfo {
   paneId: string;
@@ -58,14 +61,25 @@ export function capturePaneContent(paneId: string): string {
 
 /**
  * Send keys (command) to a tmux pane.
- * Uses -l for literal string interpretation, then sends Enter.
+ * Single-line: uses -l for literal string interpretation.
+ * Multi-line: uses load-buffer + paste-buffer with bracketed paste mode (-p)
+ * to prevent newlines from being interpreted as Enter by the receiving app.
  */
 export function sendKeys(paneId: string, command: string): void {
-  execFileSync(
-    "tmux",
-    ["send-keys", "-t", paneId, "-l", command],
-    EXEC_OPTIONS
-  );
+  if (command.includes("\n")) {
+    const bufName = `gup_${Date.now()}`;
+    const tmpFile = join(tmpdir(), `${bufName}.txt`);
+    try {
+      writeFileSync(tmpFile, command, "utf-8");
+      execFileSync("tmux", ["load-buffer", "-b", bufName, tmpFile], EXEC_OPTIONS);
+      execFileSync("tmux", ["paste-buffer", "-b", bufName, "-t", paneId, "-p"], EXEC_OPTIONS);
+    } finally {
+      try { unlinkSync(tmpFile); } catch {}
+      try { execFileSync("tmux", ["delete-buffer", "-b", bufName], EXEC_OPTIONS); } catch {}
+    }
+  } else {
+    execFileSync("tmux", ["send-keys", "-t", paneId, "-l", command], EXEC_OPTIONS);
+  }
   execFileSync("tmux", ["send-keys", "-t", paneId, "Enter"], EXEC_OPTIONS);
 }
 
