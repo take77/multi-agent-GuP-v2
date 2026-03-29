@@ -21,7 +21,7 @@ const AVATARS: Record<string, AvatarDef> = {
   oshida: { bg: "bg-violet-300", ini: "押", ring: "ring-violet-200", objectPosition: "50% 15%" },
   // カチューシャ隊
   katyusha: { bg: "bg-red-500", ini: "К", ring: "ring-red-400", objectPosition: "50% 15%" },
-  nonna: { bg: "bg-slate-400", ini: "Н", ring: "ring-slate-300", objectPosition: "50% 25%" },
+  nonna: { bg: "bg-slate-400", ini: "Н", ring: "ring-slate-300", objectPosition: "50% 20%" },
   klara: { bg: "bg-red-300", ini: "Кл", ring: "ring-red-200", objectPosition: "50% 15%" },
   mako: { bg: "bg-slate-500", ini: "麻", ring: "ring-slate-400", objectPosition: "50% 20%" },
   erwin: { bg: "bg-amber-400", ini: "Er", ring: "ring-amber-300", objectPosition: "50% 20%" },
@@ -32,16 +32,16 @@ const AVATARS: Record<string, AvatarDef> = {
   naomi: { bg: "bg-emerald-400", ini: "Na", ring: "ring-emerald-300", objectPosition: "50% 15%" },
   arisa: { bg: "bg-lime-400", ini: "Al", ring: "ring-lime-300", objectPosition: "50% 15%" },
   yukari: { bg: "bg-yellow-400", ini: "優", ring: "ring-yellow-300", objectPosition: "50% 20%" },
-  anchovy: { bg: "bg-green-400", ini: "An", ring: "ring-green-300", objectPosition: "50% 15%" },
+  anchovy: { bg: "bg-green-400", ini: "An", ring: "ring-green-300", objectPosition: "50% 20%" },
   pepperoni: { bg: "bg-orange-300", ini: "ペ", ring: "ring-orange-200", objectPosition: "50% 15%" },
   carpaccio: { bg: "bg-emerald-300", ini: "カ", ring: "ring-emerald-200", objectPosition: "50% 20%" },
   // まほ隊
   maho: { bg: "bg-purple-500", ini: "ま", ring: "ring-purple-400", objectPosition: "50% 15%" },
   erika: { bg: "bg-violet-400", ini: "エ", ring: "ring-violet-300", objectPosition: "50% 15%" },
-  mika: { bg: "bg-cyan-400", ini: "ミ", ring: "ring-cyan-300", objectPosition: "50% 15%" },
-  aki: { bg: "bg-teal-300", ini: "ア", ring: "ring-teal-200", objectPosition: "50% 25%" },
+  mika: { bg: "bg-cyan-400", ini: "ミ", ring: "ring-cyan-300", objectPosition: "50% 20%" },
+  aki: { bg: "bg-teal-300", ini: "ア", ring: "ring-teal-200", objectPosition: "50% 20%" },
   mikko: { bg: "bg-cyan-300", ini: "ミッ", ring: "ring-cyan-200", objectPosition: "50% 15%" },
-  kinuyo: { bg: "bg-purple-300", ini: "絹", ring: "ring-purple-200", objectPosition: "50% 25%" },
+  kinuyo: { bg: "bg-purple-300", ini: "絹", ring: "ring-purple-200", objectPosition: "50% 20%" },
   fukuda: { bg: "bg-purple-200", ini: "福", ring: "ring-purple-100", objectPosition: "50% 20%" },
 };
 
