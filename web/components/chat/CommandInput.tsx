@@ -20,7 +20,6 @@ export function CommandInput() {
     clusters,
     addMessage,
     sendCommand,
-    sendEscapeCommand,
     addCommandHistory,
     commandHistory,
     draftMessages,
@@ -393,18 +392,6 @@ export function CommandInput() {
           onPaste={handlePaste}
           disabled={isProcessing}
         />
-        <button
-          onClick={() => sendEscapeCommand(selectedAgent)}
-          disabled={agent?.status !== "active"}
-          title={agent?.status === "active" ? "割り込み (Escape)" : "エージェントが稼働中のみ有効"}
-          className={`px-2 py-1.5 rounded-lg text-[12px] font-medium shrink-0 flex items-center gap-1 ${
-            agent?.status === "active"
-              ? "bg-red-600 hover:bg-red-500 text-white cursor-pointer"
-              : "bg-slate-800 text-slate-600 opacity-50 cursor-not-allowed"
-          }`}
-        >
-          ⏹ 割り込み
-        </button>
         {isProcessing ? (
           <StopButton agentId={selectedAgent} />
         ) : (
