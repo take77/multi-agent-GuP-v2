@@ -104,6 +104,38 @@ describe("parseCapturePane", () => {
     expect(textBlock.content).toContain("確認してね");
   });
 
+  it("does not swallow indented Update/Edit/Write into preceding tool-result", () => {
+    // Real capture-pane pattern: Read result followed by indented Update without blank line
+    const input = `● Read(queue/inbox/naomi.yaml)
+  ⎿  queue/inbox/naomi.yaml
+  Update(queue/inbox/naomi.yaml)
+  ⎿  Added 1 line, removed 1 line
+      108 -  read: false
+      108 +  read: true`;
+    const blocks = parseCapturePane(input);
+    // Should produce 1 tool-execution block with 2 tools (Read + Update)
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string; result?: string }> };
+    expect(toolBlock.tools).toHaveLength(2);
+    expect(toolBlock.tools[0].label).toBe("Read");
+    expect(toolBlock.tools[1].label).toBe("Update");
+    expect(toolBlock.tools[1].result).toContain("Added 1 line");
+  });
+
+  it("handles Write tool call after Read result", () => {
+    const input = `  Read 1 file (ctrl+o to expand)
+  Write(web/config.ts)
+  ⎿  Wrote 15 lines to web/config.ts`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string }> };
+    expect(toolBlock.tools).toHaveLength(2);
+    expect(toolBlock.tools[0].label).toBe("Read");
+    expect(toolBlock.tools[1].label).toBe("Write");
+  });
+
   it("falls back to raw for orphaned lines", () => {
     const input = `      5522 some orphaned diff content
       5523 more orphaned stuff`;
