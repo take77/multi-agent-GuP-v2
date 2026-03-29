@@ -289,6 +289,8 @@ function tokenize(raw: string): Token[] {
         const next = lines[i];
         const nextTrimmed = next.trim();
         if (/^\s{2,}/.test(next) || /^⎿/.test(nextTrimmed)) {
+          // Don't swallow indented tool calls (e.g. "  Update(file.yaml)")
+          if (tryParseToolCall(nextTrimmed) !== null) break;
           const m = nextTrimmed.match(RE_TOOL_RESULT);
           resultLines.push(m ? m[1] : next);
           i++;
