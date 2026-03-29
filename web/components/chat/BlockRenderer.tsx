@@ -35,6 +35,38 @@ const AssistantBubble = memo(function AssistantBubble({
 
 function ToolDetail({ tool }: { tool: ToolCall }) {
   const [showResult, setShowResult] = useState(false);
+  const [showYamlDetail, setShowYamlDetail] = useState(false);
+
+  // YAML write/edit: Write/Edit/Update on .yaml/.yml files → summary display
+  const yamlFileMatch =
+    ["Write", "Edit", "Update"].includes(tool.label)
+      ? tool.detail.match(/([^/\s,()]+\.ya?ml)/i)
+      : null;
+  const yamlFileName = yamlFileMatch ? yamlFileMatch[1] : null;
+
+  if (yamlFileName) {
+    return (
+      <div className="ml-3">
+        <div className="flex items-center gap-1.5 text-[12px] text-slate-400 font-mono">
+          <span className="text-slate-600 select-none">├</span>
+          <span>📝</span>
+          <span className="text-slate-300">{yamlFileName} を更新</span>
+          <button
+            onClick={() => setShowYamlDetail(!showYamlDetail)}
+            className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors cursor-pointer ml-auto shrink-0"
+          >
+            {showYamlDetail ? "▼" : "▶"}
+          </button>
+        </div>
+        {showYamlDetail && (
+          <pre className="mt-0.5 ml-6 text-[11px] leading-[1.3] text-slate-500 font-mono whitespace-pre-wrap break-words max-h-[20vh] overflow-y-auto border-l border-slate-700 pl-2">
+            {tool.detail}
+            {tool.result && `\n---\n${tool.result}`}
+          </pre>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="ml-3">
