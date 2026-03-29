@@ -19,6 +19,7 @@ export interface AvatarDef {
   bg: string;
   ini: string;
   ring: string;
+  objectPosition?: string; // CSS object-position for face framing (e.g., "50% 20%")
 }
 
 export interface Cluster {
