@@ -30,3 +30,14 @@ export interface MergeEntry {
   time: string;
   tag?: string;
 }
+
+export interface Worktree {
+  path: string;
+  branch: string;
+  head: string;
+  squad: string | null;
+  squadColor: string | null;
+  member: string | null;
+  taskId: string | null;
+  taskDescription: string | null;
+}

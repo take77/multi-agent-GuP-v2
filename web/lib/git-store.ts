@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Branch, Repository } from "@/types/git";
+import type { Branch, Repository, Worktree } from "@/types/git";
 
 interface GitState {
   repositories: Repository[];
@@ -19,6 +19,9 @@ interface GitState {
 
   loading: boolean;
   setLoading: (v: boolean) => void;
+
+  worktrees: Worktree[];
+  setWorktrees: (wt: Worktree[]) => void;
 }
 
 export const useGitStore = create<GitState>((set) => ({
@@ -41,4 +44,7 @@ export const useGitStore = create<GitState>((set) => ({
 
   loading: false,
   setLoading: (v) => set({ loading: v }),
+
+  worktrees: [],
+  setWorktrees: (wt) => set({ worktrees: wt }),
 }));
