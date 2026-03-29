@@ -61,25 +61,22 @@ export function capturePaneContent(paneId: string): string {
 
 /**
  * Send keys (command) to a tmux pane.
- * Single-line: uses -l for literal string interpretation.
- * Multi-line: uses load-buffer + paste-buffer with bracketed paste mode (-p)
- * to prevent newlines from being interpreted as Enter by the receiving app.
+ * All commands use load-buffer + paste-buffer with bracketed paste mode (-p)
+ * to ensure reliable delivery regardless of command length or special characters.
  */
 export function sendKeys(paneId: string, command: string): void {
-  if (command.includes("\n")) {
-    const bufName = `gup_${Date.now()}`;
-    const tmpFile = join(tmpdir(), `${bufName}.txt`);
-    try {
-      writeFileSync(tmpFile, command, "utf-8");
-      execFileSync("tmux", ["load-buffer", "-b", bufName, tmpFile], EXEC_OPTIONS);
-      execFileSync("tmux", ["paste-buffer", "-b", bufName, "-t", paneId, "-p"], EXEC_OPTIONS);
-    } finally {
-      try { unlinkSync(tmpFile); } catch {}
-      try { execFileSync("tmux", ["delete-buffer", "-b", bufName], EXEC_OPTIONS); } catch {}
-    }
-  } else {
-    execFileSync("tmux", ["send-keys", "-t", paneId, "-l", command], EXEC_OPTIONS);
+  const bufName = `gup_${Date.now()}`;
+  const tmpFile = join(tmpdir(), `${bufName}.txt`);
+  try {
+    writeFileSync(tmpFile, command, "utf-8");
+    execFileSync("tmux", ["load-buffer", "-b", bufName, tmpFile], EXEC_OPTIONS);
+    execFileSync("tmux", ["paste-buffer", "-b", bufName, "-t", paneId, "-p"], EXEC_OPTIONS);
+  } finally {
+    try { unlinkSync(tmpFile); } catch {}
+    try { execFileSync("tmux", ["delete-buffer", "-b", bufName], EXEC_OPTIONS); } catch {}
   }
+  // Small wait to ensure paste-buffer completes before Enter is sent
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
   execFileSync("tmux", ["send-keys", "-t", paneId, "Enter"], EXEC_OPTIONS);
 }
 

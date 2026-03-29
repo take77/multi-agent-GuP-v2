@@ -1,64 +1,36 @@
 task:
-  task_id: subtask_126b2a
-  parent_cmd: cmd_126
-  bloom_level: L5
+  task_id: subtask_149Aa
+  parent_cmd: cmd_149_A
+  bloom_level: L3
   description: |
-    【Webアニメーション パターンカタログ — カテゴリ1-2 ドラフト作成】
+    【アバター画像の表示修正 — 6キャラ objectPosition 調整 + 必要時再クロップ】
 
-    HP案件で使えるWebアニメーションパターンのドラフトを作成せよ。
-    担当カテゴリ: ページ遷移アニメーション + ナビゲーション
+    cmd_147/148でのアバター作業知見を活かし、以下6キャラのアバター顔表示を修正せよ。
 
-    ■ 担当パターン（各カテゴリ最低2パターン、合計4-5パターン）:
+    ■ 対象キャラと問題:
+    1. ダージリン(darjeeling): objectPosition未設定。集合写真由来でクロップが甘い可能性
+    2. アンチョビ(anchovy): objectPosition未設定（設定漏れ）
+    3. ノンナ(nonna): objectPosition 50% 15% だが顔位置が不自然
+    4. カルパッチョ(carpaccio): objectPosition 50% 15% だが顔位置が不自然
+    5. 絹代(kinuyo): objectPosition 50% 15% だが顔位置が不自然
+    6. アキ(aki): objectPosition 50% 15% だが顔位置が不自然
 
-    カテゴリ1: ページ遷移アニメーション
-    - フェードイン/フェードアウト（ページ全体）
-    - スライドイン（方向付き遷移）
-    - クロスフェード
-    ※ Next.js App Router の View Transitions API や framer-motion との統合も検討
+    ■ 作業手順:
+    1. web/public/avatars/ の各キャラ画像を確認
+    2. 画像の顔位置を把握し、最適な objectPosition 値を決定
+    3. web/src/components/Avatar.tsx の AVATARS 定数を更新
+    4. 必要であれば画像自体を Pillow でクロップし直す（cmd_148の手法を参照）
+       - 公式サイト(girls-und-panzer.jp / girls-und-panzer-finale.jp)から再取得が必要な場合もあり
+    5. 他キャラのアバター表示が壊れていないことを確認
+    6. ビルド確認 (npm run build)
 
-    カテゴリ2: ナビゲーション
-    - Sticky/Fixed ヘッダー（スクロール時の背景変化）
-    - ハンバーガーメニュー（開閉アニメーション）
-    - メガメニュー（ドロップダウン）
+    ■ 制約:
+    - feature/cmd_134-web-ui ブランチ上で作業
+    - worktree 使用: worktrees/hana
+    - 変更対象: web/src/components/Avatar.tsx + web/public/avatars/ 配下画像（必要時のみ）
 
-    ■ 各パターンの記述形式:
-
-    ### パターン名
-    **カテゴリ**: xxx
-    **難易度**: 低/中/高
-    **使用頻度**: ★★★★★
-
-    #### 概要
-    何をするアニメーションか
-
-    #### 実装コード
-    ```tsx
-    // React + Tailwind CSS の完全な実装例
-    // コピペで動くレベルで記述
-    ```
-
-    #### CSS（必要な場合）
-    ```css
-    @keyframes xxx { ... }
-    ```
-
-    #### 使い方
-    - どのページ/コンポーネントで使うか
-    - カスタマイズポイント
-
-    #### 注意点
-    - パフォーマンス、アクセシビリティ等
-
-    ■ 出力先:
-    - skills/web-animation-patterns/drafts/draft-transitions-nav.md
-    - 既存の section-wrapper-pattern.md のフォーマットを参考に
-
-    ■ 技術要件:
-    - Tailwind CSS v4 対応クラスを使用
-    - jQuery/vanilla JS → React hooks + Tailwind CSS に変換
-    - framer-motion は使わない（依存を増やさない。CSS + React stateで実現）
-    - prefers-reduced-motion メディアクエリ対応を含める
-  target_path: "/home/take77/Developments/Tools/multi-agent-GuP-v2/skills/web-animation-patterns/drafts/draft-transitions-nav.md"
-  target_branch: "cmd_126/hana/animation-skill"
+  target_path: "web/src/components/Avatar.tsx"
+  target_branch: "feature/cmd_134-web-ui"
+  worktree_path: "worktrees/hana"
   status: in_progress
-  timestamp: "2026-03-26T00:30:56"
+  timestamp: "2026-03-29T15:55:00"
