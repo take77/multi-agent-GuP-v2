@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { AvatarDef } from "@/types/agent";
 
 const AVATARS: Record<string, AvatarDef> = {
@@ -59,11 +60,25 @@ export function Avatar({
   online?: boolean;
 }) {
   const a = getAvatar(id);
+  const [imgError, setImgError] = useState(false);
+  const imgSrc = `/avatars/${id}.png`;
+
   return (
-    <div
-      className={`relative ${size} rounded-full ${a.bg} flex items-center justify-center font-bold text-white shrink-0 select-none`}
-    >
-      {a.ini}
+    <div className={`relative ${size} rounded-full shrink-0`}>
+      {!imgError ? (
+        <img
+          src={imgSrc}
+          alt={a.ini}
+          className="w-full h-full rounded-full object-cover"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <div
+          className={`w-full h-full rounded-full ${a.bg} flex items-center justify-center font-bold text-white select-none`}
+        >
+          {a.ini}
+        </div>
+      )}
       {online !== undefined && (
         <span
           className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-slate-900 ${
