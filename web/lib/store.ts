@@ -41,6 +41,13 @@ interface AppState {
   draftMessages: Record<string, string>;
   setDraftMessage: (agentId: string, text: string) => void;
 
+  // Pending images (per agent — in-memory only, File is not serializable)
+  pendingImages: Record<string, File[]>;
+  pendingPreviews: Record<string, string[]>;
+  addPendingImages: (agentId: string, files: File[]) => void;
+  removePendingImage: (agentId: string, index: number) => void;
+  clearPendingImages: (agentId: string) => void;
+
   // Command sending
   sendCommand: (
     agentId: string,
@@ -121,6 +128,46 @@ export const useAppStore = create<AppState>((set) => ({
           ...s.commandHistory,
           [agentId]: [...prev, command].slice(-50),
         },
+      };
+    }),
+
+  pendingImages: {},
+  pendingPreviews: {},
+  addPendingImages: (agentId, files) =>
+    set((s) => {
+      const newPreviews = files.map((f) => URL.createObjectURL(f));
+      return {
+        pendingImages: {
+          ...s.pendingImages,
+          [agentId]: [...(s.pendingImages[agentId] ?? []), ...files],
+        },
+        pendingPreviews: {
+          ...s.pendingPreviews,
+          [agentId]: [...(s.pendingPreviews[agentId] ?? []), ...newPreviews],
+        },
+      };
+    }),
+  removePendingImage: (agentId, index) =>
+    set((s) => {
+      const previews = s.pendingPreviews[agentId] ?? [];
+      if (previews[index]) URL.revokeObjectURL(previews[index]);
+      return {
+        pendingImages: {
+          ...s.pendingImages,
+          [agentId]: (s.pendingImages[agentId] ?? []).filter((_, i) => i !== index),
+        },
+        pendingPreviews: {
+          ...s.pendingPreviews,
+          [agentId]: previews.filter((_, i) => i !== index),
+        },
+      };
+    }),
+  clearPendingImages: (agentId) =>
+    set((s) => {
+      (s.pendingPreviews[agentId] ?? []).forEach((url) => URL.revokeObjectURL(url));
+      return {
+        pendingImages: { ...s.pendingImages, [agentId]: [] },
+        pendingPreviews: { ...s.pendingPreviews, [agentId]: [] },
       };
     }),
 
