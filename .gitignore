@@ -114,6 +114,7 @@ scripts/monitor/node_modules/
 !scripts/slim_yaml.py
 !scripts/slim_yaml.sh
 !scripts/statusline.sh
+!scripts/inbox_archive.sh
 
 
 # SayTask (sample template only, not actual data)
@@ -196,3 +197,12 @@ scripts/monitor/node_modules/
 
 # Queue pending tasks template (cmd_102)
 !queue/tasks/pending.yaml
+
+# Web UI (cmd_134)
+!web/
+!web/**
+web/node_modules/
+web/.next/
+
+# Agent config (avatar definitions for Web UI)
+!config/agents.yaml

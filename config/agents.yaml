@@ -1,0 +1,189 @@
+# Agent avatar and display definitions
+# Used by Web UI for agent rendering
+# Matches Avatar.tsx AVATARS definitions
+
+agents:
+  # 司令部
+  anzu:
+    name: "あんず"
+    role: "battalion_commander"
+    cluster: "command"
+    avatar: { bg: "bg-amber-500", ini: "杏", ring: "ring-amber-400" }
+
+  miho:
+    name: "みほ"
+    role: "chief_of_staff"
+    cluster: "command"
+    avatar: { bg: "bg-rose-400", ini: "み", ring: "ring-rose-300" }
+
+  # ダージリン隊
+  darjeeling:
+    name: "ダージリン"
+    role: "captain"
+    cluster: "darjeeling"
+    avatar: { bg: "bg-blue-500", ini: "D", ring: "ring-blue-400" }
+
+  pekoe:
+    name: "ペコ"
+    role: "vice_captain"
+    cluster: "darjeeling"
+    avatar: { bg: "bg-sky-300", ini: "ペ", ring: "ring-sky-200" }
+
+  hana:
+    name: "華"
+    role: "member"
+    cluster: "darjeeling"
+    avatar: { bg: "bg-pink-300", ini: "華", ring: "ring-pink-200" }
+
+  rosehip:
+    name: "ローズヒップ"
+    role: "member"
+    cluster: "darjeeling"
+    avatar: { bg: "bg-pink-500", ini: "R", ring: "ring-pink-400" }
+
+  marie:
+    name: "マリー"
+    role: "member"
+    cluster: "darjeeling"
+    avatar: { bg: "bg-blue-200", ini: "マ", ring: "ring-blue-100" }
+
+  andou:
+    name: "安藤"
+    role: "member"
+    cluster: "darjeeling"
+    avatar: { bg: "bg-indigo-300", ini: "安", ring: "ring-indigo-200" }
+
+  oshida:
+    name: "押田"
+    role: "member"
+    cluster: "darjeeling"
+    avatar: { bg: "bg-violet-300", ini: "押", ring: "ring-violet-200" }
+
+  # カチューシャ隊
+  katyusha:
+    name: "カチューシャ"
+    role: "captain"
+    cluster: "katyusha"
+    avatar: { bg: "bg-red-500", ini: "К", ring: "ring-red-400" }
+
+  nonna:
+    name: "ノンナ"
+    role: "vice_captain"
+    cluster: "katyusha"
+    avatar: { bg: "bg-slate-400", ini: "Н", ring: "ring-slate-300" }
+
+  klara:
+    name: "クラーラ"
+    role: "member"
+    cluster: "katyusha"
+    avatar: { bg: "bg-red-300", ini: "Кл", ring: "ring-red-200" }
+
+  mako:
+    name: "麻子"
+    role: "member"
+    cluster: "katyusha"
+    avatar: { bg: "bg-slate-500", ini: "麻", ring: "ring-slate-400" }
+
+  erwin:
+    name: "エルヴィン"
+    role: "member"
+    cluster: "katyusha"
+    avatar: { bg: "bg-amber-400", ini: "Er", ring: "ring-amber-300" }
+
+  caesar:
+    name: "カエサル"
+    role: "member"
+    cluster: "katyusha"
+    avatar: { bg: "bg-orange-400", ini: "Ca", ring: "ring-orange-300" }
+
+  saori:
+    name: "沙織"
+    role: "member"
+    cluster: "katyusha"
+    avatar: { bg: "bg-pink-400", ini: "沙", ring: "ring-pink-300" }
+
+  # ケイ隊
+  kay:
+    name: "ケイ"
+    role: "captain"
+    cluster: "kay"
+    avatar: { bg: "bg-green-500", ini: "K", ring: "ring-green-400" }
+
+  arisa:
+    name: "アリサ"
+    role: "vice_captain"
+    cluster: "kay"
+    avatar: { bg: "bg-lime-400", ini: "Al", ring: "ring-lime-300" }
+
+  naomi:
+    name: "ナオミ"
+    role: "member"
+    cluster: "kay"
+    avatar: { bg: "bg-emerald-400", ini: "Na", ring: "ring-emerald-300" }
+
+  yukari:
+    name: "優花里"
+    role: "member"
+    cluster: "kay"
+    avatar: { bg: "bg-yellow-400", ini: "優", ring: "ring-yellow-300" }
+
+  anchovy:
+    name: "アンチョビ"
+    role: "member"
+    cluster: "kay"
+    avatar: { bg: "bg-green-400", ini: "An", ring: "ring-green-300" }
+
+  pepperoni:
+    name: "ペパロニ"
+    role: "member"
+    cluster: "kay"
+    avatar: { bg: "bg-orange-300", ini: "ペ", ring: "ring-orange-200" }
+
+  carpaccio:
+    name: "カルパッチョ"
+    role: "member"
+    cluster: "kay"
+    avatar: { bg: "bg-emerald-300", ini: "カ", ring: "ring-emerald-200" }
+
+  # まほ隊
+  maho:
+    name: "まほ"
+    role: "captain"
+    cluster: "maho"
+    avatar: { bg: "bg-purple-500", ini: "ま", ring: "ring-purple-400" }
+
+  erika:
+    name: "エリカ"
+    role: "vice_captain"
+    cluster: "maho"
+    avatar: { bg: "bg-violet-400", ini: "エ", ring: "ring-violet-300" }
+
+  mika:
+    name: "ミカ"
+    role: "member"
+    cluster: "maho"
+    avatar: { bg: "bg-cyan-400", ini: "ミ", ring: "ring-cyan-300" }
+
+  aki:
+    name: "アキ"
+    role: "member"
+    cluster: "maho"
+    avatar: { bg: "bg-teal-300", ini: "ア", ring: "ring-teal-200" }
+
+  mikko:
+    name: "ミッコ"
+    role: "member"
+    cluster: "maho"
+    avatar: { bg: "bg-cyan-300", ini: "ミッ", ring: "ring-cyan-200" }
+
+  kinuyo:
+    name: "絹代"
+    role: "member"
+    cluster: "maho"
+    avatar: { bg: "bg-purple-300", ini: "絹", ring: "ring-purple-200" }
+
+  fukuda:
+    name: "福田"
+    role: "member"
+    cluster: "maho"
+    avatar: { bg: "bg-purple-200", ini: "福", ring: "ring-purple-100" }

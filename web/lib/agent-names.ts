@@ -1,0 +1,68 @@
+/**
+ * agent-names.ts
+ *
+ * エージェントID → キャラクター表示名のマッピング。
+ * UI上で内部IDではなくキャラクター名を表示するために使用する。
+ */
+
+const AGENT_NAME_MAP: Record<string, string> = {
+  // 指揮系統
+  anzu: "杏（大隊長）",
+  miho: "みほ（参謀長）",
+
+  // ロール名のフォールバック（inbox等でロール名が使われる場合）
+  battalion_commander: "杏（大隊長）",
+  chief_of_staff: "みほ（参謀長）",
+  captain: "隊長",
+  vice_captain: "副隊長",
+
+  // captain_xxx 形式の複合ID
+  captain_darjeeling: "ダージリン（ダージリン隊隊長）",
+  captain_katyusha: "カチューシャ（カチューシャ隊隊長）",
+  captain_kay: "ケイ（ケイ隊隊長）",
+  captain_maho: "まほ（まほ隊隊長）",
+
+  // ダージリン隊
+  darjeeling: "ダージリン（隊長）",
+  pekoe: "ペコ（副隊長）",
+  hana: "華",
+  rosehip: "ローズヒップ",
+  marie: "マリー",
+  oshida: "押田",
+  andou: "安藤",
+
+  // カチューシャ隊
+  katyusha: "カチューシャ（隊長）",
+  nonna: "ノンナ（副隊長）",
+  klara: "クラーラ",
+  mako: "麻子",
+  erwin: "エルヴィン",
+  caesar: "カエサル",
+  saori: "沙織",
+
+  // ケイ隊
+  kay: "ケイ（隊長）",
+  arisa: "アリサ（副隊長）",
+  naomi: "ナオミ",
+  yukari: "優花里",
+  anchovy: "アンチョビ",
+  carpaccio: "カルパッチョ",
+  pepperoni: "ペパロニ",
+
+  // まほ隊
+  maho: "まほ（隊長）",
+  erika: "エリカ（副隊長）",
+  mika: "ミカ",
+  aki: "アキ",
+  mikko: "ミッコ",
+  kinuyo: "絹代",
+  fukuda: "福田",
+};
+
+/**
+ * エージェントIDを表示名に変換する。
+ * マッピングが存在しない場合は元のIDをそのまま返す。
+ */
+export function getAgentDisplayName(agentId: string): string {
+  return AGENT_NAME_MAP[agentId] ?? agentId;
+}
