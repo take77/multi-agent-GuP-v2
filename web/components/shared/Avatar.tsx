@@ -8,7 +8,7 @@ const AVATARS: Record<string, AvatarDef> = {
   anzu: { bg: "bg-amber-500", ini: "杏", ring: "ring-amber-400", objectPosition: "50% 20%" },
   miho: { bg: "bg-rose-400", ini: "み", ring: "ring-rose-300", objectPosition: "50% 15%" },
   // ダージリン隊
-  darjeeling: { bg: "bg-blue-500", ini: "D", ring: "ring-blue-400", objectPosition: "50% 20%" },
+  darjeeling: { bg: "bg-blue-500", ini: "D", ring: "ring-blue-400", objectPosition: "50% 40%" },
   orange_pekoe: { bg: "bg-sky-400", ini: "P", ring: "ring-sky-300" },
   assam: { bg: "bg-indigo-400", ini: "As", ring: "ring-indigo-300" },
   rukuriri: { bg: "bg-blue-300", ini: "ル", ring: "ring-blue-200" },
@@ -34,14 +34,14 @@ const AVATARS: Record<string, AvatarDef> = {
   yukari: { bg: "bg-yellow-400", ini: "優", ring: "ring-yellow-300", objectPosition: "50% 20%" },
   anchovy: { bg: "bg-green-400", ini: "An", ring: "ring-green-300", objectPosition: "50% 20%" },
   pepperoni: { bg: "bg-orange-300", ini: "ペ", ring: "ring-orange-200", objectPosition: "50% 15%" },
-  carpaccio: { bg: "bg-emerald-300", ini: "カ", ring: "ring-emerald-200", objectPosition: "50% 20%" },
+  carpaccio: { bg: "bg-emerald-300", ini: "カ", ring: "ring-emerald-200", objectPosition: "50% 40%" },
   // まほ隊
   maho: { bg: "bg-purple-500", ini: "ま", ring: "ring-purple-400", objectPosition: "50% 15%" },
   erika: { bg: "bg-violet-400", ini: "エ", ring: "ring-violet-300", objectPosition: "50% 15%" },
   mika: { bg: "bg-cyan-400", ini: "ミ", ring: "ring-cyan-300", objectPosition: "50% 20%" },
   aki: { bg: "bg-teal-300", ini: "ア", ring: "ring-teal-200", objectPosition: "50% 20%" },
   mikko: { bg: "bg-cyan-300", ini: "ミッ", ring: "ring-cyan-200", objectPosition: "50% 15%" },
-  kinuyo: { bg: "bg-purple-300", ini: "絹", ring: "ring-purple-200", objectPosition: "50% 20%" },
+  kinuyo: { bg: "bg-purple-300", ini: "絹", ring: "ring-purple-200", objectPosition: "50% 40%" },
   fukuda: { bg: "bg-purple-200", ini: "福", ring: "ring-purple-100", objectPosition: "50% 20%" },
 };
 
