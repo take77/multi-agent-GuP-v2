@@ -51,8 +51,19 @@ const DEFAULT_AVATAR: AvatarDef = {
   ring: "ring-slate-400",
 };
 
+/** 複合IDを実エージェントIDに正規化する */
+function normalizeAgentId(id: string): string {
+  if (id.startsWith("captain_")) return id.slice("captain_".length);
+  if (id.startsWith("vice_captain_")) return id.slice("vice_captain_".length);
+  const fixed: Record<string, string> = {
+    chief_of_staff: "miho",
+    battalion_commander: "anzu",
+  };
+  return fixed[id] ?? id;
+}
+
 export function getAvatar(id: string): AvatarDef {
-  return AVATARS[id] ?? DEFAULT_AVATAR;
+  return AVATARS[normalizeAgentId(id)] ?? DEFAULT_AVATAR;
 }
 
 export function Avatar({
@@ -64,9 +75,10 @@ export function Avatar({
   size?: string;
   online?: boolean;
 }) {
+  const normalizedId = normalizeAgentId(id);
   const a = getAvatar(id);
   const [imgError, setImgError] = useState(false);
-  const imgSrc = `/avatars/${id}.png`;
+  const imgSrc = `/avatars/${normalizedId}.png`;
 
   return (
     <div className={`relative ${size} rounded-full shrink-0`}>
