@@ -28,6 +28,7 @@ export function MessageList() {
     latestOutput,
     clusters,
     inboxMessages,
+    sendEscapeCommand,
   } = useAppStore();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<TabId>("conversation");
@@ -93,7 +94,7 @@ export function MessageList() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Tab bar */}
-      <div className="flex border-b border-slate-700/60 px-3 shrink-0">
+      <div className="flex items-center border-b border-slate-700/60 px-3 shrink-0">
         <button
           onClick={() => setActiveTab("conversation")}
           className={`px-3 py-1.5 text-[12px] font-medium transition-colors cursor-pointer ${
@@ -118,6 +119,19 @@ export function MessageList() {
               {inboxCount}
             </span>
           )}
+        </button>
+        {/* Interrupt button — right end of tab bar */}
+        <button
+          onClick={() => sendEscapeCommand(selectedAgent)}
+          disabled={agent?.status !== "active"}
+          title={agent?.status === "active" ? "割り込み (Escape)" : "エージェントが稼働中のみ有効"}
+          className={`ml-auto px-2 py-1 rounded-lg text-[11px] font-medium flex items-center gap-1 ${
+            agent?.status === "active"
+              ? "bg-red-600 hover:bg-red-500 text-white cursor-pointer"
+              : "bg-slate-800 text-slate-600 opacity-50 cursor-not-allowed"
+          }`}
+        >
+          ⏹ 割り込み
         </button>
       </div>
 
