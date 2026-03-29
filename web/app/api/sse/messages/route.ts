@@ -3,6 +3,7 @@ import { join, basename } from "path";
 import { parse as parseYaml } from "yaml";
 import { eventBus } from "@/lib/event-bus";
 import { startYamlWatcher } from "@/lib/yaml-watcher";
+import { getAgentDisplayName } from "@/lib/agent-names";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,8 +22,14 @@ interface RawInboxEntry {
   read: boolean;
 }
 
+type EnrichedInboxEntry = RawInboxEntry & {
+  to: string;
+  fromName: string;
+  toName: string;
+};
+
 function loadRecentMessages(limit = 50) {
-  const messages: Array<RawInboxEntry & { to: string }> = [];
+  const messages: EnrichedInboxEntry[] = [];
 
   try {
     const files = readdirSync(INBOX_DIR).filter(
@@ -36,7 +43,12 @@ function loadRecentMessages(limit = 50) {
         const data = parseYaml(content) as { messages?: RawInboxEntry[] };
         if (data?.messages) {
           for (const msg of data.messages) {
-            messages.push({ ...msg, to: agentId });
+            messages.push({
+              ...msg,
+              to: agentId,
+              fromName: getAgentDisplayName(msg.from),
+              toName: getAgentDisplayName(agentId),
+            });
           }
         }
       } catch {
@@ -89,7 +101,12 @@ export async function GET(req: Request) {
           // Send only unread messages (new arrivals)
           const unread = msgs
             .filter((m) => !m.read)
-            .map((m) => ({ ...m, to: agentId }));
+            .map((m) => ({
+              ...m,
+              to: agentId,
+              fromName: getAgentDisplayName(m.from),
+              toName: getAgentDisplayName(agentId),
+            }));
 
           if (unread.length > 0) {
             send("new-messages", unread);

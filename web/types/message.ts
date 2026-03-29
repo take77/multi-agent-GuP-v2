@@ -14,6 +14,8 @@ export interface InboxMessage {
   id: string;
   from: string;
   to: string;
+  fromName?: string;
+  toName?: string;
   content: string;
   type: MessageType;
   timestamp: string;
