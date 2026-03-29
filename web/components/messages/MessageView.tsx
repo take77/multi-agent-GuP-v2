@@ -79,14 +79,14 @@ function MessageBubble({ msg }: { msg: InboxMessage }) {
 
   return (
     <div className="flex gap-2 items-start">
-      <Avatar id={msg.from} size="w-6 h-6 text-[10px]" />
+      <Avatar id={msg.from} size="w-8 h-8 text-xs" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5">
-          <span className="text-[11px] font-medium text-slate-300">
+          <span className="text-xs font-medium text-slate-300">
             {msg.from}
           </span>
           <span className="text-[10px] text-slate-600">→</span>
-          <span className="text-[11px] text-slate-400">{msg.to}</span>
+          <span className="text-xs text-slate-400">{msg.to}</span>
           <span className={`text-[10px] ${cfg.color}`}>
             {cfg.icon} {cfg.label}
           </span>

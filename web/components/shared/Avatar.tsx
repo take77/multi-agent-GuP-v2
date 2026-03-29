@@ -57,7 +57,7 @@ export function getAvatar(id: string): AvatarDef {
 
 export function Avatar({
   id,
-  size = "w-6 h-6 text-[10px]",
+  size = "w-8 h-8 text-xs",
   online,
 }: {
   id: string;

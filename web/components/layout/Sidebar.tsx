@@ -96,8 +96,8 @@ export function Sidebar() {
         </div>
         {leaders.slice(0, 6).map((a) => (
           <div key={a.id} className="flex items-center gap-1.5 py-0.5">
-            <Avatar id={a.id} size="w-4 h-4 text-[7px]" />
-            <span className="text-[10px] text-slate-400 truncate">{a.name}</span>
+            <Avatar id={a.id} size="w-6 h-6 text-[10px]" />
+            <span className="text-xs text-slate-400 truncate">{a.name}</span>
           </div>
         ))}
         {restCount > 0 && (
