@@ -420,6 +420,15 @@ else
     fi
 fi
 
+# アーカイブディレクトリ確保
+mkdir -p queue/inbox/archive
+
+# inbox 既読メッセージアーカイブ（エージェント起動前に実行）
+log_info "📦 Archiving read inbox messages..."
+if [ -f scripts/inbox_archive.sh ]; then
+    bash scripts/inbox_archive.sh
+fi
+
 if [ "$CLEAN_MODE" = true ]; then
     log_info "📜 前回の作戦記録を破棄中..."
 
