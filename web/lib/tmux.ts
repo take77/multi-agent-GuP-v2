@@ -61,21 +61,14 @@ export function capturePaneContent(paneId: string): string {
 
 /**
  * Send keys (command) to a tmux pane.
- * All commands use load-buffer + paste-buffer with bracketed paste mode (-p)
- * to ensure reliable delivery regardless of command length or special characters.
+ * Uses send-keys with literal flag (-l) for reliable delivery.
+ * Do NOT use paste-buffer -p (bracketed paste) — Claude Code interprets
+ * bracketed paste as "pasted text" and won't execute it as a command.
  */
 export function sendKeys(paneId: string, command: string): void {
-  const bufName = `gup_${Date.now()}`;
-  const tmpFile = join(tmpdir(), `${bufName}.txt`);
-  try {
-    writeFileSync(tmpFile, command, "utf-8");
-    execFileSync("tmux", ["load-buffer", "-b", bufName, tmpFile], EXEC_OPTIONS);
-    execFileSync("tmux", ["paste-buffer", "-b", bufName, "-t", paneId, "-p"], EXEC_OPTIONS);
-  } finally {
-    try { unlinkSync(tmpFile); } catch {}
-    try { execFileSync("tmux", ["delete-buffer", "-b", bufName], EXEC_OPTIONS); } catch {}
-  }
-  // Small wait to ensure paste-buffer completes before Enter is sent
+  // send-keys -l sends the text literally (no key name interpretation)
+  execFileSync("tmux", ["send-keys", "-t", paneId, "-l", command], EXEC_OPTIONS);
+  // Small wait then send Enter separately
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
   execFileSync("tmux", ["send-keys", "-t", paneId, "Enter"], EXEC_OPTIONS);
 }

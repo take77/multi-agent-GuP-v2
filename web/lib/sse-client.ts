@@ -23,6 +23,22 @@ export function useSSE() {
   const setLatestOutput = useAppStore((s) => s.setLatestOutput);
   const setClusters = useAppStore((s) => s.setClusters);
 
+  // Notify server of initial selected agent on mount
+  useEffect(() => {
+    const initialAgent = useAppStore.getState().selectedAgent;
+    if (initialAgent) {
+      const token = getAuthToken();
+      fetch("/api/agents/active", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ agentId: initialAgent }),
+      }).catch(() => {});
+    }
+  }, []);
+
   // Terminal output SSE
   useEffect(() => {
     let eventSource: EventSource | null = null;
