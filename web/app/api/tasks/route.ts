@@ -104,6 +104,9 @@ export async function GET() {
     for (const file of files) {
       try {
         const agentId = basename(file, ".yaml");
+        // squads.yaml に存在しないエージェント（member1〜8, pending 等の残骸）を除外
+        if (!(agentId in squadMapping)) continue;
+
         const content = readFileSync(join(TASKS_DIR, file), "utf-8");
         const data = parseYaml(content) as {
           task?: {
@@ -119,6 +122,8 @@ export async function GET() {
         if (!data?.task?.task_id) continue;
 
         const t = data.task;
+        // 完了済み・未使用タスクは進捗タブに表示しない
+        if (t.status === "done" || t.status === "idle") continue;
         const report = reports[t.task_id!];
 
         tasks.push({
