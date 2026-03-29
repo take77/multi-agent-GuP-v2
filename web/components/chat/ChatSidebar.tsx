@@ -120,7 +120,7 @@ export function ChatSidebar() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span
-                          className={`text-[11px] truncate ${
+                          className={`text-xs truncate ${
                             selectedAgent === a.id
                               ? "text-white"
                               : "text-slate-400"

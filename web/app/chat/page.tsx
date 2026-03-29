@@ -69,8 +69,8 @@ export default function ChatPage() {
       <div className="flex-1 flex flex-col bg-slate-950 min-w-0">
         {agent && (
           <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-700/50 bg-slate-900/50 overflow-hidden">
-            <Avatar id={agent.id} size="w-6 h-6 text-[10px]" />
-            <span className="text-[13px] font-medium text-white shrink-0">
+            <Avatar id={agent.id} size="w-8 h-8 text-xs" />
+            <span className="text-sm font-medium text-white shrink-0">
               {agent.name}
             </span>
             <span className="text-[10px] px-1.5 py-0.5 rounded border border-slate-600 text-slate-400 shrink-0">

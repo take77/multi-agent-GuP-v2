@@ -57,8 +57,8 @@ export function TaskCard({ task }: { task: Task }) {
       {/* Footer: assignee + squad */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <Avatar id={task.assignee} size="w-4 h-4 text-[8px]" />
-          <span className="text-[11px] text-slate-400">{task.assignee}</span>
+          <Avatar id={task.assignee} size="w-6 h-6 text-[10px]" />
+          <span className="text-xs text-slate-400">{task.assignee}</span>
         </div>
         <span
           className="text-[10px] px-1.5 py-0.5 rounded-full border"

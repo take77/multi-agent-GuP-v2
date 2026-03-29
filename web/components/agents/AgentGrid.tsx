@@ -44,7 +44,7 @@ export function AgentGrid() {
           </button>
           <Avatar
             id={agent?.id ?? ""}
-            size="w-6 h-6 text-[10px]"
+            size="w-8 h-8 text-xs"
             online={agent?.status === "active"}
           />
           <span className="text-sm font-medium text-white">{agent?.name}</span>

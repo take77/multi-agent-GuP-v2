@@ -26,7 +26,7 @@ export function AgentCard({
       <div className="flex items-center gap-2 mb-1.5">
         <Avatar id={agent.id} online={agent.status === "active"} />
         <div className="min-w-0">
-          <span className="text-[13px] font-medium text-slate-300 group-hover:text-white block truncate">
+          <span className="text-sm font-medium text-slate-300 group-hover:text-white block truncate">
             {agent.name}
           </span>
           <div className="flex items-center gap-1">
