@@ -10,21 +10,9 @@ import { getAgentDisplayName } from "@/lib/agent-names";
 
 type TabId = "conversation" | "inbox";
 
-/** Unified chat entry for timeline display */
-interface ChatEntry {
-  kind: "user" | "agent-output" | "inbox";
-  time: string;
-  sortKey: number;
-  text: string;
-  from?: string;
-  to?: string;
-  agentId?: string;
-}
-
 export function MessageList() {
   const {
     selectedAgent,
-    messages,
     latestOutput,
     clusters,
     inboxMessages,
@@ -36,18 +24,7 @@ export function MessageList() {
     .flatMap((c) => c.agents)
     .find((a) => a.id === selectedAgent);
 
-  const userMsgs = messages[selectedAgent] ?? [];
   const output = latestOutput[selectedAgent] ?? "";
-
-  // Build timeline entries
-  const userEntries = useMemo(() => {
-    return userMsgs.map((m, i) => ({
-      kind: "user" as const,
-      time: m.time,
-      sortKey: i,
-      text: m.text,
-    }));
-  }, [userMsgs]);
 
   const inboxEntries = useMemo(() => {
     return inboxMessages
@@ -81,7 +58,6 @@ export function MessageList() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [
     activeTab,
-    userEntries.length,
     inboxEntries.length,
     parsedBlocks.length,
     output,
@@ -126,7 +102,7 @@ export function MessageList() {
         {activeTab === "conversation" && (
           <>
             {/* No output placeholder */}
-            {parsedBlocks.length === 0 && userEntries.length === 0 && (
+            {parsedBlocks.length === 0 && (
               <div className="flex flex-col items-center justify-center flex-1 text-slate-600">
                 <Avatar
                   id={agent?.id ?? "anzu"}
@@ -139,6 +115,7 @@ export function MessageList() {
             )}
 
             {/* Agent terminal output — block-based rendered view */}
+            {/* User input is rendered inline by BlockRenderer (UserInputBubble) */}
             {parsedBlocks.length > 0 && (
               <BlockRenderer
                 blocks={parsedBlocks}
@@ -146,34 +123,6 @@ export function MessageList() {
                 agentName={agentDisplayName}
               />
             )}
-
-            {/* User commands (right bubbles) */}
-            {userEntries.map((entry, i) => {
-              const isSlashCommand = entry.text.startsWith("/");
-              return (
-                <div key={`u-${i}`} className="flex justify-end">
-                  <div
-                    className={`max-w-[75%] rounded-xl rounded-tr-sm px-3 py-1.5 ${
-                      isSlashCommand
-                        ? "bg-violet-700/80 border border-violet-500/40"
-                        : "bg-sky-600"
-                    }`}
-                  >
-                    <span className="text-[13px] text-white font-mono">
-                      {isSlashCommand ? "🔧 " : "$ "}
-                      {entry.text}
-                    </span>
-                    <div
-                      className={`text-[11px] text-right mt-0.5 ${
-                        isSlashCommand ? "text-violet-300" : "text-sky-200"
-                      }`}
-                    >
-                      {entry.time}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
           </>
         )}
 
