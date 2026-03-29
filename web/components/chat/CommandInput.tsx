@@ -24,7 +24,14 @@ export function CommandInput() {
     commandHistory,
     draftMessages,
     setDraftMessage,
+    pendingImages: allPendingImages,
+    pendingPreviews: allPendingPreviews,
+    addPendingImages,
+    removePendingImage,
+    clearPendingImages,
   } = useAppStore();
+  const pendingImages = allPendingImages[selectedAgent] ?? [];
+  const pendingPreviews = allPendingPreviews[selectedAgent] ?? [];
   const [input, setInput] = useState("");
   const [drag, setDrag] = useState(false);
   const [sending, setSending] = useState(false);
@@ -35,8 +42,6 @@ export function CommandInput() {
   } | null>(null);
   const [pendingForceCommand, setPendingForceCommand] = useState<string | null>(null);
   const [historyIdx, setHistoryIdx] = useState(-1);
-  const [pendingImages, setPendingImages] = useState<File[]>([]);
-  const [pendingPreviews, setPendingPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,13 +77,6 @@ export function CommandInput() {
     setInput(draftMessages[selectedAgent] ?? "");
     setHistoryIdx(-1);
   }, [selectedAgent, draftMessages]);
-
-  // Generate preview URLs for pending images, revoke on cleanup
-  useEffect(() => {
-    const urls = pendingImages.map((f) => URL.createObjectURL(f));
-    setPendingPreviews(urls);
-    return () => urls.forEach((url) => URL.revokeObjectURL(url));
-  }, [pendingImages]);
 
   const uploadImage = useCallback(async (file: File): Promise<string | null> => {
     const token =
@@ -169,7 +167,7 @@ export function CommandInput() {
         paths.push(uploadedPath);
       }
       setUploading(false);
-      setPendingImages([]);
+      clearPendingImages(selectedAgent);
       // Send all image paths as command (with optional text)
       const imageCmd = cmd ? `${cmd}\n${paths.join("\n")}` : paths.join("\n");
       setInput("");
@@ -187,7 +185,7 @@ export function CommandInput() {
 
     // All commands sent directly — D001-D012 blocking is handled server-side
     doSend(cmd);
-  }, [input, pendingImages, doSend, uploadImage]);
+  }, [input, pendingImages, selectedAgent, doSend, uploadImage, clearPendingImages, setDraftMessage]);
 
   const handleQuickAction = useCallback(
     (command: string) => {
@@ -233,9 +231,9 @@ export function CommandInput() {
     }
     if (imageFiles.length > 0) {
       e.preventDefault();
-      setPendingImages((prev) => [...prev, ...imageFiles]);
+      addPendingImages(selectedAgent, imageFiles);
     }
-  }, []);
+  }, [selectedAgent, addPendingImages]);
 
   // Drag & drop handler
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -245,9 +243,9 @@ export function CommandInput() {
       ACCEPTED_IMAGE_TYPES.includes(f.type)
     );
     if (files.length > 0) {
-      setPendingImages((prev) => [...prev, ...files]);
+      addPendingImages(selectedAgent, files);
     }
-  }, []);
+  }, [selectedAgent, addPendingImages]);
 
   // File input handler
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -255,11 +253,11 @@ export function CommandInput() {
       ACCEPTED_IMAGE_TYPES.includes(f.type)
     );
     if (files.length > 0) {
-      setPendingImages((prev) => [...prev, ...files]);
+      addPendingImages(selectedAgent, files);
     }
     // Reset input so same file can be selected again
     e.target.value = "";
-  }, []);
+  }, [selectedAgent, addPendingImages]);
 
   const isProcessing = sending || uploading;
 
@@ -286,7 +284,7 @@ export function CommandInput() {
         <div className="mb-2">
           <ImagePreview
             images={pendingImages.map((file, i) => ({ file, preview: pendingPreviews[i] ?? "" }))}
-            onRemove={(i) => setPendingImages((prev) => prev.filter((_, idx) => idx !== i))}
+            onRemove={(i) => removePendingImage(selectedAgent, i)}
           />
         </div>
       )}
