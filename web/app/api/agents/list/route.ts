@@ -5,6 +5,7 @@ import { join } from "path";
 import { listPanes, type PaneInfo } from "@/lib/tmux";
 import { paneStates } from "@/lib/pane-streamer";
 import type { ClusterStatus } from "@/types/agent";
+import { getAgentDisplayName } from "@/lib/agent-names";
 
 const PROJECT_ROOT = process.cwd().replace(/\/web$/, "");
 
@@ -25,40 +26,6 @@ const CLUSTER_META: Record<string, { name: string; color: string }> = {
   katyusha: { name: "カチューシャ隊", color: "#ef4444" },
   kay: { name: "ケイ隊", color: "#22c55e" },
   maho: { name: "まほ隊", color: "#a855f7" },
-};
-
-// Agent display names
-const AGENT_NAMES: Record<string, string> = {
-  anzu: "あんず",
-  miho: "みほ",
-  darjeeling: "ダージリン",
-  pekoe: "ペコ",
-  hana: "華",
-  rosehip: "ローズヒップ",
-  marie: "マリー",
-  andou: "安藤",
-  oshida: "押田",
-  katyusha: "カチューシャ",
-  nonna: "ノンナ",
-  klara: "クラーラ",
-  mako: "麻子",
-  erwin: "エルヴィン",
-  caesar: "カエサル",
-  saori: "沙織",
-  kay: "ケイ",
-  arisa: "アリサ",
-  naomi: "ナオミ",
-  yukari: "優花里",
-  anchovy: "アンチョビ",
-  pepperoni: "ペパロニ",
-  carpaccio: "カルパッチョ",
-  maho: "まほ",
-  erika: "エリカ",
-  mika: "ミカ",
-  aki: "アキ",
-  mikko: "ミッコ",
-  kinuyo: "絹代",
-  fukuda: "福田",
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -149,7 +116,7 @@ export async function GET() {
     const { status, stuckMin } = computeStatus(id, pane);
     return {
       id,
-      name: AGENT_NAMES[id] || id,
+      name: getAgentDisplayName(id),
       role: id === "anzu" ? "総司令" : "参謀長",
       status,
       task: taskInfo?.task || "待機中",
@@ -182,7 +149,7 @@ export async function GET() {
         const { status, stuckMin } = computeStatus(id, pane);
         return {
           id,
-          name: AGENT_NAMES[id] || id,
+          name: getAgentDisplayName(id),
           role: ROLE_LABELS[role] || role,
           status,
           task: taskInfo?.task || "待機中",
