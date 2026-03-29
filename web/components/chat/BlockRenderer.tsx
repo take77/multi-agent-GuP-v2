@@ -129,6 +129,27 @@ const ToolWorkflowBlock = memo(function ToolWorkflowBlock({
 
 // ── 3. UserInputBubble ──
 
+const GUP_IMAGE_RE = /(\/tmp\/gup-upload-[^\s\n]+\.(?:png|jpe?g|gif|webp))/gi;
+
+/** Split text into text/image-path segments */
+function splitImagePaths(text: string): Array<{ type: "text" | "image"; value: string }> {
+  const parts: Array<{ type: "text" | "image"; value: string }> = [];
+  let last = 0;
+  let match: RegExpExecArray | null;
+  const re = new RegExp(GUP_IMAGE_RE.source, "gi");
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > last) {
+      parts.push({ type: "text", value: text.slice(last, match.index) });
+    }
+    parts.push({ type: "image", value: match[1] });
+    last = re.lastIndex;
+  }
+  if (last < text.length) {
+    parts.push({ type: "text", value: text.slice(last) });
+  }
+  return parts;
+}
+
 const UserInputBubble = memo(function UserInputBubble({
   content,
 }: {
@@ -137,6 +158,8 @@ const UserInputBubble = memo(function UserInputBubble({
   // Remove leading ❯ if present
   const text = content.replace(/^❯\s*/, "");
   const isSlashCommand = text.startsWith("/");
+  const segments = splitImagePaths(text);
+  const hasImages = segments.some((s) => s.type === "image");
 
   return (
     <div className="flex justify-end my-1">
@@ -147,10 +170,31 @@ const UserInputBubble = memo(function UserInputBubble({
             : "bg-sky-600"
         }`}
       >
-        <span className="text-[13px] text-white font-mono">
-          {isSlashCommand ? "🔧 " : "❯ "}
-          {text}
-        </span>
+        {hasImages ? (
+          <div className="flex flex-col gap-1.5">
+            {segments.map((seg, i) =>
+              seg.type === "image" ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={i}
+                  src={`/api/image?path=${encodeURIComponent(seg.value)}`}
+                  alt={seg.value.split("/").pop()}
+                  className="max-w-[200px] max-h-[150px] rounded object-contain border border-white/20"
+                />
+              ) : seg.value.trim() ? (
+                <span key={i} className="text-[13px] text-white font-mono">
+                  {isSlashCommand ? "🔧 " : "❯ "}
+                  {seg.value.trim()}
+                </span>
+              ) : null
+            )}
+          </div>
+        ) : (
+          <span className="text-[13px] text-white font-mono">
+            {isSlashCommand ? "🔧 " : "❯ "}
+            {text}
+          </span>
+        )}
       </div>
     </div>
   );
