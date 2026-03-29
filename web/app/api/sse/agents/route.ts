@@ -123,13 +123,14 @@ function buildClusters() {
     const pane = paneMap.get(id);
     const taskInfo = getTaskInfo(id);
     const stuckMin = computeStuckMinutes(id);
+    const status = determineStatus(pane, stuckMin, taskInfo?.status || "idle", id);
     return {
       id,
       name: getAgentDisplayName(id),
       role: id === "anzu" ? "総司令" : "参謀長",
-      status: determineStatus(pane, stuckMin, taskInfo?.status || "idle", id),
+      status,
       task: taskInfo?.task || "待機中",
-      stuck: stuckMin,
+      stuck: status === "stuck" ? stuckMin : 0,
       model: pane?.modelName || "",
       paneId: pane?.paneId || null,
       sessionName: pane?.sessionName || null,
@@ -151,13 +152,14 @@ function buildClusters() {
         const pane = paneMap.get(id);
         const taskInfo = getTaskInfo(id);
         const stuckMin = computeStuckMinutes(id);
+        const status = determineStatus(pane, stuckMin, taskInfo?.status || "idle", id);
         return {
           id,
           name: getAgentDisplayName(id),
           role: ROLE_LABELS[role] || role,
-          status: determineStatus(pane, stuckMin, taskInfo?.status || "idle", id),
+          status,
           task: taskInfo?.task || "待機中",
-          stuck: stuckMin,
+          stuck: status === "stuck" ? stuckMin : 0,
           model: pane?.modelName || "",
           paneId: pane?.paneId || null,
           sessionName: pane?.sessionName || null,
