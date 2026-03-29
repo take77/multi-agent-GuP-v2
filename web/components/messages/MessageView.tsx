@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { useAppStore } from "@/lib/store";
 import { Avatar } from "@/components/shared/Avatar";
 import { MessageFilter, AGENT_CLUSTER_MAP } from "./MessageFilter";
+import { getAgentDisplayName } from "@/lib/agent-names";
 import type { InboxMessage, MessageType } from "@/types/message";
 
 const TYPE_CONFIG: Record<
@@ -64,7 +65,7 @@ function CommandBadge({ msg }: { msg: InboxMessage }) {
       <span className="text-[9px] text-slate-700 font-mono shrink-0">
         {formatTimestamp(msg.timestamp)}
       </span>
-      <span className="text-[9px] text-slate-600 shrink-0">{msg.from}</span>
+      <span className="text-[9px] text-slate-600 shrink-0">{getAgentDisplayName(msg.from)}</span>
       <span
         className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800/60 border border-slate-700/30 ${cfg.color}`}
       >
@@ -83,10 +84,10 @@ function MessageBubble({ msg }: { msg: InboxMessage }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5">
           <span className="text-xs font-medium text-slate-300">
-            {msg.from}
+            {getAgentDisplayName(msg.from)}
           </span>
           <span className="text-[10px] text-slate-600">→</span>
-          <span className="text-xs text-slate-400">{msg.to}</span>
+          <span className="text-xs text-slate-400">{getAgentDisplayName(msg.to)}</span>
           <span className={`text-[10px] ${cfg.color}`}>
             {cfg.icon} {cfg.label}
           </span>
