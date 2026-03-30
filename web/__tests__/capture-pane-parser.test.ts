@@ -281,6 +281,38 @@ describe("Agent() nested output handling", () => {
   });
 });
 
+describe("session-duration (Worked for) badge", () => {
+  it("parses '✻ Worked for 15m 22s' as session-duration block", () => {
+    const input = `✻ Worked for 15m 22s`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("session-duration");
+    expect((blocks[0] as { type: "session-duration"; duration: string }).duration).toBe("15m 22s");
+  });
+
+  it("parses '✻ Worked for 1h 5m 10s' with hours", () => {
+    const input = `✻ Worked for 1h 5m 10s`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("session-duration");
+    expect((blocks[0] as { type: "session-duration"; duration: string }).duration).toBe("1h 5m 10s");
+  });
+
+  it("preserves session-duration between other blocks", () => {
+    const input = `● 作業開始します。
+
+✻ Worked for 3m 45s
+
+● 完了しました。`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(3);
+    expect(blocks[0].type).toBe("assistant-text");
+    expect(blocks[1].type).toBe("session-duration");
+    expect((blocks[1] as { type: "session-duration"; duration: string }).duration).toBe("3m 45s");
+    expect(blocks[2].type).toBe("assistant-text");
+  });
+});
+
 describe("parseCapturePaneOutput (legacy API)", () => {
   it("returns ParsedSegment[] with correct kinds", () => {
     const input = `● テスト応答

@@ -415,7 +415,24 @@ const UserInputBubble = memo(function UserInputBubble({
   );
 });
 
-// ── 4. RawFallback ──
+// ── 4. SessionDurationBadge ──
+
+const SessionDurationBadge = memo(function SessionDurationBadge({
+  duration,
+}: {
+  duration: string;
+}) {
+  return (
+    <div className="flex justify-center my-1">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-700/50 text-[11px] text-slate-400 font-mono">
+        <span>⏱</span>
+        <span>{duration}</span>
+      </span>
+    </div>
+  );
+});
+
+// ── 5. RawFallback ──
 
 const RawFallback = memo(function RawFallback({
   content,
@@ -465,6 +482,8 @@ export const BlockRenderer = memo(function BlockRenderer({
             );
           case "user-input":
             return <UserInputBubble key={i} content={block.content} />;
+          case "session-duration":
+            return <SessionDurationBadge key={i} duration={block.duration} />;
           case "raw":
             return <RawFallback key={i} content={block.content} />;
         }

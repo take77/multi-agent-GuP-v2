@@ -18,4 +18,5 @@ export type ParsedBlock =
   | { type: "assistant-text"; content: string }
   | { type: "tool-execution"; tools: ToolCall[]; agentName: string }
   | { type: "user-input"; content: string }
+  | { type: "session-duration"; duration: string }
   | { type: "raw"; content: string };

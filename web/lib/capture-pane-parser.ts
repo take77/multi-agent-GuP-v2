@@ -39,6 +39,7 @@ type Token =
   | { type: "tool-call"; call: ToolCall }
   | { type: "tool-result"; text: string }
   | { type: "user-input"; text: string }
+  | { type: "session-duration"; duration: string }
   | { type: "skip" }
   | { type: "raw"; text: string };
 
@@ -58,7 +59,7 @@ const SKIP_PATTERNS = [
   /^\?\s+/,                           // question prompts
   /^(?:Human turn|claude-code|Claude Code|Session|Loading|Initializing)/i,
   /^(?:Bypass permissions|Auto-accept|Fast mode|Model:)\s/i,
-  /^✻\s+Worked\s+for\s+/,            // "Worked for X" status line
+  // "Worked for X" is now parsed as session-duration token (not skipped)
 ];
 
 function isSkipLine(trimmed: string): boolean {
@@ -99,6 +100,9 @@ const RE_READ_FILES = /^Read(?:ing)?\s+(\d+)\s+file/;
 
 // Cogitate/think time
 const RE_COGITATE = /^✻\s+(?:Cogitated|Churned|Crunched)\s+for\s+(.+)$/;
+
+// Session duration ("Worked for X")
+const RE_WORKED_FOR = /^✻\s+Worked\s+for\s+(.+)$/;
 
 // Core markers
 const RE_USER_INPUT = /^❯\s+(.*)$/;
@@ -168,6 +172,7 @@ function isMarkerLine(trimmed: string): boolean {
     RE_TOOL_RESULT.test(trimmed) ||
     isSkipLine(trimmed) ||
     RE_COGITATE.test(trimmed) ||
+    RE_WORKED_FOR.test(trimmed) ||
     tryParseToolCall(trimmed) !== null
   );
 }
@@ -201,6 +206,14 @@ function tokenize(raw: string): Token[] {
 
     // Skip patterns
     if (isSkipLine(trimmed)) { i++; continue; }
+
+    // ✻ Worked for X → session-duration token
+    const workedMatch = trimmed.match(RE_WORKED_FOR);
+    if (workedMatch) {
+      tokens.push({ type: "session-duration", duration: workedMatch[1] });
+      i++;
+      continue;
+    }
 
     // ❯ user input (multi-line)
     const userMatch = trimmed.match(RE_USER_INPUT);
@@ -431,6 +444,12 @@ function buildBlocks(tokens: Token[]): ParsedBlock[] {
 
       case "user-input": {
         blocks.push({ type: "user-input", content: tok.text });
+        i++;
+        break;
+      }
+
+      case "session-duration": {
+        blocks.push({ type: "session-duration", duration: tok.duration });
         i++;
         break;
       }
