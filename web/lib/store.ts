@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Agent, Cluster, ChatMessage } from "@/types/agent";
 import type { InboxMessage, MessageFilter } from "@/types/message";
+import type { StructuredEvent } from "@/types/structured-event";
 
 export type ViewId = "chat" | "agents" | "git" | "progress" | "messages";
 
@@ -64,6 +65,11 @@ interface AppState {
   setMessageFilter: (f: MessageFilter) => void;
   showCommands: boolean;
   setShowCommands: (v: boolean) => void;
+
+  // Structured log events (per agent — from logs/structured/*.jsonl via SSE)
+  structuredEvents: Record<string, StructuredEvent[]>;
+  addStructuredEvent: (agentId: string, event: StructuredEvent) => void;
+  clearStructuredEvents: (agentId: string) => void;
 
   // SSE connection
   connected: boolean;
@@ -254,6 +260,19 @@ export const useAppStore = create<AppState>((set) => ({
   setMessageFilter: (f) => set({ messageFilter: f }),
   showCommands: true,
   setShowCommands: (v) => set({ showCommands: v }),
+
+  structuredEvents: {},
+  addStructuredEvent: (agentId, event) =>
+    set((s) => ({
+      structuredEvents: {
+        ...s.structuredEvents,
+        [agentId]: [...(s.structuredEvents[agentId] ?? []), event].slice(-200),
+      },
+    })),
+  clearStructuredEvents: (agentId) =>
+    set((s) => ({
+      structuredEvents: { ...s.structuredEvents, [agentId]: [] },
+    })),
 
   connected: false,
   setConnected: (v) => set({ connected: v }),
