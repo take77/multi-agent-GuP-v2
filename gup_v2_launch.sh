@@ -444,6 +444,12 @@ if [ -f scripts/inbox_archive.sh ]; then
     bash scripts/inbox_archive.sh
 fi
 
+# stale ロックファイル除去（inbox_write.sh の flock 残骸をクリーンアップ）
+log_info "🔓 Cleaning stale lock files..."
+if [ -f scripts/clean_stale_locks.sh ]; then
+    bash scripts/clean_stale_locks.sh
+fi
+
 if [ "$CLEAN_MODE" = true ]; then
     log_info "📜 前回の作戦記録を破棄中..."
 
