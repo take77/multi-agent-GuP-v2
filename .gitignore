@@ -29,6 +29,8 @@ scripts/monitor/node_modules/
 !.claude/settings.json
 !.claude/hooks/
 !.claude/hooks/session_start.sh
+!.claude/agents/
+!.claude/agents/*.md
 
 # Persona files (character definitions — safe for OSS)
 !persona/
