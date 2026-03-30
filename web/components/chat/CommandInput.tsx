@@ -11,7 +11,11 @@ const QUICK_ACTIONS = [
   { label: "Opus", command: "/model opus" },
 ];
 
-const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+const ACCEPTED_FILE_TYPES = [
+  "image/png", "image/jpeg", "image/gif", "image/webp",
+  "text/plain", "text/markdown", "application/pdf", "text/yaml",
+  "application/json", "text/csv", "application/x-yaml",
+];
 const MAX_TEXTAREA_ROWS = 6;
 
 export function CommandInput() {
@@ -224,7 +228,7 @@ export function CommandInput() {
     const items = e.clipboardData.items;
     const imageFiles: File[] = [];
     for (let i = 0; i < items.length; i++) {
-      if (ACCEPTED_IMAGE_TYPES.includes(items[i].type)) {
+      if (ACCEPTED_FILE_TYPES.includes(items[i].type)) {
         const file = items[i].getAsFile();
         if (file) imageFiles.push(file);
       }
@@ -240,7 +244,7 @@ export function CommandInput() {
     e.preventDefault();
     setDrag(false);
     const files = Array.from(e.dataTransfer.files).filter((f) =>
-      ACCEPTED_IMAGE_TYPES.includes(f.type)
+      ACCEPTED_FILE_TYPES.includes(f.type)
     );
     if (files.length > 0) {
       addPendingImages(selectedAgent, files);
@@ -250,7 +254,7 @@ export function CommandInput() {
   // File input handler
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []).filter((f) =>
-      ACCEPTED_IMAGE_TYPES.includes(f.type)
+      ACCEPTED_FILE_TYPES.includes(f.type)
     );
     if (files.length > 0) {
       addPendingImages(selectedAgent, files);
@@ -275,7 +279,7 @@ export function CommandInput() {
     >
       {drag && (
         <div className="text-center text-sky-300 text-[12px] py-2 mb-2 border border-dashed border-sky-600 rounded-lg bg-sky-900/30">
-          画像をドロップでアップロード
+          ファイルをドロップでアップロード
         </div>
       )}
 
@@ -349,7 +353,7 @@ export function CommandInput() {
       <div className="flex gap-1.5 items-end">
         <button
           className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 shrink-0"
-          title="画像を添付"
+          title="ファイルを添付"
           onClick={() => fileInputRef.current?.click()}
         >
           <svg
@@ -370,7 +374,7 @@ export function CommandInput() {
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp"
+          accept="image/png,image/jpeg,image/gif,image/webp,.md,.txt,.pdf,.yaml,.yml,.json,.csv,.log"
           multiple
           className="hidden"
           onChange={handleFileSelect}
