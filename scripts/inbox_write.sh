@@ -13,6 +13,8 @@ FROM="${4:-unknown}"
 
 INBOX="$SCRIPT_DIR/queue/inbox/${TARGET}.yaml"
 LOCKFILE="${INBOX}.lock"
+DELIVERY_LOG="$SCRIPT_DIR/logs/inbox_delivery.log"
+mkdir -p "$SCRIPT_DIR/logs"
 
 # Validate arguments
 if [ -z "$TARGET" ] || [ -z "$CONTENT" ]; then
@@ -89,7 +91,27 @@ except Exception as e:
 " || exit 1
 
     ) 200>"$LOCKFILE"; then
-        # Success — log the write
+        # Success — delivery log (案B)
+        echo "[$(date '+%Y-%m-%dT%H:%M:%S')] [SUCCESS] ${FROM} → ${TARGET} (type=${TYPE}) msg_id=${MSG_ID}" >> "$DELIVERY_LOG"
+
+        # Read-back verification: confirm msg_id is in inbox (案A)
+        if ! python3 -c "
+import yaml, sys
+try:
+    data = yaml.safe_load(open('$INBOX')) or {}
+    msgs = data.get('messages', []) or []
+    found = any(str(m.get('id', '')) == '$MSG_ID' for m in msgs)
+    if not found:
+        print('[inbox_write] WARNING: write verification failed — msg_id $MSG_ID not found in $INBOX', file=sys.stderr)
+        sys.exit(1)
+except Exception as e:
+    print(f'[inbox_write] WARNING: read-back verification error: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>&1; then
+            echo "[$(date '+%Y-%m-%dT%H:%M:%S')] [WARN_VERIFY] ${FROM} → ${TARGET} (type=${TYPE}) msg_id=${MSG_ID}" >> "$DELIVERY_LOG"
+            echo "[$(date '+%Y-%m-%dT%H:%M:%S')] [inbox_write] WARNING: msg_id ${MSG_ID} not verified in ${INBOX}" >&2
+        fi
+
         echo "[$(date '+%Y-%m-%dT%H:%M:%S')] [inbox_write] SUCCESS: ${FROM} → ${TARGET} (type=${TYPE})" >&2
         exit 0
     else
@@ -100,6 +122,7 @@ except Exception as e:
             sleep 1
         else
             echo "[inbox_write] Failed to acquire lock after $max_attempts attempts for $INBOX" >&2
+            echo "[$(date '+%Y-%m-%dT%H:%M:%S')] [FAIL] ${FROM} → ${TARGET} (type=${TYPE}) msg_id=${MSG_ID}" >> "$DELIVERY_LOG"
             exit 1
         fi
     fi
