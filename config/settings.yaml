@@ -74,6 +74,16 @@ agent_teams:
     unresponsive_threshold_sec: 300
     manual_command: "scripts/fallback_to_tmux.sh"
 
+# CLI設定（エージェント別モデル / CLI種別）
+# get_agent_model() が参照する。未設定時は cli_adapter.sh 内のデフォルトロジックを使用。
+cli:
+  default: claude
+  agents:
+    anzu:
+      model: opus
+    miho:
+      model: opus   # 参謀長は Opus（施策分配 + ブランチマージ判断 + 品質ゲート）
+
 # Bloom Taxonomy 動的モデルルーティング
 # タスク複雑度（L1-L6）に基づき、適切なモデルに振り分ける
 bloom_routing:
