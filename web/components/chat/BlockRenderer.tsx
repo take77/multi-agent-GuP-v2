@@ -5,6 +5,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import { Avatar } from "@/components/shared/Avatar";
+import { getAgentDisplayName } from "@/lib/agent-names";
 import type { ParsedBlock, ToolCall } from "@/types/parsed-blocks";
 
 // ── 0. Bash Summary Helpers ──
@@ -104,6 +105,51 @@ function ToolDetail({ tool }: { tool: ToolCall }) {
   const [showResult, setShowResult] = useState(false);
   const [showYamlDetail, setShowYamlDetail] = useState(false);
   const [showBashDetail, setShowBashDetail] = useState(false);
+
+  // inbox_write card: Bash with inbox_write.sh in detail
+  const isInboxWrite =
+    tool.label === "Bash" && tool.detail.includes("inbox_write.sh");
+  if (isInboxWrite) {
+    // Extract sender → target from result: "[...] [inbox_write] SUCCESS: miho → darjeeling"
+    const match = tool.result?.match(
+      /\[inbox_write\]\s+SUCCESS:\s+(\w+)\s+[→\-]+\s+(\w+)/
+    );
+    const sender = match ? match[1] : null;
+    const target = match ? match[2] : null;
+    const failed = tool.result?.includes("FAIL") || (!match && !!tool.result);
+
+    return (
+      <div className="ml-3">
+        <div className="flex items-center gap-1.5 text-[12px] font-mono">
+          <span className="text-slate-600 select-none">├</span>
+          <div
+            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border ${
+              failed
+                ? "bg-red-950/30 border-red-700/40"
+                : "bg-slate-800/80 border-slate-700/50"
+            }`}
+          >
+            <span>📨</span>
+            {sender && target ? (
+              <>
+                <span className="text-slate-300">
+                  {getAgentDisplayName(sender)}
+                </span>
+                <span className="text-slate-500 text-[11px]">→</span>
+                <span className="text-sky-400">
+                  {getAgentDisplayName(target)}
+                </span>
+              </>
+            ) : (
+              <span className={failed ? "text-red-400" : "text-slate-400"}>
+                {failed ? "送信失敗" : "inbox_write"}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // YAML write/edit: Write/Edit/Update on .yaml/.yml files → summary display
   const yamlFileMatch =
