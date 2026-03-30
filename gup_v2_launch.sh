@@ -743,6 +743,8 @@ if [ "$SETUP_ONLY" = false ]; then
     fi
 
     # 参謀長（miho）: CLI Adapter経由でコマンド構築
+    # モデル: opus（config/settings.yaml cli.agents.miho.model で設定）
+    # 理由: 施策分配判断、worktreeマージ管理、品質ゲート機能に高い推論能力が必要
     _miho_cli_type="claude"
     _miho_cmd="claude --model opus --dangerously-skip-permissions"
     if [ "$CLI_ADAPTER_LOADED" = true ]; then
