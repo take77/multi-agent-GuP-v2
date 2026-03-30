@@ -26,6 +26,14 @@ pane_exists() {
     tmux list-panes -a -F "#{session_name}:#{window_name}.#{pane_index}" 2>/dev/null | grep -qx "$pane"
 }
 
+# pane-base-index に依存しない、@agent_id プロパティによるペイン特定
+find_pane_for_agent() {
+    local session="$1"
+    local agent="$2"
+    tmux list-panes -t "$session" -F '#{session_name}:#{window_name}.#{pane_index}' \
+        -f "#{==:#{@agent_id},$agent}" 2>/dev/null | head -1
+}
+
 start_watcher_if_missing() {
     local agent="$1"
     local pane="$2"
@@ -63,59 +71,60 @@ start_watcher_if_missing() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# エージェント → セッション マッピング
+# pane-base-index に依存しない @agent_id ベースのペイン特定に使用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+declare -A SESSION_MAP=(
+    # 司令部 (command session)
+    ["anzu"]="command"
+    ["miho"]="command"
+    # ダージリン隊 (darjeeling cluster)
+    ["darjeeling"]="darjeeling"
+    ["pekoe"]="darjeeling"
+    ["hana"]="darjeeling"
+    ["rosehip"]="darjeeling"
+    ["marie"]="darjeeling"
+    ["oshida"]="darjeeling"
+    ["andou"]="darjeeling"
+    # カチューシャ隊 (katyusha cluster)
+    ["katyusha"]="katyusha"
+    ["nonna"]="katyusha"
+    ["klara"]="katyusha"
+    ["mako"]="katyusha"
+    ["erwin"]="katyusha"
+    ["caesar"]="katyusha"
+    ["saori"]="katyusha"
+    # ケイ隊 (kay cluster)
+    ["kay"]="kay"
+    ["arisa"]="kay"
+    ["naomi"]="kay"
+    ["anchovy"]="kay"
+    ["pepperoni"]="kay"
+    ["carpaccio"]="kay"
+    ["yukari"]="kay"
+    # 西住まほ隊 (maho cluster)
+    ["maho"]="maho"
+    ["erika"]="maho"
+    ["mika"]="maho"
+    ["aki"]="maho"
+    ["mikko"]="maho"
+    ["kinuyo"]="maho"
+    ["fukuda"]="maho"
+)
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Main Loop — Monitor and restart watchers for all agents
 # ═══════════════════════════════════════════════════════════════════════════════
 
 while true; do
-    # ─────────────────────────────────────────────────────────────────────────
-    # 司令部 (command session)
-    # ─────────────────────────────────────────────────────────────────────────
-    start_watcher_if_missing "anzu" "command:main.0" "logs/inbox_watcher_anzu.log"
-    start_watcher_if_missing "miho" "command:main.1" "logs/inbox_watcher_miho.log"
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # ダージリン隊 (darjeeling cluster)
-    # ─────────────────────────────────────────────────────────────────────────
-    start_watcher_if_missing "darjeeling" "darjeeling:agents.0" "logs/inbox_watcher_darjeeling.log"
-    start_watcher_if_missing "pekoe" "darjeeling:agents.1" "logs/inbox_watcher_pekoe.log"
-    start_watcher_if_missing "hana" "darjeeling:agents.2" "logs/inbox_watcher_hana.log"
-    start_watcher_if_missing "rosehip" "darjeeling:agents.3" "logs/inbox_watcher_rosehip.log"
-    start_watcher_if_missing "marie" "darjeeling:agents.4" "logs/inbox_watcher_marie.log"
-    start_watcher_if_missing "oshida" "darjeeling:agents.5" "logs/inbox_watcher_oshida.log"
-    start_watcher_if_missing "andou" "darjeeling:agents.6" "logs/inbox_watcher_andou.log"
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # カチューシャ隊 (katyusha cluster)
-    # ─────────────────────────────────────────────────────────────────────────
-    start_watcher_if_missing "katyusha" "katyusha:agents.0" "logs/inbox_watcher_katyusha.log"
-    start_watcher_if_missing "nonna" "katyusha:agents.1" "logs/inbox_watcher_nonna.log"
-    start_watcher_if_missing "klara" "katyusha:agents.2" "logs/inbox_watcher_klara.log"
-    start_watcher_if_missing "mako" "katyusha:agents.3" "logs/inbox_watcher_mako.log"
-    start_watcher_if_missing "erwin" "katyusha:agents.4" "logs/inbox_watcher_erwin.log"
-    start_watcher_if_missing "caesar" "katyusha:agents.5" "logs/inbox_watcher_caesar.log"
-    start_watcher_if_missing "saori" "katyusha:agents.6" "logs/inbox_watcher_saori.log"
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # ケイ隊 (kay cluster)
-    # ─────────────────────────────────────────────────────────────────────────
-    start_watcher_if_missing "kay" "kay:agents.0" "logs/inbox_watcher_kay.log"
-    start_watcher_if_missing "arisa" "kay:agents.1" "logs/inbox_watcher_arisa.log"
-    start_watcher_if_missing "naomi" "kay:agents.2" "logs/inbox_watcher_naomi.log"
-    start_watcher_if_missing "anchovy" "kay:agents.3" "logs/inbox_watcher_anchovy.log"
-    start_watcher_if_missing "pepperoni" "kay:agents.4" "logs/inbox_watcher_pepperoni.log"
-    start_watcher_if_missing "carpaccio" "kay:agents.5" "logs/inbox_watcher_carpaccio.log"
-    start_watcher_if_missing "yukari" "kay:agents.6" "logs/inbox_watcher_yukari.log"
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # 西住まほ隊 (maho cluster)
-    # ─────────────────────────────────────────────────────────────────────────
-    start_watcher_if_missing "maho" "maho:agents.0" "logs/inbox_watcher_maho.log"
-    start_watcher_if_missing "erika" "maho:agents.1" "logs/inbox_watcher_erika.log"
-    start_watcher_if_missing "mika" "maho:agents.2" "logs/inbox_watcher_mika.log"
-    start_watcher_if_missing "aki" "maho:agents.3" "logs/inbox_watcher_aki.log"
-    start_watcher_if_missing "mikko" "maho:agents.4" "logs/inbox_watcher_mikko.log"
-    start_watcher_if_missing "kinuyo" "maho:agents.5" "logs/inbox_watcher_kinuyo.log"
-    start_watcher_if_missing "fukuda" "maho:agents.6" "logs/inbox_watcher_fukuda.log"
+    for agent in "${!SESSION_MAP[@]}"; do
+        session="${SESSION_MAP[$agent]}"
+        pane=$(find_pane_for_agent "$session" "$agent")
+        if [ -n "$pane" ]; then
+            start_watcher_if_missing "$agent" "$pane" "logs/inbox_watcher_${agent}.log"
+        fi
+    done
 
     sleep 5
 done
