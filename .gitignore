@@ -115,7 +115,7 @@ scripts/monitor/node_modules/
 !scripts/slim_yaml.sh
 !scripts/statusline.sh
 !scripts/inbox_archive.sh
-
+!scripts/worktree_manager.sh
 
 # SayTask (sample template only, not actual data)
 !saytask/
