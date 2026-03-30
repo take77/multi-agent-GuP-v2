@@ -1,36 +1,49 @@
-import { describe, it, before, after } from 'node:test';
-import * as assert from 'node:assert';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
 import { taskCompletedHook } from './task_completed.js';
 
 /**
  * Unit Test for TaskCompleted Hook
+ *
+ * 安全策: process.chdir() で cwd を /tmp 配下の一時ディレクトリに切り替え、
+ * hook が参照する相対パス（queue/hq/, queue/tasks/）がプロジェクト本体と干渉しないようにする。
  */
 
-const TEST_STATE_PATH = 'queue/hq/test_session_state.yaml';
-const TEST_TASKS_DIR = 'queue/tasks';
+let TEST_BASE_DIR: string;
+let ORIGINAL_CWD: string;
 
 describe('taskCompletedHook', () => {
-  before(async () => {
-    // テスト用のディレクトリとファイルを準備
-    await fs.mkdir('queue/hq', { recursive: true });
-    await fs.mkdir('queue/tasks', { recursive: true });
+  beforeAll(async () => {
+    ORIGINAL_CWD = process.cwd();
+
+    // /tmp 配下に隔離されたテスト用ディレクトリを作成
+    TEST_BASE_DIR = await fs.mkdtemp(path.join(os.tmpdir(), 'gup-hook-test-'));
+
+    // hook が参照する相対パス構造を再現
+    await fs.mkdir(path.join(TEST_BASE_DIR, 'queue', 'hq'), { recursive: true });
+    await fs.mkdir(path.join(TEST_BASE_DIR, 'queue', 'tasks'), { recursive: true });
 
     // テスト用の初期状態YAML
-    await fs.writeFile(TEST_STATE_PATH, 'teammates: []\n', 'utf8');
+    await fs.writeFile(
+      path.join(TEST_BASE_DIR, 'queue', 'hq', 'session_state.yaml'),
+      'teammates: []\n',
+      'utf8'
+    );
+
+    // cwd を一時ディレクトリに切り替え
+    process.chdir(TEST_BASE_DIR);
   });
 
-  after(async () => {
-    // テスト後のクリーンアップ
+  afterAll(async () => {
+    // cwd を元に戻す
+    process.chdir(ORIGINAL_CWD);
+
+    // クリーンアップ
     try {
-      await fs.unlink(TEST_STATE_PATH);
-      // タスクYAMLファイルも削除
-      const files = await fs.readdir(TEST_TASKS_DIR);
-      for (const file of files) {
-        if (file.startsWith('test_task_')) {
-          await fs.unlink(path.join(TEST_TASKS_DIR, file));
-        }
+      if (TEST_BASE_DIR) {
+        await fs.rm(TEST_BASE_DIR, { recursive: true, force: true });
       }
     } catch (error) {
       // クリーンアップエラーは無視
@@ -38,7 +51,6 @@ describe('taskCompletedHook', () => {
   });
 
   it('should block when criteria are not met', async () => {
-    // タスクYAMLを作成（acceptance_criteria あり）
     const taskYaml = `
 task:
   task_id: test_task_001
@@ -47,9 +59,8 @@ task:
     - "All tests passed"
     - "Code compiled successfully"
 `;
-    await fs.writeFile(path.join(TEST_TASKS_DIR, 'test_task_001.yaml'), taskYaml, 'utf8');
+    await fs.writeFile('queue/tasks/test_task_001.yaml', taskYaml, 'utf8');
 
-    // criteria を満たさない result で呼び出し
     const input = {
       task_id: 'test_task_001',
       result: 'Some incomplete result'
@@ -57,14 +68,12 @@ task:
 
     const response = await taskCompletedHook(input);
 
-    // block が返ることを検証
-    assert.strictEqual(response.decision, 'block');
-    assert.ok(response.reason);
-    assert.ok(response.reason.includes('All tests passed'));
+    expect(response.decision).toBe('block');
+    expect(response.reason).toBeTruthy();
+    expect(response.reason).toContain('All tests passed');
   });
 
   it('should allow when all criteria are met', async () => {
-    // タスクYAMLを作成（acceptance_criteria あり）
     const taskYaml = `
 task:
   task_id: test_task_002
@@ -73,9 +82,8 @@ task:
     - "Build completed"
     - "Tests passed"
 `;
-    await fs.writeFile(path.join(TEST_TASKS_DIR, 'test_task_002.yaml'), taskYaml, 'utf8');
+    await fs.writeFile('queue/tasks/test_task_002.yaml', taskYaml, 'utf8');
 
-    // criteria を全て満たす result で呼び出し
     const input = {
       task_id: 'test_task_002',
       result: 'Build completed successfully. All Tests passed with no errors.'
@@ -83,20 +91,17 @@ task:
 
     const response = await taskCompletedHook(input);
 
-    // allow が返ることを検証（空オブジェクト）
-    assert.deepStrictEqual(response, {});
+    expect(response).toEqual({});
   });
 
   it('should allow when criteria do not exist (fail-open)', async () => {
-    // タスクYAMLを作成（acceptance_criteria なし）
     const taskYaml = `
 task:
   task_id: test_task_003
   description: Test task without criteria
 `;
-    await fs.writeFile(path.join(TEST_TASKS_DIR, 'test_task_003.yaml'), taskYaml, 'utf8');
+    await fs.writeFile('queue/tasks/test_task_003.yaml', taskYaml, 'utf8');
 
-    // criteria がない場合は allow（フェイルオープン）
     const input = {
       task_id: 'test_task_003',
       result: 'Any result'
@@ -104,12 +109,10 @@ task:
 
     const response = await taskCompletedHook(input);
 
-    // allow が返ることを検証（空オブジェクト）
-    assert.deepStrictEqual(response, {});
+    expect(response).toEqual({});
   });
 
   it('should block when result is undefined', async () => {
-    // タスクYAMLを作成（acceptance_criteria あり）
     const taskYaml = `
 task:
   task_id: test_task_004
@@ -117,9 +120,8 @@ task:
   acceptance_criteria:
     - "Some criterion"
 `;
-    await fs.writeFile(path.join(TEST_TASKS_DIR, 'test_task_004.yaml'), taskYaml, 'utf8');
+    await fs.writeFile('queue/tasks/test_task_004.yaml', taskYaml, 'utf8');
 
-    // result が undefined の場合
     const input = {
       task_id: 'test_task_004',
       result: undefined
@@ -127,14 +129,12 @@ task:
 
     const response = await taskCompletedHook(input);
 
-    // block が返ることを検証
-    assert.strictEqual(response.decision, 'block');
-    assert.ok(response.reason);
-    assert.ok(response.reason.includes('Result is empty or undefined'));
+    expect(response.decision).toBe('block');
+    expect(response.reason).toBeTruthy();
+    expect(response.reason).toContain('Result is empty or undefined');
   });
 
   it('should allow on error (fail-open)', async () => {
-    // 存在しないタスクIDでエラーを発生させる
     const input = {
       task_id: 'non_existent_task',
       result: 'Some result'
@@ -142,7 +142,6 @@ task:
 
     const response = await taskCompletedHook(input);
 
-    // エラー時はフェイルオープンで allow（空オブジェクト）
-    assert.deepStrictEqual(response, {});
+    expect(response).toEqual({});
   });
 });

@@ -710,6 +710,43 @@ tasks:
 
 **理由**: worktree内の作業順序を隊長任せにすると、コンフリクトや手戻りが発生しやすい。参謀長が全体の依存関係を把握した上で指示することで、効率的な並列作業が実現できる。
 
+## タスクルーティング判断基準
+
+施策を受け取ったら、タスクの規模・複雑さに応じて実行経路を選択する。
+
+| 規模 | 種類の例 | ルート |
+|------|----------|--------|
+| **重量級** | 新機能実装、大規模リファクタ、API設計変更 | 隊長 → 隊員(tmux) |
+| **軽量級** | lint修正、YAML整理、ドキュメント更新、設定ファイル微修正 | subagent スポーン |
+
+**判断に迷ったら重量級扱い**（隊長→隊員ルート）。subagentは単純・明確・短時間のタスクのみ。
+
+### subagent スポーン方法
+
+軽量タスクは `.claude/agents/task-runner.md` に定義された Custom Agent を使用する。
+このエージェントは frontmatter で `model: claude-sonnet-4-6`, `maxTurns: 15`, `isolation: worktree` が設定済み。
+
+Claude Code の Agent ツール呼び出し例:
+
+```
+Agent(
+  prompt="あなたは task-runner です。
+         .claude/agents/task-runner.md の指示に従ってください。
+         対象タスク: queue/tasks/{agent_id}.yaml を読み、lint修正を実施し、
+         queue/reports/{agent_id}_report.yaml に報告を書いた後、
+         bash scripts/inbox_write.sh katyusha '完了' report_received {agent_id}
+         を実行せよ。"
+)
+```
+
+**注意**: Custom Agent の `isolation: worktree` は frontmatter で指定済みのため、Agent() 呼び出し時に重複指定は不要。
+
+### ハイブリッドモード(Agent Teams)について
+
+`--agent-teams` フラグ起動時の Agent Teams 連携コードは**実験コードとして保持**する。
+削除・無効化してはならない。将来の正式採用時に参照する。
+フラグなし通常起動では Agent Teams コードは動作せず、影響なし。
+
 ## コミュニケーションスタイル
 
 西住みほとして、以下のスタイルでコミュニケーションを取ってください:
