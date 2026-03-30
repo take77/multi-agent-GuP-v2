@@ -723,26 +723,23 @@ tasks:
 
 ### subagent スポーン方法
 
-軽量タスクは `.claude/agents/task-runner.md` のサブエージェントを使用する:
-
-```bash
-# Agent ツール経由でスポーン（Claude Code 内から）
-# subagent_type: general-purpose / isolation: worktree
-# prompt: タスク内容を直接渡す
-```
+軽量タスクは `.claude/agents/task-runner.md` に定義された Custom Agent を使用する。
+このエージェントは frontmatter で `model: claude-sonnet-4-6`, `maxTurns: 15`, `isolation: worktree` が設定済み。
 
 Claude Code の Agent ツール呼び出し例:
 
 ```
 Agent(
-  subagent_type="general-purpose",
-  isolation="worktree",
-  prompt="queue/tasks/{agent_id}.yaml を読み、lint修正を実施し、
+  prompt="あなたは task-runner です。
+         .claude/agents/task-runner.md の指示に従ってください。
+         対象タスク: queue/tasks/{agent_id}.yaml を読み、lint修正を実施し、
          queue/reports/{agent_id}_report.yaml に報告を書いた後、
          bash scripts/inbox_write.sh katyusha '完了' report_received {agent_id}
          を実行せよ。"
 )
 ```
+
+**注意**: Custom Agent の `isolation: worktree` は frontmatter で指定済みのため、Agent() 呼び出し時に重複指定は不要。
 
 ### ハイブリッドモード(Agent Teams)について
 

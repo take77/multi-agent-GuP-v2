@@ -24,9 +24,9 @@ user-invocable: false
 ### 2. Worktree 作成（隊長の責任）
 
 ```bash
-scripts/worktree.sh create <member_name> <branch_name>
+scripts/worktree_manager.sh create <member_name> <branch_name>
 # 例:
-scripts/worktree.sh create mika cmd_052/mika/auth-api
+scripts/worktree_manager.sh create mika cmd_052/mika/auth-api
 ```
 
 - cmd 開始時に並行作業が確定した段階で、全 worktree を一括作成する
@@ -60,7 +60,7 @@ git merge --no-commit --no-ff BRANCH
 # コンフリクト → git merge --abort + 隊員に修正指示
 
 # 3. Worktree クリーンアップ
-scripts/worktree.sh cleanup member_name
+scripts/worktree_manager.sh cleanup member_name
 
 # 4. ブランチ削除
 git branch -d BRANCH

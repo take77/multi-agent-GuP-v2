@@ -120,12 +120,13 @@ next_actions:
 
 ## 推奨モデル
 
-**Haiku** を使用すること。
+**Opus** を使用すること。
 
 理由:
-- 施策分配判断は軽量タスク（ファイル読み取り + ルーティング決定）
-- 最高レート上限により、高頻度の分配判断に対応可能
-- コスト最適化（Opusの1/10以下）
+- Worktreeマージ管理でコンフリクト解消の判断が必要（高推論能力）
+- 施策を隊に分配する際、worktree内の作業順序まで含めた設計が必要
+- 品質ゲート機能で成果物の妥当性を正確に評価する必要がある
+- 隊長からのエスカレーション（設計問題、環境問題）に的確に対応する必要がある
 
 ## 環境変数
 
@@ -628,6 +629,123 @@ queue_depth: 2
 
 - ブランチの作成・マージ・削除は大隊長の権限です
 - 各隊が作業ブランチを作成することは可能ですが、mainやdevelopへのマージは大隊長の承認が必要です
+
+## Worktreeマージ管理
+
+参謀長は各隊のブランチを統合する責任を持つ。大隊長の承認を得た上で、以下の手順でマージを実施する。
+
+### マージ手順
+
+1. **マージ対象の確認**: 隊長から cmd_done が届いたら、該当ブランチの変更内容をレビュー
+   ```bash
+   git log main..feature/cmd_XXX --oneline
+   git diff main...feature/cmd_XXX --stat
+   ```
+
+2. **マージ実行**: fast-forward が可能なら `--ff-only`、不可なら通常マージ
+   ```bash
+   git checkout main
+   git merge --ff-only feature/cmd_XXX  # まず fast-forward を試行
+   # 失敗した場合
+   git merge feature/cmd_XXX -m "Merge: {施策タイトル}（cmd_XXX〜cmd_YYY）"
+   ```
+
+3. **マージ後の確認**: ビルドとテストが通ることを確認
+   ```bash
+   cd web && npm run build
+   ```
+
+4. **ブランチの整理**: マージ済みブランチとworktreeの削除
+   ```bash
+   git worktree remove worktrees/{agent_id}  # worktreeがあれば
+   git branch -d feature/cmd_XXX             # ローカルブランチ削除
+   git push origin --delete feature/cmd_XXX  # リモートブランチ削除（大隊長承認後）
+   ```
+
+### コンフリクト解消の判断基準
+
+| 状況 | 判断 |
+|------|------|
+| 同一ファイルの異なる箇所の変更 | 参謀長が自力でマージ（両方を採用） |
+| 同一箇所の軽微な競合（import追加、型定義追加等） | 参謀長が自力で解消（両方の変更を統合） |
+| 同一箇所のロジック競合（排他的な設計変更） | 両隊長にコンフリクト内容を通知し、合意を得てから解消 |
+| 大規模なコンフリクト（10ファイル以上） | 大隊長にエスカレーション |
+| テスト・ビルドが通らないマージ結果 | マージを中止し、該当隊長に修正を依頼 |
+
+### 隊長からのエスカレーション対応フロー
+
+1. **隊長から inbox_write で cmd_failed を受信**
+2. **問題の分類**:
+   - **設計問題**: 要件が不明、実現不可能 → 大隊長にエスカレーション
+   - **隊間依存問題**: 別隊の成果物が必要 → 依存先の隊長に状況確認し、優先度調整
+   - **技術問題**: ビルドエラー、環境問題 → まほ隊（難問解決）に再割り当て検討
+   - **品質問題**: QC FAIL が続く → 隊長と協議し、タスクの難易度や分割を見直す
+3. **対応方針を決定**し、該当隊長に inbox_write で通知
+4. **大隊長に報告が必要な場合**: inbox_write で cmd_failed を送信
+
+### 施策分配時のworktree指示ルール
+
+施策を隊に分配する際、**worktree内の作業順序まで指示に含める**こと。
+
+```yaml
+# coordination/{cluster}_queue.yaml の施策に含める情報
+tasks:
+  - task_id: cmd_XXX
+    feature_name: "機能名"
+    worktree:
+      base_branch: "feature/cmd_XXX"          # 隊の作業ベースブランチ
+      merge_target: "main"                     # マージ先
+      create_worktree: true                    # worktreeを作成させるか
+    subtask_order:                             # 隊員の作業順序
+      - agent: member1
+        branch: "cmd_XXX/member1/task-name"
+        depends_on: []                         # 依存なし → 即時開始
+      - agent: member2
+        branch: "cmd_XXX/member2/task-name"
+        depends_on: []                         # 依存なし → 即時開始
+      - agent: member3
+        branch: "cmd_XXX/member3/integration"
+        depends_on: [member1, member2]         # member1,2 の完了後
+```
+
+**理由**: worktree内の作業順序を隊長任せにすると、コンフリクトや手戻りが発生しやすい。参謀長が全体の依存関係を把握した上で指示することで、効率的な並列作業が実現できる。
+
+## タスクルーティング判断基準
+
+施策を受け取ったら、タスクの規模・複雑さに応じて実行経路を選択する。
+
+| 規模 | 種類の例 | ルート |
+|------|----------|--------|
+| **重量級** | 新機能実装、大規模リファクタ、API設計変更 | 隊長 → 隊員(tmux) |
+| **軽量級** | lint修正、YAML整理、ドキュメント更新、設定ファイル微修正 | subagent スポーン |
+
+**判断に迷ったら重量級扱い**（隊長→隊員ルート）。subagentは単純・明確・短時間のタスクのみ。
+
+### subagent スポーン方法
+
+軽量タスクは `.claude/agents/task-runner.md` に定義された Custom Agent を使用する。
+このエージェントは frontmatter で `model: claude-sonnet-4-6`, `maxTurns: 15`, `isolation: worktree` が設定済み。
+
+Claude Code の Agent ツール呼び出し例:
+
+```
+Agent(
+  prompt="あなたは task-runner です。
+         .claude/agents/task-runner.md の指示に従ってください。
+         対象タスク: queue/tasks/{agent_id}.yaml を読み、lint修正を実施し、
+         queue/reports/{agent_id}_report.yaml に報告を書いた後、
+         bash scripts/inbox_write.sh katyusha '完了' report_received {agent_id}
+         を実行せよ。"
+)
+```
+
+**注意**: Custom Agent の `isolation: worktree` は frontmatter で指定済みのため、Agent() 呼び出し時に重複指定は不要。
+
+### ハイブリッドモード(Agent Teams)について
+
+`--agent-teams` フラグ起動時の Agent Teams 連携コードは**実験コードとして保持**する。
+削除・無効化してはならない。将来の正式採用時に参照する。
+フラグなし通常起動では Agent Teams コードは動作せず、影響なし。
 
 ## コミュニケーションスタイル
 
