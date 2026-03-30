@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import { Avatar } from "@/components/shared/Avatar";
 import { getAgentDisplayName } from "@/lib/agent-names";
+import { DiffFoldView } from "@/components/chat/DiffFoldView";
 import type { ParsedBlock, ToolCall } from "@/types/parsed-blocks";
 import { TruncatedToolResult } from "./TruncatedToolResult";
 
@@ -233,7 +234,9 @@ function ToolDetail({ tool }: { tool: ToolCall }) {
         )}
       </div>
       {showResult && tool.result && (
-        tool.label === "Read" ? (
+        tool.result.includes("diff --git ") ? (
+          <DiffFoldView raw={tool.result} />
+        ) : tool.label === "Read" ? (
           <TruncatedToolResult content={tool.result} />
         ) : (
           <pre className="mt-0.5 ml-6 text-[11px] leading-[1.3] text-slate-500 font-mono whitespace-pre-wrap break-words max-h-[20vh] overflow-y-auto border-l border-slate-700 pl-2">
