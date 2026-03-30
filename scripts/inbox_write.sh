@@ -39,12 +39,18 @@ while [ $attempt -lt $max_attempts ]; do
         flock -w 5 200 || exit 1
 
         # Add message via python3 (unified YAML handling)
+        # Security: all variables passed via environment/stdin to prevent injection
+        IW_INBOX="$INBOX" IW_MSG_ID="$MSG_ID" IW_FROM="$FROM" \
+        IW_TIMESTAMP="$TIMESTAMP" IW_TYPE="$TYPE" \
         python3 -c "
-import yaml, sys
+import yaml, sys, os
 
 try:
+    content = sys.stdin.read().rstrip('\n')
+    inbox_path = os.environ['IW_INBOX']
+
     # Load existing inbox
-    with open('$INBOX') as f:
+    with open(inbox_path) as f:
         data = yaml.safe_load(f)
 
     # Initialize if needed
@@ -55,11 +61,11 @@ try:
 
     # Add new message
     new_msg = {
-        'id': '$MSG_ID',
-        'from': '$FROM',
-        'timestamp': '$TIMESTAMP',
-        'type': '$TYPE',
-        'content': '''$CONTENT''',
+        'id': os.environ['IW_MSG_ID'],
+        'from': os.environ['IW_FROM'],
+        'timestamp': os.environ['IW_TIMESTAMP'],
+        'type': os.environ['IW_TYPE'],
+        'content': content,
         'read': False
     }
     data['messages'].append(new_msg)
@@ -73,12 +79,12 @@ try:
         data['messages'] = unread + read[-30:]
 
     # Atomic write: tmp file + rename (prevents partial reads)
-    import tempfile, os
-    tmp_fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname('$INBOX'), suffix='.tmp')
+    import tempfile
+    tmp_fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(inbox_path), suffix='.tmp')
     try:
         with os.fdopen(tmp_fd, 'w') as f:
             yaml.dump(data, f, default_flow_style=False, allow_unicode=True, indent=2)
-        os.replace(tmp_path, '$INBOX')
+        os.replace(tmp_path, inbox_path)
     except:
         os.unlink(tmp_path)
         raise
@@ -86,7 +92,7 @@ try:
 except Exception as e:
     print(f'ERROR: {e}', file=sys.stderr)
     sys.exit(1)
-" || exit 1
+" <<< "$CONTENT" || exit 1
 
     ) 200>"$LOCKFILE"; then
         # Success — log the write
