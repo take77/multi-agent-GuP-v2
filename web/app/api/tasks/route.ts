@@ -93,7 +93,7 @@ function loadReports(): Record<
   return reports;
 }
 
-/** Collect all task file paths: queue/tasks/ + clusters/*/queue/tasks/ */
+// Collect all task file paths: queue/tasks/ + clusters/*/queue/tasks/
 function collectTaskFiles(): Array<{ dir: string; file: string }> {
   const entries: Array<{ dir: string; file: string }> = [];
 
