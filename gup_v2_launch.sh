@@ -48,6 +48,7 @@ SHELL_OVERRIDE=""
 CLUSTER_MODE=""  # "" = 従来モード, "darjeeling" = ダージリン隊のみ, "all" = 全クラスタ
 COMMAND_SERVER_MODE=false  # --command: 司令部サーバーのみ起動
 AGENT_TEAMS_MODE=false
+WEB_MODE=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -106,6 +107,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --command           司令部サーバーのみ起動（大隊長+参謀長の2ペイン）"
             echo "                      デフォルトtmuxサーバーにcommandセッションとして起動"
             echo "  --all-clusters      全クラスタ起動（将来用、現在はスタブ）"
+            echo "  --web               Web UI を起動（http://localhost:3000）"
+            echo "                      tmuxセッション起動後、cd web && npm run dev をバックグラウンド実行"
             echo "  --agent-teams       Agent Teams モード有効化（Phase 0適用が前提）"
             echo "                      参謀長モニタプロセスを起動し、YAML↔Agent Teams双方向連携を有効化"
             echo "  -h, --help          このヘルプを表示"
@@ -157,6 +160,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --command)
             COMMAND_SERVER_MODE=true
+            shift
+            ;;
+        --web)
+            WEB_MODE=true
             shift
             ;;
         --agent-teams)
@@ -966,7 +973,18 @@ echo "  ════════════════════════
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 8: Windows Terminal でタブを開く（-t オプション時のみ）
+# STEP 8: Web UI 起動（--web オプション時のみ）
+# ═══════════════════════════════════════════════════════════════════════════════
+if [ "$WEB_MODE" = true ]; then
+    log_info "🌐 Web UI を起動中..."
+    mkdir -p "$SCRIPT_DIR/logs/structured"
+    (cd "$SCRIPT_DIR/web" && npm run dev > "$SCRIPT_DIR/logs/structured/web_dev.log" 2>&1 &)
+    log_success "  └─ Web UI 起動完了: http://localhost:3000"
+    echo ""
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 9: Windows Terminal でタブを開く（-t オプション時のみ）
 # ═══════════════════════════════════════════════════════════════════════════════
 if [ "$OPEN_TERMINAL" = true ]; then
     log_info "📺 Windows Terminal でタブを展開中..."
