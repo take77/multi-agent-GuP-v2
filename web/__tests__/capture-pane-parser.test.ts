@@ -209,6 +209,78 @@ describe("parseCapturePane", () => {
   });
 });
 
+describe("Agent() nested output handling", () => {
+  it("keeps nested ● markers inside Agent tool-result as raw text", () => {
+    const input = `● Agent(pekoe)
+  ⎿  Result from pekoe:
+     ● ペコがコードを確認しています
+     ● Read(web/lib/store.ts)
+       ⎿  Contents of store.ts...
+     ● 確認完了しました。`;
+    const blocks = parseCapturePane(input);
+    // Should be 1 tool-execution block with 1 Agent tool
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string; result?: string }> };
+    expect(toolBlock.tools).toHaveLength(1);
+    expect(toolBlock.tools[0].label).toBe("Agent");
+    // The nested ● content should be in the result, not split into separate blocks
+    expect(toolBlock.tools[0].result).toContain("ペコがコードを確認しています");
+    expect(toolBlock.tools[0].result).toContain("Read(web/lib/store.ts)");
+    expect(toolBlock.tools[0].result).toContain("確認完了しました");
+  });
+
+  it("nested ● does not produce extra assistant-text blocks", () => {
+    const input = `● Agent(hana)
+  ⎿  Agent result:
+     ● 華が作業を開始します
+     ● Bash(echo hello)
+       ⎿  hello
+     ● 作業完了
+
+● 次のタスクに進みます。`;
+    const blocks = parseCapturePane(input);
+    // Should be: 1 tool-execution (Agent) + 1 assistant-text
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string; result?: string }> };
+    expect(toolBlock.tools[0].label).toBe("Agent");
+    expect(toolBlock.tools[0].result).toContain("華が作業を開始します");
+    expect(blocks[1].type).toBe("assistant-text");
+    expect((blocks[1] as { type: "assistant-text"; content: string }).content).toContain("次のタスクに進みます");
+  });
+
+  it("handles Agent result with deeply nested ● markers at various indentation", () => {
+    const input = `● Agent(rosehip)
+  ⎿  Starting task...
+       ● ネスト1段目
+         ● ネスト2段目
+     ● 同レベルに戻る`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string; result?: string }> };
+    expect(toolBlock.tools[0].label).toBe("Agent");
+    expect(toolBlock.tools[0].result).toContain("ネスト1段目");
+    expect(toolBlock.tools[0].result).toContain("ネスト2段目");
+    expect(toolBlock.tools[0].result).toContain("同レベルに戻る");
+  });
+  it("unindented ● after Agent result starts a new assistant-text block", () => {
+    const input = `● Agent(pekoe)
+  ⎿  Result from pekoe
+● これは新しいアシスタント発話`;
+    const blocks = parseCapturePane(input);
+    // Should be: 1 tool-execution (Agent) + 1 assistant-text
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string; result?: string }> };
+    expect(toolBlock.tools[0].label).toBe("Agent");
+    expect(toolBlock.tools[0].result).not.toContain("新しいアシスタント発話");
+    expect(blocks[1].type).toBe("assistant-text");
+    expect((blocks[1] as { type: "assistant-text"; content: string }).content).toContain("新しいアシスタント発話");
+  });
+});
+
 describe("parseCapturePaneOutput (legacy API)", () => {
   it("returns ParsedSegment[] with correct kinds", () => {
     const input = `● テスト応答

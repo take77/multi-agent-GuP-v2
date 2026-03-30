@@ -292,49 +292,53 @@ function tokenize(raw: string): Token[] {
         const next = lines[i];
         const nextTrimmed = next.trim();
 
-        // 1. Core markers always end collection
-        if (RE_USER_INPUT.test(nextTrimmed) || RE_ASSISTANT_TEXT.test(nextTrimmed)) break;
-        if (/^⎿/.test(nextTrimmed) && resultLines.length > 0) {
-          // New ⎿ continues result
+        // 1. Indented content (2+ spaces) — continue collecting
+        //    This handles nested Agent output where ● appears indented.
+        //    Must be checked BEFORE core markers to avoid breaking on nested ●.
+        if (/^\s{2,}/.test(next)) {
+          // Don't swallow indented tool calls (e.g. "  Update(file.yaml)")
+          if (tryParseToolCall(nextTrimmed) !== null) break;
+          // ⎿ continuation within indented block
           const m = nextTrimmed.match(RE_TOOL_RESULT);
           resultLines.push(m ? m[1] : next);
           i++;
           continue;
         }
 
-        // 2. Empty line + next is core marker → end
+        // 2. ⎿ continuation at start of line
+        if (/^⎿/.test(nextTrimmed) && resultLines.length > 0) {
+          const m = nextTrimmed.match(RE_TOOL_RESULT);
+          resultLines.push(m ? m[1] : next);
+          i++;
+          continue;
+        }
+
+        // 3. Core markers (non-indented) always end collection
+        if (RE_USER_INPUT.test(nextTrimmed) || RE_ASSISTANT_TEXT.test(nextTrimmed)) break;
+
+        // 4. Empty line + next is core marker → end
         if (nextTrimmed === "") {
           let peek = i + 1;
           while (peek < lines.length && lines[peek].trim() === "") peek++;
           if (peek >= lines.length) break;
           const peekTrimmed = lines[peek].trim();
           if (RE_USER_INPUT.test(peekTrimmed) || RE_ASSISTANT_TEXT.test(peekTrimmed) || tryParseToolCall(peekTrimmed) !== null) break;
-          // Empty line but no core marker ahead — include it and continue
           resultLines.push("");
           i++;
           continue;
         }
 
-        // 3. Indented content (2+ spaces) — continue collecting
-        if (/^\s{2,}/.test(next)) {
-          // Don't swallow indented tool calls (e.g. "  Update(file.yaml)")
-          if (tryParseToolCall(nextTrimmed) !== null) break;
-          resultLines.push(next);
-          i++;
-          continue;
-        }
-
-        // 4. Diff pattern lines (e.g. "108 - read: false") — continue collecting
+        // 5. Diff pattern lines (e.g. "108 - read: false") — continue collecting
         if (RE_DIFF_LINE.test(nextTrimmed)) {
           resultLines.push(next);
           i++;
           continue;
         }
 
-        // 5. Standalone tool call at start of line — end
+        // 6. Standalone tool call at start of line — end
         if (tryParseToolCall(nextTrimmed) !== null) break;
 
-        // 6. Other unindented lines — end
+        // 7. Other unindented lines — end
         break;
       }
       tokens.push({ type: "tool-result", text: resultLines.join("\n") });

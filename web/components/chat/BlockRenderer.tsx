@@ -103,6 +103,52 @@ const AssistantBubble = memo(function AssistantBubble({
 
 // ── 2. ToolWorkflowBlock ──
 
+function AgentNestedOutput({ result }: { result: string }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const lines = result.split("\n");
+  const nestedEntries: Array<{ type: "text" | "marker"; content: string }> = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const markerMatch = trimmed.match(/^●\s(.*)$/);
+    if (markerMatch) {
+      nestedEntries.push({ type: "marker", content: markerMatch[1] });
+    } else if (trimmed) {
+      nestedEntries.push({ type: "text", content: trimmed });
+    }
+  }
+
+  const stepCount = nestedEntries.filter(e => e.type === "marker").length;
+
+  return (
+    <div className="mt-1 ml-3 border-l-2 border-sky-700/40 pl-2">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+      >
+        <span className="select-none">{expanded ? "▼" : "▶"}</span>
+        <span>サブエージェント出力{stepCount > 0 ? ` (${stepCount} ステップ)` : ""}</span>
+      </button>
+      {expanded && (
+        <div className="mt-1 space-y-0.5">
+          {nestedEntries.map((entry, idx) => (
+            <div key={idx} className="text-[11px] font-mono">
+              {entry.type === "marker" ? (
+                <div className="flex items-start gap-1 text-slate-400">
+                  <span className="text-sky-500 select-none shrink-0">●</span>
+                  <span className="break-words">{entry.content}</span>
+                </div>
+              ) : (
+                <div className="text-slate-600 ml-3 break-words">{entry.content}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ToolDetail({ tool }: { tool: ToolCall }) {
   const [showResult, setShowResult] = useState(false);
   const [showYamlDetail, setShowYamlDetail] = useState(false);
@@ -149,6 +195,20 @@ function ToolDetail({ tool }: { tool: ToolCall }) {
             )}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // Agent nested output: show structured collapsible view
+  if (tool.label === "Agent" && tool.result && /●\s/.test(tool.result)) {
+    return (
+      <div className="ml-3">
+        <div className="flex items-center gap-1.5 text-[12px] text-slate-400 font-mono">
+          <span className="text-slate-600 select-none">├</span>
+          <span>🤖</span>
+          <span className="text-slate-300">Agent({tool.detail})</span>
+        </div>
+        <AgentNestedOutput result={tool.result} />
       </div>
     );
   }
