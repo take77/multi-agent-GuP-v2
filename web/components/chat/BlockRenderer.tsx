@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import { Avatar } from "@/components/shared/Avatar";
 import type { ParsedBlock, ToolCall } from "@/types/parsed-blocks";
+import { TruncatedToolResult } from "./TruncatedToolResult";
 
 // ── 1. AssistantBubble ──
 
@@ -85,9 +86,13 @@ function ToolDetail({ tool }: { tool: ToolCall }) {
         )}
       </div>
       {showResult && tool.result && (
-        <pre className="mt-0.5 ml-6 text-[11px] leading-[1.3] text-slate-500 font-mono whitespace-pre-wrap break-words max-h-[20vh] overflow-y-auto border-l border-slate-700 pl-2">
-          {tool.result}
-        </pre>
+        tool.label === "Read" ? (
+          <TruncatedToolResult content={tool.result} />
+        ) : (
+          <pre className="mt-0.5 ml-6 text-[11px] leading-[1.3] text-slate-500 font-mono whitespace-pre-wrap break-words max-h-[20vh] overflow-y-auto border-l border-slate-700 pl-2">
+            {tool.result}
+          </pre>
+        )
       )}
     </div>
   );
