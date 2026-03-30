@@ -31,6 +31,7 @@ start_watcher_if_missing() {
     local pane="$2"
     local log_file="$3"
     local cli
+    local lock_file="/tmp/gup_watcher_${agent}.lock"
 
     ensure_inbox_file "$agent"
     if ! pane_exists "$pane"; then
@@ -48,12 +49,17 @@ start_watcher_if_missing() {
         fi
     fi
 
-    if pgrep -f "scripts/inbox_watcher.sh ${agent} " >/dev/null 2>&1; then
-        return 0
-    fi
+    # flock による排他制御: pgrep チェックと nohup 起動の TOCTOU 窓を閉じる
+    (
+        flock -n 9 || return 0  # ロック取得失敗 = 別プロセスが起動処理中 → skip
 
-    cli=$(tmux show-options -p -t "$pane" -v @agent_cli 2>/dev/null || echo "claude")
-    nohup bash scripts/inbox_watcher.sh "$agent" "$pane" "$cli" >> "$log_file" 2>&1 &
+        if pgrep -f "scripts/inbox_watcher.sh ${agent} " >/dev/null 2>&1; then
+            return 0
+        fi
+
+        cli=$(tmux show-options -p -t "$pane" -v @agent_cli 2>/dev/null || echo "claude")
+        nohup bash scripts/inbox_watcher.sh "$agent" "$pane" "$cli" >> "$log_file" 2>&1 &
+    ) 9>"$lock_file"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
