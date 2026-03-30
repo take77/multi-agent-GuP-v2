@@ -105,6 +105,9 @@ const RE_USER_INPUT = /^❯\s+(.*)$/;
 const RE_ASSISTANT_TEXT = /^●\s(.*)$/;
 const RE_TOOL_RESULT = /^⎿\s?(.*)$/;
 
+// Diff line pattern: "108 - read: false" or "108 + read: true"
+const RE_DIFF_LINE = /^\d+\s+[-+]\s/;
+
 /**
  * Try to parse a trimmed line as a ToolCall.
  */
@@ -288,15 +291,51 @@ function tokenize(raw: string): Token[] {
       while (i < lines.length) {
         const next = lines[i];
         const nextTrimmed = next.trim();
-        if (/^\s{2,}/.test(next) || /^⎿/.test(nextTrimmed)) {
-          // Don't swallow indented tool calls (e.g. "  Update(file.yaml)")
-          if (tryParseToolCall(nextTrimmed) !== null) break;
+
+        // 1. Core markers always end collection
+        if (RE_USER_INPUT.test(nextTrimmed) || RE_ASSISTANT_TEXT.test(nextTrimmed)) break;
+        if (/^⎿/.test(nextTrimmed) && resultLines.length > 0) {
+          // New ⎿ continues result
           const m = nextTrimmed.match(RE_TOOL_RESULT);
           resultLines.push(m ? m[1] : next);
           i++;
-        } else {
-          break;
+          continue;
         }
+
+        // 2. Empty line + next is core marker → end
+        if (nextTrimmed === "") {
+          let peek = i + 1;
+          while (peek < lines.length && lines[peek].trim() === "") peek++;
+          if (peek >= lines.length) break;
+          const peekTrimmed = lines[peek].trim();
+          if (RE_USER_INPUT.test(peekTrimmed) || RE_ASSISTANT_TEXT.test(peekTrimmed) || tryParseToolCall(peekTrimmed) !== null) break;
+          // Empty line but no core marker ahead — include it and continue
+          resultLines.push("");
+          i++;
+          continue;
+        }
+
+        // 3. Indented content (2+ spaces) — continue collecting
+        if (/^\s{2,}/.test(next)) {
+          // Don't swallow indented tool calls (e.g. "  Update(file.yaml)")
+          if (tryParseToolCall(nextTrimmed) !== null) break;
+          resultLines.push(next);
+          i++;
+          continue;
+        }
+
+        // 4. Diff pattern lines (e.g. "108 - read: false") — continue collecting
+        if (RE_DIFF_LINE.test(nextTrimmed)) {
+          resultLines.push(next);
+          i++;
+          continue;
+        }
+
+        // 5. Standalone tool call at start of line — end
+        if (tryParseToolCall(nextTrimmed) !== null) break;
+
+        // 6. Other unindented lines — end
+        break;
       }
       tokens.push({ type: "tool-result", text: resultLines.join("\n") });
       continue;

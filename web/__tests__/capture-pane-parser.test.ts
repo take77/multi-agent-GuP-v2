@@ -136,6 +136,70 @@ describe("parseCapturePane", () => {
     expect(toolBlock.tools[1].label).toBe("Write");
   });
 
+  it("collects unindented diff lines in Update tool-result", () => {
+    // YAML diff output where line-numbered diff lines have NO leading whitespace
+    const input = `● Update(queue/inbox/mika.yaml)
+  ⎿  Added 1 line, removed 1 line
+108 - read: false
+108 + read: true`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string; result?: string }> };
+    expect(toolBlock.tools).toHaveLength(1);
+    expect(toolBlock.tools[0].label).toBe("Update");
+    expect(toolBlock.tools[0].result).toContain("Added 1 line");
+    expect(toolBlock.tools[0].result).toContain("read: false");
+    expect(toolBlock.tools[0].result).toContain("read: true");
+  });
+
+  it("does not swallow ● marker after diff lines", () => {
+    // Diff output ends, then a new ● assistant speech starts
+    const input = `● Update(queue/inbox/mika.yaml)
+  ⎿  Added 1 line, removed 1 line
+108 - read: false
+108 + read: true
+
+● 完了しました。報告書を書きます。`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string; result?: string }> };
+    expect(toolBlock.tools[0].result).toContain("read: true");
+    expect(blocks[1].type).toBe("assistant-text");
+    expect((blocks[1] as { type: "assistant-text"; content: string }).content).toContain("完了しました");
+  });
+
+  it("does not swallow ❯ marker after diff lines", () => {
+    const input = `● Update(queue/tasks/mika.yaml)
+  ⎿  Added 2 lines, removed 1 line
+5 - status: assigned
+5 + status: in_progress
+
+❯ 次のタスクをお願い`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].type).toBe("tool-execution");
+    expect(blocks[1].type).toBe("user-input");
+  });
+
+  it("collects multi-line diff with various line numbers", () => {
+    // Edit tool with larger diff
+    const input = `● Edit(web/lib/parser.ts)
+  ⎿  Changed 5 lines
+10 - const old = true;
+10 + const old = false;
+11 - let x = 1;
+11 + let x = 2;
+12 - let y = 3;
+12 + let y = 4;`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string; result?: string }> };
+    expect(toolBlock.tools[0].result).toContain("let y = 4");
+  });
+
   it("falls back to raw for orphaned lines", () => {
     const input = `      5522 some orphaned diff content
       5523 more orphaned stuff`;
