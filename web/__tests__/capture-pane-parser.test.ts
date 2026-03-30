@@ -136,12 +136,180 @@ describe("parseCapturePane", () => {
     expect(toolBlock.tools[1].label).toBe("Write");
   });
 
+  it("collects unindented diff lines in Update tool-result", () => {
+    // YAML diff output where line-numbered diff lines have NO leading whitespace
+    const input = `● Update(queue/inbox/mika.yaml)
+  ⎿  Added 1 line, removed 1 line
+108 - read: false
+108 + read: true`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string; result?: string }> };
+    expect(toolBlock.tools).toHaveLength(1);
+    expect(toolBlock.tools[0].label).toBe("Update");
+    expect(toolBlock.tools[0].result).toContain("Added 1 line");
+    expect(toolBlock.tools[0].result).toContain("read: false");
+    expect(toolBlock.tools[0].result).toContain("read: true");
+  });
+
+  it("does not swallow ● marker after diff lines", () => {
+    // Diff output ends, then a new ● assistant speech starts
+    const input = `● Update(queue/inbox/mika.yaml)
+  ⎿  Added 1 line, removed 1 line
+108 - read: false
+108 + read: true
+
+● 完了しました。報告書を書きます。`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string; result?: string }> };
+    expect(toolBlock.tools[0].result).toContain("read: true");
+    expect(blocks[1].type).toBe("assistant-text");
+    expect((blocks[1] as { type: "assistant-text"; content: string }).content).toContain("完了しました");
+  });
+
+  it("does not swallow ❯ marker after diff lines", () => {
+    const input = `● Update(queue/tasks/mika.yaml)
+  ⎿  Added 2 lines, removed 1 line
+5 - status: assigned
+5 + status: in_progress
+
+❯ 次のタスクをお願い`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].type).toBe("tool-execution");
+    expect(blocks[1].type).toBe("user-input");
+  });
+
+  it("collects multi-line diff with various line numbers", () => {
+    // Edit tool with larger diff
+    const input = `● Edit(web/lib/parser.ts)
+  ⎿  Changed 5 lines
+10 - const old = true;
+10 + const old = false;
+11 - let x = 1;
+11 + let x = 2;
+12 - let y = 3;
+12 + let y = 4;`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string; result?: string }> };
+    expect(toolBlock.tools[0].result).toContain("let y = 4");
+  });
+
   it("falls back to raw for orphaned lines", () => {
     const input = `      5522 some orphaned diff content
       5523 more orphaned stuff`;
     const blocks = parseCapturePane(input);
     expect(blocks).toHaveLength(1);
     expect(blocks[0].type).toBe("raw");
+  });
+});
+
+describe("Agent() nested output handling", () => {
+  it("keeps nested ● markers inside Agent tool-result as raw text", () => {
+    const input = `● Agent(pekoe)
+  ⎿  Result from pekoe:
+     ● ペコがコードを確認しています
+     ● Read(web/lib/store.ts)
+       ⎿  Contents of store.ts...
+     ● 確認完了しました。`;
+    const blocks = parseCapturePane(input);
+    // Should be 1 tool-execution block with 1 Agent tool
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string; result?: string }> };
+    expect(toolBlock.tools).toHaveLength(1);
+    expect(toolBlock.tools[0].label).toBe("Agent");
+    // The nested ● content should be in the result, not split into separate blocks
+    expect(toolBlock.tools[0].result).toContain("ペコがコードを確認しています");
+    expect(toolBlock.tools[0].result).toContain("Read(web/lib/store.ts)");
+    expect(toolBlock.tools[0].result).toContain("確認完了しました");
+  });
+
+  it("nested ● does not produce extra assistant-text blocks", () => {
+    const input = `● Agent(hana)
+  ⎿  Agent result:
+     ● 華が作業を開始します
+     ● Bash(echo hello)
+       ⎿  hello
+     ● 作業完了
+
+● 次のタスクに進みます。`;
+    const blocks = parseCapturePane(input);
+    // Should be: 1 tool-execution (Agent) + 1 assistant-text
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string; result?: string }> };
+    expect(toolBlock.tools[0].label).toBe("Agent");
+    expect(toolBlock.tools[0].result).toContain("華が作業を開始します");
+    expect(blocks[1].type).toBe("assistant-text");
+    expect((blocks[1] as { type: "assistant-text"; content: string }).content).toContain("次のタスクに進みます");
+  });
+
+  it("handles Agent result with deeply nested ● markers at various indentation", () => {
+    const input = `● Agent(rosehip)
+  ⎿  Starting task...
+       ● ネスト1段目
+         ● ネスト2段目
+     ● 同レベルに戻る`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string; result?: string }> };
+    expect(toolBlock.tools[0].label).toBe("Agent");
+    expect(toolBlock.tools[0].result).toContain("ネスト1段目");
+    expect(toolBlock.tools[0].result).toContain("ネスト2段目");
+    expect(toolBlock.tools[0].result).toContain("同レベルに戻る");
+  });
+  it("unindented ● after Agent result starts a new assistant-text block", () => {
+    const input = `● Agent(pekoe)
+  ⎿  Result from pekoe
+● これは新しいアシスタント発話`;
+    const blocks = parseCapturePane(input);
+    // Should be: 1 tool-execution (Agent) + 1 assistant-text
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].type).toBe("tool-execution");
+    const toolBlock = blocks[0] as { type: "tool-execution"; tools: Array<{ label: string; result?: string }> };
+    expect(toolBlock.tools[0].label).toBe("Agent");
+    expect(toolBlock.tools[0].result).not.toContain("新しいアシスタント発話");
+    expect(blocks[1].type).toBe("assistant-text");
+    expect((blocks[1] as { type: "assistant-text"; content: string }).content).toContain("新しいアシスタント発話");
+  });
+});
+
+describe("session-duration (Worked for) badge", () => {
+  it("parses '✻ Worked for 15m 22s' as session-duration block", () => {
+    const input = `✻ Worked for 15m 22s`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("session-duration");
+    expect((blocks[0] as { type: "session-duration"; duration: string }).duration).toBe("15m 22s");
+  });
+
+  it("parses '✻ Worked for 1h 5m 10s' with hours", () => {
+    const input = `✻ Worked for 1h 5m 10s`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("session-duration");
+    expect((blocks[0] as { type: "session-duration"; duration: string }).duration).toBe("1h 5m 10s");
+  });
+
+  it("preserves session-duration between other blocks", () => {
+    const input = `● 作業開始します。
+
+✻ Worked for 3m 45s
+
+● 完了しました。`;
+    const blocks = parseCapturePane(input);
+    expect(blocks).toHaveLength(3);
+    expect(blocks[0].type).toBe("assistant-text");
+    expect(blocks[1].type).toBe("session-duration");
+    expect((blocks[1] as { type: "session-duration"; duration: string }).duration).toBe("3m 45s");
+    expect(blocks[2].type).toBe("assistant-text");
   });
 });
 

@@ -39,6 +39,7 @@ type Token =
   | { type: "tool-call"; call: ToolCall }
   | { type: "tool-result"; text: string }
   | { type: "user-input"; text: string }
+  | { type: "session-duration"; duration: string }
   | { type: "skip" }
   | { type: "raw"; text: string };
 
@@ -58,7 +59,7 @@ const SKIP_PATTERNS = [
   /^\?\s+/,                           // question prompts
   /^(?:Human turn|claude-code|Claude Code|Session|Loading|Initializing)/i,
   /^(?:Bypass permissions|Auto-accept|Fast mode|Model:)\s/i,
-  /^✻\s+Worked\s+for\s+/,            // "Worked for X" status line
+  // "Worked for X" is now parsed as session-duration token (not skipped)
 ];
 
 function isSkipLine(trimmed: string): boolean {
@@ -100,10 +101,16 @@ const RE_READ_FILES = /^Read(?:ing)?\s+(\d+)\s+file/;
 // Cogitate/think time
 const RE_COGITATE = /^✻\s+(?:Cogitated|Churned|Crunched)\s+for\s+(.+)$/;
 
+// Session duration ("Worked for X")
+const RE_WORKED_FOR = /^✻\s+Worked\s+for\s+(.+)$/;
+
 // Core markers
 const RE_USER_INPUT = /^❯\s+(.*)$/;
 const RE_ASSISTANT_TEXT = /^●\s(.*)$/;
 const RE_TOOL_RESULT = /^⎿\s?(.*)$/;
+
+// Diff line pattern: "108 - read: false" or "108 + read: true"
+const RE_DIFF_LINE = /^\d+\s+[-+]\s/;
 
 /**
  * Try to parse a trimmed line as a ToolCall.
@@ -165,6 +172,7 @@ function isMarkerLine(trimmed: string): boolean {
     RE_TOOL_RESULT.test(trimmed) ||
     isSkipLine(trimmed) ||
     RE_COGITATE.test(trimmed) ||
+    RE_WORKED_FOR.test(trimmed) ||
     tryParseToolCall(trimmed) !== null
   );
 }
@@ -198,6 +206,14 @@ function tokenize(raw: string): Token[] {
 
     // Skip patterns
     if (isSkipLine(trimmed)) { i++; continue; }
+
+    // ✻ Worked for X → session-duration token
+    const workedMatch = trimmed.match(RE_WORKED_FOR);
+    if (workedMatch) {
+      tokens.push({ type: "session-duration", duration: workedMatch[1] });
+      i++;
+      continue;
+    }
 
     // ❯ user input (multi-line)
     const userMatch = trimmed.match(RE_USER_INPUT);
@@ -288,15 +304,55 @@ function tokenize(raw: string): Token[] {
       while (i < lines.length) {
         const next = lines[i];
         const nextTrimmed = next.trim();
-        if (/^\s{2,}/.test(next) || /^⎿/.test(nextTrimmed)) {
+
+        // 1. Indented content (2+ spaces) — continue collecting
+        //    This handles nested Agent output where ● appears indented.
+        //    Must be checked BEFORE core markers to avoid breaking on nested ●.
+        if (/^\s{2,}/.test(next)) {
           // Don't swallow indented tool calls (e.g. "  Update(file.yaml)")
           if (tryParseToolCall(nextTrimmed) !== null) break;
+          // ⎿ continuation within indented block
           const m = nextTrimmed.match(RE_TOOL_RESULT);
           resultLines.push(m ? m[1] : next);
           i++;
-        } else {
-          break;
+          continue;
         }
+
+        // 2. ⎿ continuation at start of line
+        if (/^⎿/.test(nextTrimmed) && resultLines.length > 0) {
+          const m = nextTrimmed.match(RE_TOOL_RESULT);
+          resultLines.push(m ? m[1] : next);
+          i++;
+          continue;
+        }
+
+        // 3. Core markers (non-indented) always end collection
+        if (RE_USER_INPUT.test(nextTrimmed) || RE_ASSISTANT_TEXT.test(nextTrimmed)) break;
+
+        // 4. Empty line + next is core marker → end
+        if (nextTrimmed === "") {
+          let peek = i + 1;
+          while (peek < lines.length && lines[peek].trim() === "") peek++;
+          if (peek >= lines.length) break;
+          const peekTrimmed = lines[peek].trim();
+          if (RE_USER_INPUT.test(peekTrimmed) || RE_ASSISTANT_TEXT.test(peekTrimmed) || tryParseToolCall(peekTrimmed) !== null) break;
+          resultLines.push("");
+          i++;
+          continue;
+        }
+
+        // 5. Diff pattern lines (e.g. "108 - read: false") — continue collecting
+        if (RE_DIFF_LINE.test(nextTrimmed)) {
+          resultLines.push(next);
+          i++;
+          continue;
+        }
+
+        // 6. Standalone tool call at start of line — end
+        if (tryParseToolCall(nextTrimmed) !== null) break;
+
+        // 7. Other unindented lines — end
+        break;
       }
       tokens.push({ type: "tool-result", text: resultLines.join("\n") });
       continue;
@@ -388,6 +444,12 @@ function buildBlocks(tokens: Token[]): ParsedBlock[] {
 
       case "user-input": {
         blocks.push({ type: "user-input", content: tok.text });
+        i++;
+        break;
+      }
+
+      case "session-duration": {
+        blocks.push({ type: "session-duration", duration: tok.duration });
         i++;
         break;
       }

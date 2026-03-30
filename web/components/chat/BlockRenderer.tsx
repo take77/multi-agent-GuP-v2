@@ -5,7 +5,77 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import { Avatar } from "@/components/shared/Avatar";
+import { getAgentDisplayName } from "@/lib/agent-names";
+import { DiffFoldView } from "@/components/chat/DiffFoldView";
 import type { ParsedBlock, ToolCall } from "@/types/parsed-blocks";
+import { TruncatedToolResult } from "./TruncatedToolResult";
+
+// ── 0. Bash Summary Helpers ──
+
+interface BashSummary {
+  icon: string;
+  text: string;
+  errorDetails?: string;
+}
+
+function parseBashSummary(detail: string, result: string): BashSummary | null {
+  // npm install / yarn add / npm ci / pnpm install
+  if (/\bnpm\s+(install|ci|i)\b|\byarn\s+(add|install)\b|\bpnpm\s+(install|add)\b/.test(detail)) {
+    const addedMatch = result.match(/added (\d+) packages?/);
+    const count = addedMatch ? addedMatch[1] : null;
+    return {
+      icon: "📦",
+      text: count ? `${count} packages installed` : "packages installed",
+    };
+  }
+
+  // npm run build / next build / yarn build / vite build / tsc
+  if (/\bnpm\s+run\s+build\b|\byarn\s+build\b|\bnext\s+build\b|\bvite\s+build\b|\bnpx\s+next\s+build\b|\btsc\b/.test(detail)) {
+    // Detect failure: "error" keyword present, but not in a passing test summary
+    const hasBuildError =
+      /\b(Error|error TS|FAILED|Build error)\b/.test(result) ||
+      / failed\b/.test(result.toLowerCase());
+    if (hasBuildError) {
+      const errorLines = result
+        .split("\n")
+        .filter((l) => /error/i.test(l))
+        .slice(0, 3)
+        .join(" | ")
+        .trim();
+      return {
+        icon: "🔨",
+        text: "Build failed ✗",
+        errorDetails: errorLines || undefined,
+      };
+    }
+    return { icon: "🔨", text: "Build pass ✓" };
+  }
+
+  // vitest / jest
+  if (/\bvitest\b|\bjest\b/.test(detail)) {
+    const passMatch = result.match(/(\d+)\s+passed/);
+    const failMatch = result.match(/(\d+)\s+failed/);
+    const pass = passMatch ? passMatch[1] : "0";
+    const fail = failMatch ? failMatch[1] : "0";
+    return { icon: "🧪", text: `${pass} pass, ${fail} fail` };
+  }
+
+  // git commit
+  if (/\bgit\s+commit\b/.test(detail)) {
+    const hashMatch = result.match(/\[[^\]]*\s+([a-f0-9]{6,8})\]/);
+    const hash = hashMatch ? hashMatch[1] : "";
+    return { icon: "📝", text: hash ? `committed ${hash}` : "committed" };
+  }
+
+  // git push
+  if (/\bgit\s+push\b/.test(detail)) {
+    const branchMatch = detail.match(/git\s+push(?:\s+\S+)?\s+(\S+)/);
+    const branch = branchMatch ? branchMatch[1] : "";
+    return { icon: "📝", text: branch ? `pushed to ${branch}` : "pushed" };
+  }
+
+  return null;
+}
 
 // ── 1. AssistantBubble ──
 
@@ -33,9 +103,115 @@ const AssistantBubble = memo(function AssistantBubble({
 
 // ── 2. ToolWorkflowBlock ──
 
+function AgentNestedOutput({ result }: { result: string }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const lines = result.split("\n");
+  const nestedEntries: Array<{ type: "text" | "marker"; content: string }> = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const markerMatch = trimmed.match(/^●\s(.*)$/);
+    if (markerMatch) {
+      nestedEntries.push({ type: "marker", content: markerMatch[1] });
+    } else if (trimmed) {
+      nestedEntries.push({ type: "text", content: trimmed });
+    }
+  }
+
+  const stepCount = nestedEntries.filter(e => e.type === "marker").length;
+
+  return (
+    <div className="mt-1 ml-3 border-l-2 border-sky-700/40 pl-2">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+      >
+        <span className="select-none">{expanded ? "▼" : "▶"}</span>
+        <span>サブエージェント出力{stepCount > 0 ? ` (${stepCount} ステップ)` : ""}</span>
+      </button>
+      {expanded && (
+        <div className="mt-1 space-y-0.5">
+          {nestedEntries.map((entry, idx) => (
+            <div key={idx} className="text-[11px] font-mono">
+              {entry.type === "marker" ? (
+                <div className="flex items-start gap-1 text-slate-400">
+                  <span className="text-sky-500 select-none shrink-0">●</span>
+                  <span className="break-words">{entry.content}</span>
+                </div>
+              ) : (
+                <div className="text-slate-600 ml-3 break-words">{entry.content}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ToolDetail({ tool }: { tool: ToolCall }) {
   const [showResult, setShowResult] = useState(false);
   const [showYamlDetail, setShowYamlDetail] = useState(false);
+  const [showBashDetail, setShowBashDetail] = useState(false);
+
+  // inbox_write card: Bash with inbox_write.sh in detail
+  const isInboxWrite =
+    tool.label === "Bash" && tool.detail.includes("inbox_write.sh");
+  if (isInboxWrite) {
+    // Extract sender → target from result: "[...] [inbox_write] SUCCESS: miho → darjeeling"
+    const match = tool.result?.match(
+      /\[inbox_write\]\s+SUCCESS:\s+(\w+)\s+[→\-]+\s+(\w+)/
+    );
+    const sender = match ? match[1] : null;
+    const target = match ? match[2] : null;
+    const failed = tool.result?.includes("FAIL") || (!match && !!tool.result);
+
+    return (
+      <div className="ml-3">
+        <div className="flex items-center gap-1.5 text-[12px] font-mono">
+          <span className="text-slate-600 select-none">├</span>
+          <div
+            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border ${
+              failed
+                ? "bg-red-950/30 border-red-700/40"
+                : "bg-slate-800/80 border-slate-700/50"
+            }`}
+          >
+            <span>📨</span>
+            {sender && target ? (
+              <>
+                <span className="text-slate-300">
+                  {getAgentDisplayName(sender)}
+                </span>
+                <span className="text-slate-500 text-[11px]">→</span>
+                <span className="text-sky-400">
+                  {getAgentDisplayName(target)}
+                </span>
+              </>
+            ) : (
+              <span className={failed ? "text-red-400" : "text-slate-400"}>
+                {failed ? "送信失敗" : "inbox_write"}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Agent nested output: show structured collapsible view
+  if (tool.label === "Agent" && tool.result && /●\s/.test(tool.result)) {
+    return (
+      <div className="ml-3">
+        <div className="flex items-center gap-1.5 text-[12px] text-slate-400 font-mono">
+          <span className="text-slate-600 select-none">├</span>
+          <span>🤖</span>
+          <span className="text-slate-300">Agent({tool.detail})</span>
+        </div>
+        <AgentNestedOutput result={tool.result} />
+      </div>
+    );
+  }
 
   // YAML write/edit: Write/Edit/Update on .yaml/.yml files → summary display
   const yamlFileMatch =
@@ -68,6 +244,39 @@ function ToolDetail({ tool }: { tool: ToolCall }) {
     );
   }
 
+  // Bash command summary: detect type and show structured summary
+  if (tool.label === "Bash" && tool.result) {
+    const bashSummary = parseBashSummary(tool.detail, tool.result);
+    if (bashSummary) {
+      return (
+        <div className="ml-3">
+          <div className="flex items-center gap-1.5 text-[12px] text-slate-400 font-mono">
+            <span className="text-slate-600 select-none">├</span>
+            <span>{bashSummary.icon}</span>
+            <span className="text-slate-300">{bashSummary.text}</span>
+            {bashSummary.errorDetails && (
+              <span className="text-red-400 truncate max-w-[240px] text-[11px]">
+                {bashSummary.errorDetails}
+              </span>
+            )}
+            <button
+              onClick={() => setShowBashDetail(!showBashDetail)}
+              className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors cursor-pointer ml-auto shrink-0"
+            >
+              {showBashDetail ? "▼" : "▶"}
+            </button>
+          </div>
+          {showBashDetail && (
+            <pre className="mt-0.5 ml-6 text-[11px] leading-[1.3] text-slate-500 font-mono whitespace-pre-wrap break-words max-h-[20vh] overflow-y-auto border-l border-slate-700 pl-2">
+              {tool.detail}
+              {`\n---\n${tool.result}`}
+            </pre>
+          )}
+        </div>
+      );
+    }
+  }
+
   return (
     <div className="ml-3">
       <div className="flex items-center gap-1.5 text-[12px] text-slate-400 font-mono">
@@ -85,9 +294,15 @@ function ToolDetail({ tool }: { tool: ToolCall }) {
         )}
       </div>
       {showResult && tool.result && (
-        <pre className="mt-0.5 ml-6 text-[11px] leading-[1.3] text-slate-500 font-mono whitespace-pre-wrap break-words max-h-[20vh] overflow-y-auto border-l border-slate-700 pl-2">
-          {tool.result}
-        </pre>
+        tool.result.includes("diff --git ") ? (
+          <DiffFoldView raw={tool.result} />
+        ) : tool.label === "Read" ? (
+          <TruncatedToolResult content={tool.result} />
+        ) : (
+          <pre className="mt-0.5 ml-6 text-[11px] leading-[1.3] text-slate-500 font-mono whitespace-pre-wrap break-words max-h-[20vh] overflow-y-auto border-l border-slate-700 pl-2">
+            {tool.result}
+          </pre>
+        )
       )}
     </div>
   );
@@ -164,7 +379,7 @@ const UserInputBubble = memo(function UserInputBubble({
   return (
     <div className="flex justify-end my-1">
       <div
-        className={`max-w-[75%] rounded-xl rounded-tr-sm px-3 py-1.5 ${
+        className={`max-w-[90%] rounded-xl rounded-tr-sm px-3 py-1.5 ${
           isSlashCommand
             ? "bg-violet-700/80 border border-violet-500/40"
             : "bg-sky-600"
@@ -190,7 +405,7 @@ const UserInputBubble = memo(function UserInputBubble({
             )}
           </div>
         ) : (
-          <span className="text-[13px] text-white font-mono">
+          <span className="text-[13px] text-white font-mono whitespace-pre-wrap">
             {isSlashCommand ? "🔧 " : "❯ "}
             {text}
           </span>
@@ -200,7 +415,24 @@ const UserInputBubble = memo(function UserInputBubble({
   );
 });
 
-// ── 4. RawFallback ──
+// ── 4. SessionDurationBadge ──
+
+const SessionDurationBadge = memo(function SessionDurationBadge({
+  duration,
+}: {
+  duration: string;
+}) {
+  return (
+    <div className="flex justify-center my-1">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-700/50 text-[11px] text-slate-400 font-mono">
+        <span>⏱</span>
+        <span>{duration}</span>
+      </span>
+    </div>
+  );
+});
+
+// ── 5. RawFallback ──
 
 const RawFallback = memo(function RawFallback({
   content,
@@ -250,6 +482,8 @@ export const BlockRenderer = memo(function BlockRenderer({
             );
           case "user-input":
             return <UserInputBubble key={i} content={block.content} />;
+          case "session-duration":
+            return <SessionDurationBadge key={i} duration={block.duration} />;
           case "raw":
             return <RawFallback key={i} content={block.content} />;
         }

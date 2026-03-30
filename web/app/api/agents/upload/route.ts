@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
-import { writeFile } from "fs/promises";
-import { join } from "path";
+import { writeFile, mkdir } from "fs/promises";
+import { join, resolve } from "path";
 
-const ALLOWED_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
+const ALLOWED_EXTENSIONS = new Set([
+  "png", "jpg", "jpeg", "gif", "webp",
+  "md", "txt", "pdf", "yaml", "yml", "json", "csv", "log",
+]);
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+const PROJECT_ROOT = resolve(process.cwd(), "..");
+const UPLOADS_DIR = resolve(PROJECT_ROOT, "uploads");
 
 function sanitizeFilename(name: string): string {
   // Remove path separators and null bytes, keep only safe characters
@@ -47,19 +53,26 @@ export async function POST(req: Request) {
 
     if (!ALLOWED_EXTENSIONS.has(ext)) {
       return NextResponse.json(
-        { error: `Unsupported file type: ${ext}. Allowed: png, jpg, gif, webp` },
+        { error: `Unsupported file type: ${ext}. Allowed: png, jpg, gif, webp, md, txt, pdf, yaml, yml, json, csv, log` },
         { status: 400 }
       );
     }
 
-    // Sanitized filename (for display only — not used in path)
+    // Sanitized filename
     const sanitizedName = sanitizeFilename(originalName);
 
-    // Build save path — prevent path traversal by using only /tmp with controlled name
+    // Ensure uploads directory exists
+    await mkdir(UPLOADS_DIR, { recursive: true });
+
+    // Build save path — {timestamp}_{sanitizedOriginalName}
     const timestamp = Date.now();
-    const random = Math.random().toString(36).slice(2, 8);
-    const saveFilename = `gup-upload-${timestamp}-${random}.${ext}`;
-    const savePath = join("/tmp", saveFilename);
+    const saveFilename = `${timestamp}_${sanitizedName}`;
+    const savePath = resolve(UPLOADS_DIR, saveFilename);
+
+    // Security: verify the resolved path is inside UPLOADS_DIR
+    if (!savePath.startsWith(UPLOADS_DIR + "/") && savePath !== UPLOADS_DIR) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     // Write file
     const bytes = await file.arrayBuffer();
