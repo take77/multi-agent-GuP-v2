@@ -7,6 +7,73 @@ import remarkBreaks from "remark-breaks";
 import { Avatar } from "@/components/shared/Avatar";
 import type { ParsedBlock, ToolCall } from "@/types/parsed-blocks";
 
+// ── 0. Bash Summary Helpers ──
+
+interface BashSummary {
+  icon: string;
+  text: string;
+  errorDetails?: string;
+}
+
+function parseBashSummary(detail: string, result: string): BashSummary | null {
+  // npm install / yarn add / npm ci / pnpm install
+  if (/\bnpm\s+(install|ci|i)\b|\byarn\s+(add|install)\b|\bpnpm\s+(install|add)\b/.test(detail)) {
+    const addedMatch = result.match(/added (\d+) packages?/);
+    const count = addedMatch ? addedMatch[1] : null;
+    return {
+      icon: "📦",
+      text: count ? `${count} packages installed` : "packages installed",
+    };
+  }
+
+  // npm run build / next build / yarn build / vite build / tsc
+  if (/\bnpm\s+run\s+build\b|\byarn\s+build\b|\bnext\s+build\b|\bvite\s+build\b|\bnpx\s+next\s+build\b|\btsc\b/.test(detail)) {
+    // Detect failure: "error" keyword present, but not in a passing test summary
+    const hasBuildError =
+      /\b(Error|error TS|FAILED|Build error)\b/.test(result) ||
+      / failed\b/.test(result.toLowerCase());
+    if (hasBuildError) {
+      const errorLines = result
+        .split("\n")
+        .filter((l) => /error/i.test(l))
+        .slice(0, 3)
+        .join(" | ")
+        .trim();
+      return {
+        icon: "🔨",
+        text: "Build failed ✗",
+        errorDetails: errorLines || undefined,
+      };
+    }
+    return { icon: "🔨", text: "Build pass ✓" };
+  }
+
+  // vitest / jest
+  if (/\bvitest\b|\bjest\b/.test(detail)) {
+    const passMatch = result.match(/(\d+)\s+passed/);
+    const failMatch = result.match(/(\d+)\s+failed/);
+    const pass = passMatch ? passMatch[1] : "0";
+    const fail = failMatch ? failMatch[1] : "0";
+    return { icon: "🧪", text: `${pass} pass, ${fail} fail` };
+  }
+
+  // git commit
+  if (/\bgit\s+commit\b/.test(detail)) {
+    const hashMatch = result.match(/\[[^\]]*\s+([a-f0-9]{6,8})\]/);
+    const hash = hashMatch ? hashMatch[1] : "";
+    return { icon: "📝", text: hash ? `committed ${hash}` : "committed" };
+  }
+
+  // git push
+  if (/\bgit\s+push\b/.test(detail)) {
+    const branchMatch = detail.match(/git\s+push(?:\s+\S+)?\s+(\S+)/);
+    const branch = branchMatch ? branchMatch[1] : "";
+    return { icon: "📝", text: branch ? `pushed to ${branch}` : "pushed" };
+  }
+
+  return null;
+}
+
 // ── 1. AssistantBubble ──
 
 const AssistantBubble = memo(function AssistantBubble({
@@ -36,6 +103,7 @@ const AssistantBubble = memo(function AssistantBubble({
 function ToolDetail({ tool }: { tool: ToolCall }) {
   const [showResult, setShowResult] = useState(false);
   const [showYamlDetail, setShowYamlDetail] = useState(false);
+  const [showBashDetail, setShowBashDetail] = useState(false);
 
   // YAML write/edit: Write/Edit/Update on .yaml/.yml files → summary display
   const yamlFileMatch =
@@ -66,6 +134,39 @@ function ToolDetail({ tool }: { tool: ToolCall }) {
         )}
       </div>
     );
+  }
+
+  // Bash command summary: detect type and show structured summary
+  if (tool.label === "Bash" && tool.result) {
+    const bashSummary = parseBashSummary(tool.detail, tool.result);
+    if (bashSummary) {
+      return (
+        <div className="ml-3">
+          <div className="flex items-center gap-1.5 text-[12px] text-slate-400 font-mono">
+            <span className="text-slate-600 select-none">├</span>
+            <span>{bashSummary.icon}</span>
+            <span className="text-slate-300">{bashSummary.text}</span>
+            {bashSummary.errorDetails && (
+              <span className="text-red-400 truncate max-w-[240px] text-[11px]">
+                {bashSummary.errorDetails}
+              </span>
+            )}
+            <button
+              onClick={() => setShowBashDetail(!showBashDetail)}
+              className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors cursor-pointer ml-auto shrink-0"
+            >
+              {showBashDetail ? "▼" : "▶"}
+            </button>
+          </div>
+          {showBashDetail && (
+            <pre className="mt-0.5 ml-6 text-[11px] leading-[1.3] text-slate-500 font-mono whitespace-pre-wrap break-words max-h-[20vh] overflow-y-auto border-l border-slate-700 pl-2">
+              {tool.detail}
+              {`\n---\n${tool.result}`}
+            </pre>
+          )}
+        </div>
+      );
+    }
   }
 
   return (
