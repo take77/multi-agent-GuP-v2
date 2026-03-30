@@ -379,7 +379,7 @@ const UserInputBubble = memo(function UserInputBubble({
   return (
     <div className="flex justify-end my-1">
       <div
-        className={`max-w-[75%] rounded-xl rounded-tr-sm px-3 py-1.5 ${
+        className={`max-w-[90%] rounded-xl rounded-tr-sm px-3 py-1.5 ${
           isSlashCommand
             ? "bg-violet-700/80 border border-violet-500/40"
             : "bg-sky-600"
@@ -405,7 +405,7 @@ const UserInputBubble = memo(function UserInputBubble({
             )}
           </div>
         ) : (
-          <span className="text-[13px] text-white font-mono">
+          <span className="text-[13px] text-white font-mono whitespace-pre-wrap">
             {isSlashCommand ? "🔧 " : "❯ "}
             {text}
           </span>
