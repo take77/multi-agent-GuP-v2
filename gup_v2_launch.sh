@@ -48,6 +48,8 @@ SHELL_OVERRIDE=""
 CLUSTER_MODE=""  # "" = 従来モード, "darjeeling" = ダージリン隊のみ, "all" = 全クラスタ
 COMMAND_SERVER_MODE=false  # --command: 司令部サーバーのみ起動
 AGENT_TEAMS_MODE=false
+WORKTREE_MODE=false        # --worktree: 各隊のworktreeを自動セットアップ
+WORKTREE_CMD_ID=""         # --worktree <cmd_id>: worktreeに紐づけるcmd番号
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -103,6 +105,8 @@ while [[ $# -gt 0 ]]; do
             echo "                      未指定時はshoutモード（タスク完了時にecho表示）"
             echo "  --cluster <name>    指定クラスタのみ起動（例: --cluster darjeeling, --cluster katyusha）"
             echo "                      デフォルトtmuxサーバーに統合されたセッションとして起動"
+            echo "  --worktree [cmd_id] 各隊のworktreeを自動セットアップ（scripts/worktree_manager.sh が必要）"
+            echo "                      cmd_idを省略した場合はcaptain_queueの最新IDを使用"
             echo "  --command           司令部サーバーのみ起動（大隊長+参謀長の2ペイン）"
             echo "                      デフォルトtmuxサーバーにcommandセッションとして起動"
             echo "  --all-clusters      全クラスタ起動（将来用、現在はスタブ）"
@@ -158,6 +162,15 @@ while [[ $# -gt 0 ]]; do
         --command)
             COMMAND_SERVER_MODE=true
             shift
+            ;;
+        --worktree)
+            WORKTREE_MODE=true
+            if [[ -n "$2" && "$2" != -* ]]; then
+                WORKTREE_CMD_ID="$2"
+                shift 2
+            else
+                shift
+            fi
             ;;
         --agent-teams)
             echo "⚠️  Agent Teams モードは gup_v2_launch_hybrid.sh を使用してください"
@@ -730,6 +743,8 @@ if [ "$SETUP_ONLY" = false ]; then
     fi
 
     # 参謀長（miho）: CLI Adapter経由でコマンド構築
+    # モデル: opus（config/settings.yaml cli.agents.miho.model で設定）
+    # 理由: 施策分配判断、worktreeマージ管理、品質ゲート機能に高い推論能力が必要
     _miho_cli_type="claude"
     _miho_cmd="claude --model opus --dangerously-skip-permissions"
     if [ "$CLI_ADAPTER_LOADED" = true ]; then
@@ -808,6 +823,37 @@ if [ "$SETUP_ONLY" = false ]; then
     setup_kay_cluster
     setup_maho_cluster
     log_success "✅ 全4隊クラスタ構築完了"
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # STEP 6.7.6: Worktree 自動セットアップ（--worktree 指定時のみ）
+    # ═══════════════════════════════════════════════════════════════════════════
+    if [ "$WORKTREE_MODE" = true ]; then
+        if [ -f "$SCRIPT_DIR/scripts/worktree_manager.sh" ]; then
+            log_info "🌿 Worktree自動セットアップを実行中..."
+
+            # cmd_id が省略された場合は captain_queue.yaml の最新IDを取得
+            _wt_cmd_id="$WORKTREE_CMD_ID"
+            if [ -z "$_wt_cmd_id" ]; then
+                _wt_cmd_id=$(grep -oE 'id: cmd_[0-9]+' "$SCRIPT_DIR/queue/captain_queue.yaml" 2>/dev/null | tail -1 | awk '{print $2}' || echo "")
+            fi
+
+            if [ -z "$_wt_cmd_id" ]; then
+                log_war "  ⚠️  cmd_idが不明のためworktreeセットアップをスキップ（--worktree <cmd_id> で指定してください）"
+            else
+                for _wt_cluster in darjeeling katyusha kay maho; do
+                    if bash "$SCRIPT_DIR/scripts/worktree_manager.sh" create "$_wt_cluster" "$_wt_cmd_id"; then
+                        log_success "  └─ ${_wt_cluster}: worktree作成完了"
+                    else
+                        log_war "  └─ ${_wt_cluster}: worktree作成失敗（スキップ）"
+                    fi
+                done
+                log_success "✅ Worktree自動セットアップ完了 (cmd_id: ${_wt_cmd_id})"
+            fi
+        else
+            log_war "  ⚠️  scripts/worktree_manager.sh が見つかりません（worktreeセットアップをスキップ）"
+            log_war "  ⚠️  scripts/worktree_manager.sh を作成後に再実行してください"
+        fi
+    fi
 
     # フェーズ2: Claude Code召喚を並列実行（セッションは既存のため端末サイズ問題なし）
     log_war "⚡ 全4隊Claude Codeを並列召喚中..."

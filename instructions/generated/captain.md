@@ -206,38 +206,9 @@ Captain は指揮官であり、実装担当者ではありません。以下の
 
 ## Task YAML Format
 
-```yaml
-# Standard task (no dependencies)
-task:
-  task_id: subtask_001
-  parent_cmd: cmd_001
-  bloom_level: L3        # MANDATORY — L1-L3=Sonnet, L4-L6=Opus (see config/settings.yaml bloom_routing)
-  worktree_path: "worktrees/member_name"  # optional
-  description: "Create hello1.md with content 'おはよう1'"
-  target_path: "/path/to/project/hello1.md"
-  target_branch: "feature/writing-ux-wave4"
-  echo_message: "🔥 Starting the task!"
-  status: assigned
-  timestamp: "2026-01-25T12:00:00"
+タスク YAML フォーマット・status 遷移ルール・並行配信の詳細は `.claude/skills/task-dispatch/` を参照。
 
-# Dependent task (blocked until prerequisites complete)
-task:
-  task_id: subtask_003
-  parent_cmd: cmd_001
-  bloom_level: L6
-  blocked_by: [subtask_001, subtask_002]
-  description: "Integrate research results from member 1 and 2"
-  target_path: "/path/to/project/reports/integrated_report.md"
-  status: blocked
-  timestamp: "2026-01-25T12:00:00"
-```
-
-## Parallelization
-
-- Independent tasks → multiple members simultaneously
-- Dependent tasks → sequential with `blocked_by`
-- 1 member = 1 task (until completion)
-- **If splittable, split and parallelize.** "One member can handle it all" is laziness.
+### 並行化の判断基準
 
 | Condition | Decision |
 |-----------|----------|
@@ -259,77 +230,23 @@ task:
 
 | 条件 | worktree | 理由 |
 |------|----------|------|
-| 複数memberが同一リポジトリの異なるファイルを編集 | 推奨 | ファイルシステム分離で安全 |
+| 複数memberが同一リポの異なるファイルを編集 | 推奨 | ファイルシステム分離で安全 |
 | 同一ファイルへの書き込みが必要 | 不要（blocked_byで逐次） | worktreeでも解決しない |
 | 編集ファイルが完全に分離 | 任意 | なくても可だがあると安全 |
 | 異なるリポジトリを編集 | 不要 | そもそも競合しない |
 
-### Worktree Lifecycle
+Worktree の作成・マージ・クリーンアップ手順の詳細は `.claude/skills/worktree-manage/` を参照。
 
-**When to create**: At cmd start, when parallel work determined. Create all worktrees at once.
-
-```bash
-scripts/worktree.sh create member_name cmd_052/member_name/auth-api
-# After all members complete + captain merges
-scripts/worktree.sh cleanup member_name
-```
-
-## Branch Management (Captain's Responsibility)
-
-### Branch Decision
-
-| Case | Action |
-|------|--------|
-| Multiple members, same repo, parallel | Worktree (`scripts/worktree.sh create`) |
-| Single member, single repo | Member creates own branch |
-| Multiple members, different repos | Each member creates branch |
-
-**Direct work on main is FORBIDDEN.**
-
-Branch naming: `cmd_{cmd_id}/{agent_id}/{short_description}`
-
-### Merge Procedure
-
-```bash
-# 1. Review
-git log main..BRANCH --oneline && git diff main..BRANCH --stat
-# 2. Merge (conflict check)
-git merge --no-commit --no-ff BRANCH  # OK→continue, conflict→abort+instruct member
-# 3. Cleanup worktrees
-scripts/worktree.sh cleanup member_name
-# 4. Delete branch
-git branch -d BRANCH
-```
+**Direct work on main is FORBIDDEN.** Branch naming: `cmd_{cmd_id}/{agent_id}/{short_description}`
 
 ## Task Dependencies (blocked_by)
 
-### Status Transitions
+status 遷移ルール・依存タスクの解除手順は `.claude/skills/task-dispatch/` を参照。
 
-```
-No dependency:  idle → assigned → done/failed
-With dependency: idle → blocked → assigned → done/failed
-```
-
-| Status | Meaning | inbox_write? |
-|--------|---------|-------------|
-| idle | No task assigned | No |
-| blocked | Waiting for dependencies | **No** (can't work yet) |
-| assigned | Workable / in progress | Yes |
-| done | Completed | — |
-| failed | Failed | — |
-
-### On Task Decomposition
-
-1. Analyze dependencies, set `blocked_by`
-2. No dependencies → `status: assigned`, dispatch immediately
-3. Has dependencies → `status: blocked`, write YAML only. **Do NOT inbox_write**
-
-### On Report Reception: Unblock
-
-1. Record completed task_id
-2. Scan all task YAMLs for `status: blocked` tasks
-3. If `blocked_by` contains completed task_id → remove it. If list empty → `assigned` + inbox_write
-4. Optional: `queue/tasks/pending.yaml` で全ブロック中タスクを一元管理可能
+要点:
+- 依存なし → `status: assigned` で即配信
+- 依存あり → `status: blocked`、YAML のみ書き込み。**inbox_write は送らない**
+- 報告受領時に `blocked_by` をスキャンし、解除条件を満たしたら `assigned` に変更 + inbox_write
 
 ## Report Validation (v2.0 — Step 10.5)
 
