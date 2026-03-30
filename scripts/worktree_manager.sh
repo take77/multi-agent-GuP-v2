@@ -30,10 +30,22 @@ create_worktree() {
     local cmd_id="$2"
     local wt_path="$WORKTREE_BASE/$name"
     local branch="squad/${name}/${cmd_id}"
+    local _cleanup_needed=false
+
+    cleanup_on_failure() {
+        if [ "$_cleanup_needed" = true ]; then
+            echo "[worktree_manager] INTERRUPTED: cleaning up..." >&2
+            git worktree remove --force "$wt_path" 2>/dev/null || rm -rf "$wt_path"
+            git branch -D "$branch" 2>/dev/null || true
+            git worktree prune 2>/dev/null || true
+        fi
+    }
+    trap cleanup_on_failure EXIT INT TERM
 
     if [ -d "$wt_path" ]; then
         echo "[worktree_manager] ERROR: already exists: $wt_path" >&2
         echo "  Use 'delete $name' first, or choose a different name." >&2
+        trap - EXIT INT TERM
         exit 1
     fi
 
@@ -44,6 +56,7 @@ create_worktree() {
     echo "  branch: $branch"
     echo ""
 
+    _cleanup_needed=true
     # Create worktree from current HEAD (detached initially, then branch)
     git worktree add -b "$branch" "$wt_path" HEAD
 
@@ -70,6 +83,8 @@ create_worktree() {
         linked=$((linked + 1))
     done
 
+    _cleanup_needed=false
+    trap - EXIT INT TERM
     echo ""
     echo "[worktree_manager] SUCCESS: $wt_path ($linked symlinks)"
 }
