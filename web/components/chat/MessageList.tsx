@@ -6,6 +6,7 @@ import { Avatar } from "@/components/shared/Avatar";
 import { parseCapturePaneOutput } from "@/lib/capture-pane-parser";
 import { segmentsToBlocks } from "@/lib/segment-to-block";
 import { BlockRenderer } from "@/components/chat/BlockRenderer";
+import { StructuredEventCard } from "@/components/chat/StructuredEventCard";
 import { getAgentDisplayName } from "@/lib/agent-names";
 
 type TabId = "conversation" | "inbox";
@@ -16,6 +17,7 @@ export function MessageList() {
     latestOutput,
     clusters,
     inboxMessages,
+    structuredEvents,
     sendEscapeCommand,
   } = useAppStore();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -48,6 +50,10 @@ export function MessageList() {
   }, [inboxMessages, selectedAgent]);
 
   const agentDisplayName = agent?.name ?? getAgentDisplayName(selectedAgent);
+
+  const agentStructuredEvents = useMemo(() => {
+    return structuredEvents[selectedAgent] ?? [];
+  }, [structuredEvents, selectedAgent]);
 
   const parsedBlocks = useMemo(() => {
     const segments = parseCapturePaneOutput(output);
@@ -125,6 +131,15 @@ export function MessageList() {
                 <p className="text-[12px] mt-3">
                   {agent?.name} の出力待ち...
                 </p>
+              </div>
+            )}
+
+            {/* Structured event cards — emitted by agents to logs/structured/ */}
+            {agentStructuredEvents.length > 0 && (
+              <div className="space-y-1.5">
+                {agentStructuredEvents.map((event, i) => (
+                  <StructuredEventCard key={`se-${i}`} event={event} />
+                ))}
               </div>
             )}
 
