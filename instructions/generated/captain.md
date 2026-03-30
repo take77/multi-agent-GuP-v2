@@ -930,6 +930,20 @@ bash scripts/inbox_write.sh miho \
   cmd_failed captain_{your_name}
 ```
 
+## inbox_write 実行確認（MANDATORY）
+
+inbox_write.sh を実行した後、必ず以下を確認すること:
+1. Bash ツールの出力に「SUCCESS」が含まれていること
+2. SUCCESS が確認できない場合、再実行すること
+3. 「配信済み」「送信済み」と記載する前に、必ず SUCCESS 確認を完了すること
+
+## cmd_done 到達確認（MANDATORY）
+
+cmd_done / cmd_failed を inbox_write で送信した後:
+1. 相手の inbox YAML を Read で開く
+2. 自分が送ったメッセージ（msg_id）が存在することを確認
+3. 存在しない場合は再送する
+
 ## Skill Evaluation
 
 1. **Research latest spec** (mandatory)

@@ -217,6 +217,13 @@ bash scripts/inbox_write.sh maho "ミカです。subtask_084a 完了しました
 That's it. No state checking, no retry, no delivery verification.
 The inbox_write guarantees persistence. inbox_watcher handles delivery.
 
+## inbox_write 実行確認（MANDATORY）
+
+inbox_write.sh を実行した後、必ず以下を確認すること:
+1. Bash ツールの出力に「SUCCESS」が含まれていること
+2. SUCCESS が確認できない場合、再実行すること
+3. 「報告済み」「送信済み」と記載する前に、必ず SUCCESS 確認を完了すること
+
 ---
 ## Post-Task Inbox Check（必須）
 

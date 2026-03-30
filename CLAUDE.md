@@ -210,6 +210,13 @@ Inbox type definitions (upward report events):
 - `type: cmd_done` — Captain → Chief of Staff / Chief of Staff → Commander: 施策完了通知
 - `type: cmd_failed` — Captain → Chief of Staff / Chief of Staff → Commander: 施策失敗・エスカレーション通知
 
+## inbox_write 実行確認（MANDATORY — 全エージェント共通）
+
+inbox_write.sh を実行した後、必ず以下を確認すること:
+1. Bash ツールの出力に「SUCCESS」が含まれていること
+2. SUCCESS が確認できない場合、再実行すること
+3. 「報告済み」「送信済み」「配信済み」と記載する前に、必ず SUCCESS 確認を完了すること
+
 ## Inbox Processing Protocol (captain/member)
 
 When you receive `inboxN` (e.g. `inbox3`):
