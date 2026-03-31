@@ -20,7 +20,7 @@ if [ -n "$1" ]; then
     TARGETS=("$INBOX_DIR/$1.yaml")
 else
     # 全inbox対象（.lockファイルは除外）
-    mapfile -t TARGETS < <(find "$INBOX_DIR" -maxdepth 1 -name "*.yaml" ! -name "*.lock" | sort)
+    mapfile -t TARGETS < <(find -L "$INBOX_DIR" -maxdepth 1 -name "*.yaml" ! -name "*.lock" | sort)
 fi
 
 for INBOX in "${TARGETS[@]}"; do

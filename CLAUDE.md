@@ -110,6 +110,13 @@ bash scripts/inbox_write.sh <target_agent> "<message>" <type> <from>
 
 Delivery: `inbox_watcher.sh` handles wake-up signals. **Agents NEVER call tmux send-keys directly.**
 
+## inbox_write 実行確認（MANDATORY — 全エージェント共通）
+
+inbox_write.sh を実行した後、必ず以下を確認すること:
+1. Bash ツールの出力に「SUCCESS」が含まれていること
+2. SUCCESS が確認できない場合、再実行すること
+3. 「報告済み」「送信済み」「配信済み」と記載する前に、必ず SUCCESS 確認を完了すること
+
 ## Inbox Processing Protocol
 
 When you receive `inboxN`: Read inbox → process `read: false` entries → set `read: true` → resume.
