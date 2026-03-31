@@ -34,10 +34,18 @@ export class StateManager {
     }
   }
 
-  // YAML ファイル書き込み
+  // YAML ファイル書き込み（アトミック: tmp+rename パターン）
   async save(): Promise<void> {
     const content = yaml.dump(this.state);
-    await fs.writeFile(this.statePath, content, 'utf8');
+    const tmpPath = `${this.statePath}.tmp.${process.pid}.${Date.now()}`;
+    try {
+      await fs.writeFile(tmpPath, content, 'utf8');
+      await fs.rename(tmpPath, this.statePath);
+    } catch (error) {
+      // エラー時は一時ファイルをクリーンアップ
+      try { await fs.unlink(tmpPath); } catch { /* already gone */ }
+      throw error;
+    }
   }
 
   // メッセージからの状態更新

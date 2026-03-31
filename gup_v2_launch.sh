@@ -312,6 +312,7 @@ echo ""
 if [ "$COMMAND_SERVER_MODE" = true ]; then
     log_info "🎖️ 司令部サーバーモード: 大隊長+参謀長のみ起動"
     check_dependencies
+    cleanup_stale_processes
     launch_command_server
     exit 0
 fi
@@ -320,6 +321,7 @@ fi
 # クラスタモード分岐（--cluster オプション指定時）
 # ═══════════════════════════════════════════════════════════════════════════════
 if [ -n "$CLUSTER_MODE" ]; then
+    cleanup_stale_processes
     case "$CLUSTER_MODE" in
         darjeeling)
             log_info "🫖 クラスタモード: ダージリン隊のみ起動"
@@ -440,6 +442,12 @@ mkdir -p queue/inbox/archive
 log_info "📦 Archiving read inbox messages..."
 if [ -f scripts/inbox_archive.sh ]; then
     bash scripts/inbox_archive.sh
+fi
+
+# stale ロックファイル除去（inbox_write.sh の flock 残骸をクリーンアップ）
+log_info "🔓 Cleaning stale lock files..."
+if [ -f scripts/clean_stale_locks.sh ]; then
+    bash scripts/clean_stale_locks.sh
 fi
 
 if [ "$CLEAN_MODE" = true ]; then
@@ -682,6 +690,13 @@ if [ "$AGENT_TEAMS_MODE" = true ]; then
     log_success "  ✅ GUP_AGENT_TEAMS_ACTIVE=1 設定完了"
 
     # (2) 参謀長モニタプロセスをバックグラウンド起動
+    # 既存モニタープロセスがあれば停止してから新規起動
+    _existing_monitor_pid=$(tmux show-environment -t command GUP_MONITOR_PID 2>/dev/null | sed 's/.*=//')
+    if [ -n "$_existing_monitor_pid" ] && kill -0 "$_existing_monitor_pid" 2>/dev/null; then
+        kill "$_existing_monitor_pid" 2>/dev/null || true
+        wait "$_existing_monitor_pid" 2>/dev/null || true
+        log_info "  └─ 既存モニタープロセス(PID: $_existing_monitor_pid)を停止"
+    fi
     if [ -d "$SCRIPT_DIR/scripts/monitor" ] && [ -f "$SCRIPT_DIR/scripts/monitor/start.ts" ]; then
         cd "$SCRIPT_DIR/scripts/monitor"
         npx tsx start.ts >> "$SCRIPT_DIR/logs/monitor.log" 2>&1 &
@@ -803,10 +818,7 @@ if [ "$SETUP_ONLY" = false ]; then
     done
 
     # 既存のwatcherと孤児inotifywaitをkill（クラスタ起動前にクリーンアップ）
-    pkill -f "inbox_watcher.sh" 2>/dev/null || true
-    pkill -f "watcher_supervisor.sh" 2>/dev/null || true
-    pkill -f "inotifywait.*queue/inbox" 2>/dev/null || true
-    sleep 1
+    cleanup_stale_processes
 
     # STEP 6.7 は廃止 — CLAUDE.md Session Start (step 1: tmux agent_id) で各自が自律的に
     # 自分のinstructions/*.mdを読み込む。検証済み (2026-02-08)。

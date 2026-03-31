@@ -254,7 +254,30 @@ describe('StateManager', () => {
     await fs.rm(testQueueDir, { recursive: true, force: true });
   });
 
-  it('Test 8: getAcceptanceCriteria - description も acceptance_criteria もない場合は空配列', async () => {
+  it('Test 8: save() アトミック書き込み - 一時ファイルが残らない', async () => {
+    const manager = new StateManager(testStatePath);
+    await manager.load();
+
+    manager.updateFromMessage({
+      type: 'task_assigned',
+      from: 'ashigaru1',
+      task_id: 'task_atomic_001',
+    });
+
+    await manager.save();
+
+    // state ファイルが正しく書き込まれていることを確認
+    const content = await fs.readFile(testStatePath, 'utf8');
+    expect(content).toContain('task_atomic_001');
+
+    // 一時ファイル (.tmp.*) が残っていないことを確認
+    const dir = path.dirname(testStatePath);
+    const files = await fs.readdir(dir);
+    const tmpFiles = files.filter(f => f.includes('.tmp.'));
+    expect(tmpFiles).toEqual([]);
+  });
+
+  it('Test 9: getAcceptanceCriteria - description も acceptance_criteria もない場合は空配列', async () => {
     const testQueueDir = path.join(TEST_BASE_DIR, 'test_queue_8');
     const testHqDir = path.join(testQueueDir, 'hq');
     const testTasksDirForCriteria = path.join(testQueueDir, 'tasks');

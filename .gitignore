@@ -115,9 +115,11 @@ scripts/monitor/node_modules/
 !scripts/init_runtime_data.sh
 !scripts/slim_yaml.py
 !scripts/slim_yaml.sh
+!scripts/archive_coordination.py
 !scripts/statusline.sh
 !scripts/inbox_archive.sh
 !scripts/worktree_manager.sh
+!scripts/clean_stale_locks.sh
 
 # SayTask (sample template only, not actual data)
 !saytask/
