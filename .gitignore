@@ -133,6 +133,7 @@ scripts/monitor/node_modules/
 !docs/auto-mode-evaluation.md
 !docs/multi-cli-evaluation.md
 !docs/web-ui-summary.md
+!docs/skipped_branches_cmd163.yaml
 
 # Screenshots (masked — no secrets)
 !images/
