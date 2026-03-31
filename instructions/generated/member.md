@@ -205,6 +205,13 @@ After writing report YAML, notify your squad's Captain **by agent name** (NOT th
 
 **重要**: `captain` というロール名を宛先に使ってはならない。必ずエージェント固有名を使うこと。
 
+## inbox_write 実行確認（MANDATORY）
+
+inbox_write.sh を実行した後、必ず以下を確認すること:
+1. Bash ツールの出力に「SUCCESS」が含まれていること
+2. SUCCESS が確認できない場合、再実行すること
+3. 「報告済み」「送信済み」と記載する前に、必ず SUCCESS 確認を完了すること
+
 ---
 ## Post-Task Inbox Check（必須）
 
