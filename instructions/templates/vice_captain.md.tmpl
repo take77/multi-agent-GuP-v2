@@ -117,16 +117,107 @@ Read queue/reports/${member}_report.yaml
 - bloom_level が L1-L3 のタスクは QC スキップ可能（隊長が直接判定）
 - L4 以上のタスクのみ QC を実施
 
+### Step 3.5: Codex adversarial-review（Codex プラグイン連携）
+
+**発動条件**: `bloom_level >= 4` AND `codex_status == available`
+
+bloom_level が L1-L3、または Codex が利用不可の場合はこの Step をスキップし Step 4 へ進む。
+
+#### 3.5.1: ステータス確認
+
+```bash
+CODEX_STATUS=$(yq '.status' queue/hq/codex_status.yaml)
+COOLDOWN=$(yq '.cooldown_until' queue/hq/codex_status.yaml)
+```
+
+#### 3.5.2: cooldown 自動復帰チェック
+
+```bash
+if [ "$CODEX_STATUS" = "rate_limited" ] && [ "$(date -u +%s)" -ge "$(date -d "$COOLDOWN" +%s)" ]; then
+  # cooldown 経過 → available に復帰
+  yq -i '.status = "available" | .consecutive_failures = 0' queue/hq/codex_status.yaml
+  CODEX_STATUS="available"
+fi
+```
+
+#### 3.5.3: 実行判定
+
+```bash
+if [ "$CODEX_STATUS" = "available" ]; then
+  # Codex adversarial-review を実行
+  /codex:adversarial-review
+
+  # 成功 → カウンタ更新
+  yq -i '.total_reviews_today += 1 | .last_checked = "NOW"' queue/hq/codex_status.yaml
+else
+  # フォールバック → Step 4 へ直行（Claude-only 結果で判定）
+fi
+```
+
+#### rate limit 検知時の処理
+
+Codex が rate limit エラーを返した場合:
+
+```bash
+yq -i '
+  .status = "rate_limited" |
+  .rate_limited_at = "NOW" |
+  .cooldown_until = "NOW + cooldown_minutes" |
+  .consecutive_failures += 1
+' queue/hq/codex_status.yaml
+# 今回の QC は Claude self-review の結果のみで判定続行
+```
+
+#### codex_reviews.jsonl への記録
+
+adversarial-review 完了後、結果を JSONL に追記する:
+
+```bash
+# PASS 時
+echo '{"ts":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","task_id":"'"${TASK_ID}"'","result":"pass","model":"gpt-5.4-mini","duration_sec":'"${DURATION}"',"bloom_level":'"${BLOOM}"'}' \
+  >> queue/hq/codex_reviews.jsonl
+
+# FAIL 時（指摘あり）
+echo '{"ts":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","task_id":"'"${TASK_ID}"'","result":"fail","model":"gpt-5.4-mini","duration_sec":'"${DURATION}"',"bloom_level":'"${BLOOM}"',"issues":["issue1","issue2"]}' \
+  >> queue/hq/codex_reviews.jsonl
+```
+
 ### Step 4: QC 結果送信
 
-#### PASS の場合
+3つのパターンに応じた結果フォーマット:
+
+#### パターン A: Claude + Codex 両方実施（dual）
 ```bash
 bash scripts/inbox_write.sh ${captain_name} \
-  "QC PASS: subtask_XXX。コード品質OK、AC全項目達成。" \
+  "QC PASS: subtask_XXX。
+   [Claude] コード品質OK、AC全項目達成。
+   [Codex] adversarial-review: 重大指摘なし。設計トレードオフ2件（軽微）。
+   review_mode: dual" \
   qc_result ${vice_captain_name}
 ```
 
-#### FAIL の場合
+#### パターン B: Claude-only（Bloom L1-L3 または Codex スキップ）
+```bash
+bash scripts/inbox_write.sh ${captain_name} \
+  "QC PASS: subtask_XXX。
+   [Claude] コード品質OK、AC全項目達成。
+   review_mode: claude_only
+   reason: bloom_level_L2" \
+  qc_result ${vice_captain_name}
+```
+
+#### パターン C: Claude-only フォールバック（Codex 不可時）
+```bash
+bash scripts/inbox_write.sh ${captain_name} \
+  "QC PASS: subtask_XXX。
+   [Claude] コード品質OK、AC全項目達成。
+   review_mode: claude_only_fallback
+   reason: codex_rate_limited
+   note: Codex復帰予定 ${cooldown_until}" \
+  qc_result ${vice_captain_name}
+```
+
+#### FAIL の場合（全パターン共通）
 ```bash
 bash scripts/inbox_write.sh ${captain_name} \
   "QC FAIL: subtask_XXX。理由: {具体的な不合格理由}。修正ポイント: {改善提案}" \

@@ -100,6 +100,21 @@ Step 5: Start work（persona の口調を維持）
 
 Always include: 1) Agent role 2) Forbidden actions list 3) Current task ID 4) Persona speech traits（口調特徴3つ、`persona/quick_reference.md` 参照）
 
+# Codex Plugin (codex-plugin-cc)
+
+## 対象
+- vice_captain: adversarial-review（Bloom L4+ タスクの QC 強化）
+- captain: rescue（Phase 2、stuck member の調査委任）
+
+## フォールバック
+Codex が rate limit / エラー時は Claude-only QC に自動フォールバック。
+軍の稼働は止めない。ステータスは queue/hq/codex_status.yaml で管理。
+
+## コスト
+- ChatGPT Plus $20/mo（サブスク認証）
+- Bloom L1-L3 はスキップ、L4+ のみ実行
+- デフォルトモデル: gpt-5.4-mini（軽量）
+
 # Communication Protocol
 
 ## Mailbox System (inbox_write.sh)

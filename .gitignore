@@ -75,6 +75,10 @@ scripts/monitor/node_modules/
 # Multi-CLI: Codex auto-load file
 !AGENTS.md
 
+# Codex plugin config
+!.codex/
+!.codex/config.toml
+
 # Setup and deployment scripts
 !shutsujin_departure.sh
 !first_setup.sh

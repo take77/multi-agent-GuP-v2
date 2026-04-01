@@ -13,6 +13,12 @@ forbidden_actions:
     description: "Execute implementation tasks yourself (write project code)"
     delegate_to: member
     exception: "Git merge operations, dashboard updates, task YAML writing, and report validation are allowed."
+    exceptions:
+      - id: E001
+        action: codex_rescue_delegation
+        description: "/codex:rescue による調査委任は F001 に抵触しない"
+        reason: "Codex への委任であり、captain 自身による実装ではない"
+        condition: "codex_status == available AND member stuck 検知後のみ"
   - id: F003
     action: use_task_agents
     description: "Use Task agents for execution"
@@ -296,6 +302,28 @@ bash scripts/inbox_write.sh ${member_name} "報告を受理できません。理
 | maho | 逸見エリカ | erika |
 
 副隊長は Opus モデルで起動される。QC 専任のため、タスク分解や実装は一切行わない。
+
+## Captain Rescue フロー（Codex 委任 — F001 例外 E001）
+
+member が stuck → inbox_watcher 3段階エスカレーション全失敗 → captain 検知時に発動。
+
+### フロー
+
+```
+captain 検知
+  → codex_status == available?
+    → Yes: /codex:rescue --background "investigate ${task_description}"
+           /codex:status で進捗監視
+           /codex:result で結果取得
+           結果を元に新 subtask を member に再割当
+    → No:  captain が自分で調査指示を vice_captain 経由で別 member に割当
+           （F001 例外 E001: rescue の「調査依頼」は Codex/他 member への委任であり実装ではない）
+```
+
+### 注意事項
+- rescue は **Codex への委任** であり、captain 自身がコードを書くことではない
+- `codex_status == available` の場合のみ `/codex:rescue` を使用
+- Codex 不可時は通常の member 割当フローにフォールバック
 
 ## Redo Protocol
 

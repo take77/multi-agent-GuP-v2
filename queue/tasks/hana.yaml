@@ -1,39 +1,6 @@
 task:
-  task_id: subtask_162C_archive
-  parent_cmd: cmd_162
-  bloom_level: L3
-  description: |
-    commander_to_staff.yaml のアーカイブ機構を実装する。
-
-    ■ 背景
-    coordination/commander_to_staff.yaml が 443KB に肥大化し読み込み不能。
-    status: completed / done / active(全subtask完了済み) の施策をアーカイブする仕組みが必要。
-
-    ■ 実装方針
-    scripts/slim_yaml.py を拡張するか、専用スクリプト（scripts/archive_coordination.py 等）を新規作成する。
-    どちらでもよいが、slim_yaml.py の既存パターン（backup → archive → prune）に倣うこと。
-
-    ■ 要件
-    1. coordination/commander_to_staff.yaml から完了施策を抽出
-       - status が completed, done のエントリを対象
-       - YAML のトップレベルキーが施策ID（cmd_XXX_...）、値が施策定義
-    2. 抽出した施策を coordination/archive/ ディレクトリに退避
-       - ファイル名形式: coordination/archive/YYYYMMDD.yaml（日次アーカイブ）
-       - または coordination/archive/cmd_XXX.yaml（施策単位）— 好みで選んでよい
-    3. 元ファイルから完了施策を除去し、未完了分のみ残す
-    4. --dry-run オプション対応（何が移動されるか表示のみ）
-    5. バックアップ作成（slim_yaml.py の backup_file パターン参照）
-
-    ■ テスト
-    - bats でテストを書くこと（tests/unit/test_archive_coordination.bats）
-    - dry-run で副作用なし確認
-    - 実行後に元ファイルサイズが減少すること
-    - アーカイブファイルに完了施策が含まれること
-
-    ■ 参考ファイル
-    - scripts/slim_yaml.py — 既存アーカイブパターン
-    - coordination/commander_to_staff.yaml — 対象ファイル（443KB、先頭20行で構造を確認せよ）
-  target_path: "/home/take77/Developments/Tools/multi-agent-GuP-v2/scripts"
-  target_branch: "feature/cmd_162-infra-hardening"
-  status: in_progress
-  timestamp: "2026-03-31T01:36:10"
+  task_id: subtask_164A
+  parent_cmd: cmd_164
+  bloom_level: L2
+  status: done
+  timestamp: "2026-04-01T18:35:00"
