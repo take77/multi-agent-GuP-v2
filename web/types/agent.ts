@@ -41,8 +41,22 @@ export interface UsageWindow {
   resets_at: string; // ISO8601 timestamp
 }
 
+export type CodexStatus = "available" | "rate_limited" | "error";
+
+export interface CodexUsageData {
+  status: CodexStatus;
+  cooldown_until: string | null;
+  total_reviews_today: number;
+  pass_count: number;
+  fail_count: number;
+  last_checked: string | null;
+  plan: string;
+  estimated_remaining: number | null;
+}
+
 export interface UsageData {
   five_hour: UsageWindow;
   seven_day: UsageWindow;
+  codex?: CodexUsageData;
   fetched_at: number; // unix epoch seconds
 }
