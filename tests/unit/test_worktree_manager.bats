@@ -31,6 +31,8 @@ setup() {
     export TEST_REPO="$TEST_TMPDIR/repo"
     mkdir -p "$TEST_REPO"
     git -C "$TEST_REPO" init -b main >/dev/null 2>&1
+    git -C "$TEST_REPO" config user.name "Test"
+    git -C "$TEST_REPO" config user.email "test@test.com"
 
     # 初期コミットが必要（worktreeはコミットがないと作れない）
     git -C "$TEST_REPO" commit --allow-empty -m "initial commit" >/dev/null 2>&1
