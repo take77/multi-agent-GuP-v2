@@ -123,6 +123,24 @@ YAML
 cli:
   default: kimi
 YAML
+
+    # settings with cli.default_effort（推論 effort 全エージェント共通デフォルト）
+    cat > "${TEST_TMP}/settings_effort_high.yaml" << 'YAML'
+cli:
+  default: claude
+  default_effort: high
+  agents:
+    captain:
+      type: claude
+      model: opus
+    member5:
+      type: codex
+    member7:
+      type: copilot
+    member3:
+      type: kimi
+      model: k2.5
+YAML
 }
 
 teardown() {
@@ -312,6 +330,40 @@ load_adapter_with() {
     [[ "$result" == claude*--dangerously-skip-permissions ]]
 }
 
+# default_effort tests: when cli.default_effort is set,
+# Claude CLI receives --effort flag; Codex CLI receives -c model_reasoning_effort.
+# Test names kept ASCII-only due to bats 1.13 parser bug with non-ASCII names.
+
+@test "build_cli_command: claude with default_effort high appends --effort flag" {
+    load_adapter_with "${TEST_TMP}/settings_effort_high.yaml"
+    result=$(build_cli_command "captain")
+    [ "$result" = "claude --model opus --effort high --dangerously-skip-permissions" ]
+}
+
+@test "build_cli_command: codex with default_effort high appends -c model_reasoning_effort" {
+    load_adapter_with "${TEST_TMP}/settings_effort_high.yaml"
+    result=$(build_cli_command "member5")
+    [ "$result" = "codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen -c model_reasoning_effort=high" ]
+}
+
+@test "build_cli_command: copilot ignores default_effort (flag not supported)" {
+    load_adapter_with "${TEST_TMP}/settings_effort_high.yaml"
+    result=$(build_cli_command "member7")
+    [ "$result" = "copilot --yolo" ]
+}
+
+@test "build_cli_command: kimi ignores default_effort (flag not supported)" {
+    load_adapter_with "${TEST_TMP}/settings_effort_high.yaml"
+    result=$(build_cli_command "member3")
+    [ "$result" = "kimi --yolo --model k2.5" ]
+}
+
+@test "build_cli_command: default_effort undefined does not add effort flag" {
+    load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
+    result=$(build_cli_command "captain")
+    [ "$result" = "claude --model opus --dangerously-skip-permissions" ]
+}
+
 # =============================================================================
 # get_instruction_file テスト
 # =============================================================================
@@ -376,9 +428,9 @@ load_adapter_with() {
     [ "$(get_instruction_file captain claude)" = "instructions/captain.md" ]
     [ "$(get_instruction_file vice_captain claude)" = "instructions/vice_captain.md" ]
     [ "$(get_instruction_file member1 claude)" = "instructions/member.md" ]
-    # codex
+    # codex — vice_captain は Route B 統一（cmd_164）により Claude CLI のみで起動するため、
+    # codex × vice_captain の組み合わせはサポート対象外。captain / member のみ検証する。
     [ "$(get_instruction_file captain codex)" = "instructions/codex-captain.md" ]
-    [ "$(get_instruction_file vice_captain codex)" = "instructions/codex-vice_captain.md" ]
     [ "$(get_instruction_file member3 codex)" = "instructions/codex-member.md" ]
     # copilot
     [ "$(get_instruction_file captain copilot)" = ".github/copilot-instructions-captain.md" ]

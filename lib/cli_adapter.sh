@@ -10,8 +10,14 @@
 #   get_agent_model(agent_id)               → "opus" | "sonnet" | "haiku" | "k2.5"
 
 # プロジェクトルートを基準にsettings.yamlのパスを解決
-CLI_ADAPTER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLI_ADAPTER_PROJECT_ROOT="$(cd "${CLI_ADAPTER_DIR}/.." && pwd)"
+# zsh では BASH_SOURCE が空になるため、git root をフォールバックに使用
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+    CLI_ADAPTER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    CLI_ADAPTER_PROJECT_ROOT="$(dirname "$CLI_ADAPTER_DIR")"
+else
+    # zsh fallback: git root or PWD
+    CLI_ADAPTER_PROJECT_ROOT="$(git -C "${0:a:h}" rev-parse --show-toplevel 2>/dev/null || pwd)"
+fi
 CLI_ADAPTER_SETTINGS="${CLI_ADAPTER_SETTINGS:-${CLI_ADAPTER_PROJECT_ROOT}/config/settings.yaml}"
 
 # 許可されたCLI種別
@@ -56,11 +62,11 @@ except Exception:
 # 許可されたCLI種別かチェック
 _cli_adapter_is_valid_cli() {
     local cli_type="$1"
-    local allowed
-    for allowed in $CLI_ADAPTER_ALLOWED_CLIS; do
-        [[ "$cli_type" == "$allowed" ]] && return 0
-    done
-    return 1
+    # Use case statement to avoid zsh word-splitting issues
+    case " $CLI_ADAPTER_ALLOWED_CLIS " in
+        *" $cli_type "*) return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
 # --- 公開API ---
@@ -128,17 +134,29 @@ build_cli_command() {
     local model
     model=$(get_agent_model "$agent_id")
 
+    # 全エージェント共通の推論 effort（cli.default_effort）
+    # 値は low | medium | high | max。未定義時は空文字を返し、フラグは付与しない
+    local effort
+    effort=$(_cli_adapter_read_yaml "cli.default_effort" "")
+
     case "$cli_type" in
         claude)
             local cmd="claude"
             if [[ -n "$model" ]]; then
                 cmd="$cmd --model $model"
             fi
+            if [[ -n "$effort" ]]; then
+                cmd="$cmd --effort $effort"
+            fi
             cmd="$cmd --dangerously-skip-permissions"
             echo "$cmd"
             ;;
         codex)
-            echo "codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen"
+            local cmd="codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen"
+            if [[ -n "$effort" ]]; then
+                cmd="$cmd -c model_reasoning_effort=$effort"
+            fi
+            echo "$cmd"
             ;;
         copilot)
             echo "copilot --yolo"

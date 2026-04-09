@@ -79,8 +79,10 @@ setup() {
     [ -f "$OUTPUT_DIR/codex-captain.md" ]
 }
 
-@test "codex: codex-vice_captain.md generated" {
-    [ -f "$OUTPUT_DIR/codex-vice_captain.md" ]
+# NOTE: codex-vice_captain.md は Route B 統一（cmd_164）により廃止。
+# 副隊長は Claude CLI で起動し、Codex Plugin (/codex:adversarial-review) を呼び出す方針。
+@test "codex: codex-vice_captain.md NOT generated (Route B unified)" {
+    [ ! -f "$OUTPUT_DIR/codex-vice_captain.md" ]
 }
 
 @test "codex: codex-member.md generated" {
@@ -123,10 +125,6 @@ setup() {
     [ -s "$OUTPUT_DIR/codex-captain.md" ]
 }
 
-@test "content: codex-vice_captain.md is not empty" {
-    [ -s "$OUTPUT_DIR/codex-vice_captain.md" ]
-}
-
 @test "content: codex-member.md is not empty" {
     [ -s "$OUTPUT_DIR/codex-member.md" ]
 }
@@ -149,10 +147,6 @@ setup() {
 
 @test "content: codex-captain.md contains captain role reference" {
     grep -qi "captain\|隊長" "$OUTPUT_DIR/codex-captain.md"
-}
-
-@test "content: codex-vice_captain.md contains vice_captain role reference" {
-    grep -qi "vice_captain\|副隊長" "$OUTPUT_DIR/codex-vice_captain.md"
 }
 
 @test "content: codex-member.md contains member role reference" {

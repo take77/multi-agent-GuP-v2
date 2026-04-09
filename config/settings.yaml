@@ -31,7 +31,7 @@ agent_teams:
   lead:
     agent_id: anzu
     model: opus
-    effort: medium
+    effort: high
     delegate_mode: true
     session: command
     pane: 0
@@ -76,13 +76,23 @@ agent_teams:
 
 # CLI設定（エージェント別モデル / CLI種別）
 # get_agent_model() が参照する。未設定時は cli_adapter.sh 内のデフォルトロジックを使用。
+# エージェントごとに使用するCLIを指定
+# cli_adapter.sh が参照する
 cli:
-  default: claude
+  default: claude  # 未指定エージェントのデフォルト
+  # 全エージェント共通の推論 effort（low | medium | high | max）
+  # Claude CLI: --effort フラグに渡される
+  # Codex CLI: -c model_reasoning_effort=<value> に渡される
+  # 未定義時は CLI のデフォルトを使用
+  default_effort: high
   agents:
     anzu:
       model: opus
     miho:
       model: opus   # 参謀長は Opus（施策分配 + ブランチマージ判断 + 品質ゲート）
+    # 副隊長（QC専任）は Claude CLI で起動し、Codex Plugin (/codex:adversarial-review)
+    # を Step 3.5 で呼び出す方針（cmd_164 で整備）。ここで type:codex を指定すると
+    # プラグイン経由の adversarial-review が使えなくなるので指定しない。
 
 # Bloom Taxonomy 動的モデルルーティング
 # タスク複雑度（L1-L6）に基づき、適切なモデルに振り分ける
