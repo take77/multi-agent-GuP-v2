@@ -117,3 +117,11 @@ bloom_routing:
   # モデル切替コマンド（隊長が隊員に送信）
   # bash scripts/inbox_write.sh ${member} "/model opus" model_switch ${captain}
   switch_type: model_switch
+
+codex_plugin:
+  enabled: true
+  auth_method: subscription
+  bloom_threshold: 4
+  fallback_on_limit: true
+  cooldown_minutes: 60
+  max_retries: 1

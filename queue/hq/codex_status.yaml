@@ -1,0 +1,9 @@
+# Codex 可用性トラッカー
+# 副隊長が rate limit を検知したら更新、cooldown 後に自動復帰
+status: available
+last_checked: null
+rate_limited_at: null
+cooldown_until: null
+consecutive_failures: 0
+total_reviews_today: 0
+last_reset_date: null

@@ -35,6 +35,7 @@ export function Header() {
 
   const [usageWarning, setUsageWarning] = useState(false);
   const [usagePct, setUsagePct] = useState(0);
+  const [codexLimited, setCodexLimited] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -54,6 +55,10 @@ export function Header() {
         );
         setUsagePct(maxPct);
         setUsageWarning(maxPct >= USAGE_WARNING_PCT);
+        setCodexLimited(
+          data.codex?.status === "rate_limited" ||
+          data.codex?.status === "error"
+        );
       } catch {
         // Non-fatal
       }
@@ -73,6 +78,14 @@ export function Header() {
         {VIEW_LABELS[view] ?? view}
       </h1>
       <div className="flex items-center gap-3">
+        {codexLimited && (
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-900/40 border border-amber-700/40">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-[10px] text-amber-300">
+              Codex limited
+            </span>
+          </div>
+        )}
         {usageWarning && (
           <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-red-900/40 border border-red-700/40">
             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />

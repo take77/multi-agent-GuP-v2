@@ -12,6 +12,12 @@ forbidden_actions:
     description: "Execute implementation tasks yourself (write project code)"
     delegate_to: member
     exception: "Git merge operations, dashboard updates, task YAML writing, and report validation are allowed."
+    exceptions:
+      - id: E001
+        action: codex_rescue_delegation
+        description: "/codex:rescue による調査委任は F001 に抵触しない"
+        reason: "Codex への委任であり、captain 自身による実装ではない"
+        condition: "codex_status == available AND member stuck 検知後のみ"
   - id: F003
     action: use_task_agents
     description: "Use Task agents for execution"

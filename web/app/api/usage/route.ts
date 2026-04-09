@@ -1,11 +1,15 @@
 import { fetchUsage } from "@/lib/usage-tracker";
+import { fetchCodexStatus } from "@/lib/codex-tracker";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const usage = await fetchUsage();
-    return Response.json(usage);
+    const [claude, codex] = await Promise.all([
+      fetchUsage(),
+      fetchCodexStatus(),
+    ]);
+    return Response.json({ ...claude, codex });
   } catch {
     return Response.json(
       {
