@@ -141,12 +141,20 @@ EOFYAML
     echo "  ✅ Created: $output_filename"
 }
 
-# Build CLI variants for roles that have role definition files
+# Build CLI variants for roles that have role definition files.
+# NOTE: vice_captain + codex combination is intentionally skipped.
+# 副隊長は Claude CLI で起動し、Codex Plugin (/codex:adversarial-review) を
+# Step 3.5 で呼び出す方針（cmd_164）。Codex CLI で直接副隊長を召喚するルートは廃止。
 for role_file in "$PARTS_DIR"/roles/*_role.md; do
     [ -f "$role_file" ] || continue
     role_name="$(basename "$role_file" _role.md)"
 
     for cli_type in codex copilot kimi; do
+        # Route B 統一: vice_captain は Claude のみで起動
+        if [ "$cli_type" = "codex" ] && [ "$role_name" = "vice_captain" ]; then
+            echo "Skipping: codex-vice_captain.md (Route B unified — vice_captain uses Claude CLI + Codex Plugin)"
+            continue
+        fi
         build_cli_variant "$cli_type" "$role_name" "${cli_type}-${role_name}.md"
     done
 done
@@ -168,11 +176,12 @@ generate_agents_md() {
         return 0
     fi
 
+    # NOTE: vice_captain は Claude CLI + Codex Plugin 方針（cmd_164, Route B 統一）のため
+    # Codex 専用指示書を生成しない。AGENTS.md 内の vice_captain 参照は Claude 版を指す。
     sed \
         -e 's|CLAUDE\.md|AGENTS.md|g' \
         -e 's|CLAUDE\.local\.md|AGENTS.override.md|g' \
         -e 's|instructions/captain\.md|instructions/generated/codex-captain.md|g' \
-        -e 's|instructions/vice_captain\.md|instructions/generated/codex-vice_captain.md|g' \
         -e 's|instructions/member\.md|instructions/generated/codex-member.md|g' \
         -e 's|~/.claude/|~/.codex/|g' \
         -e 's|\.claude\.json|.codex/config.toml|g' \
