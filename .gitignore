@@ -205,6 +205,12 @@ scripts/monitor/node_modules/
 !queue/hq/
 !queue/hq/**
 
+worktrees/
+
+# macOS Finder metadata
+.DS_Store
+**/.DS_Store
+
 # Queue pending tasks template (cmd_102)
 !queue/tasks/pending.yaml
 
