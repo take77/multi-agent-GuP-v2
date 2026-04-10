@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # 🏯 multi-agent-GuP-v2 発進スクリプト（Agent Teams ハイブリッドモード専用）
 # Agent Teams Hybrid Mode Launcher — gup_v2_launch.sh から分離された実験的機能専用ランチャー
 #

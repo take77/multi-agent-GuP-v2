@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # watcher_supervisor.sh — 全エージェントのinbox_watcherを一括管理

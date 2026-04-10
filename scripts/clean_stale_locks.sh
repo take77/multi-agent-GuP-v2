@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # clean_stale_locks.sh — queue/inbox/*.yaml.lock のstaleロックを除去する
 #
 # 使用方法:
