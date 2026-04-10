@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # bridge_relay.sh — Agent Teams ↔ YAML 変換ブリッジ
 # Usage: bash scripts/bridge_relay.sh <direction> <captain_id> <cluster_session> [args...]
 # direction: down (Agent Teams → YAML) | up (YAML → Agent Teams message)

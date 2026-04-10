@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # 🏯 multi-agent-GuP-v2 発進スクリプト（毎日の起動用）
 # Daily Deployment Script for Multi-Agent Orchestration System
 #

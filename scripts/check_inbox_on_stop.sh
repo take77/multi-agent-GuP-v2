@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # check_inbox_on_stop.sh
 # Claude Code Stop Hook: Check for unread inbox messages
 # Usage: Called by .claude/settings.json hooks.stop

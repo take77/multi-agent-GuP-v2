@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # inbox_archive.sh — inboxの read:true メッセージをアーカイブに退避する
 # Usage:
 #   bash scripts/inbox_archive.sh              # 全inbox対象
