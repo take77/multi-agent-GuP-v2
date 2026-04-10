@@ -138,6 +138,9 @@ scripts/monitor/node_modules/
 !docs/multi-cli-evaluation.md
 !docs/web-ui-summary.md
 !docs/skipped_branches_cmd163.yaml
+!docs/claude-tos-risk-strategy.md
+!docs/reference/
+!docs/reference/**
 
 # Screenshots (masked — no secrets)
 !images/
