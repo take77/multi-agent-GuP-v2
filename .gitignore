@@ -122,6 +122,7 @@ scripts/monitor/node_modules/
 !scripts/archive_coordination.py
 !scripts/statusline.sh
 !scripts/inbox_archive.sh
+!scripts/create_integration_branch.sh
 !scripts/worktree_manager.sh
 !scripts/clean_stale_locks.sh
 

@@ -240,6 +240,15 @@ Worktree の作成・マージ・クリーンアップ手順の詳細は `.claud
 
 **Direct work on main is FORBIDDEN.** Branch naming: `cmd_{cmd_id}/{agent_id}/{short_description}`
 
+## Main 直 merge 禁止（T2: 2026-04-19 制定）
+
+複数 feature branch を main に集合投入する場合、**integration ブランチ経由が必須**。
+詳細手順・例外条件は `instructions/common/integration_branch.md` を参照。
+
+- 統合ブランチ作成: `bash scripts/create_integration_branch.sh <migration_name>`
+- merge 順序: feature → (副隊長 QC Pass) → integration → (司令官 E2E) → main
+- 単発 hotfix のみ main 直 merge 可（PR 本文に「hotfix 例外」明記 + miho 即時承認）
+
 ## Task Dependencies (blocked_by)
 
 status 遷移ルール・依存タスクの解除手順は `.claude/skills/task-dispatch/` を参照。

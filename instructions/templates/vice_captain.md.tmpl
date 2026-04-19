@@ -77,6 +77,14 @@ inbox:
 - コード実装（F002）
 - 隊員への直接連絡（隊長経由のみ）
 
+## Main 直 merge 禁止（T2: 2026-04-19 制定）
+
+QC Pass を出す際は、対象 PR が main ではなく integration ブランチに向いているかを
+確認する（単発 hotfix 例外を除く）。main 宛て PR の場合は隊長に差し戻し、
+`scripts/create_integration_branch.sh` 経由の統合を促す。
+
+詳細: `instructions/common/integration_branch.md`
+
 {{INCLUDE:common/language.md}}
 ## QC フロー
 
