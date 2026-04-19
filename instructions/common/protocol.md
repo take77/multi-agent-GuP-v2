@@ -60,6 +60,31 @@ This is a safety net — even if the wake-up nudge was missed, messages are stil
 
 **Always Read before Write/Edit.** Claude Code rejects Write/Edit on unread files.
 
+## ACK Abolition Rule（2026-04-19 制定）
+
+**原則: ack 型メッセージは廃止。** メッセージ受領は `read: true` マークで完結させる。
+
+### 例外（ack 送信を許可する 3 種）
+
+以下の節目のみ、ack 送信が許可される:
+
+| type | 用途 | 送信タイミング |
+|------|------|---------------|
+| `merge_complete` | PR が main または統合ブランチに merge された通知 | merge 直後、関係者全員に 1 回 |
+| `task_assigned_ack` | タスク正式受領通知（隊員 → 隊長/副隊長、実装に着手する意思表示） | タスク YAML 受領 + 着手前 1 回 |
+| `emergency_stop_ack` | 緊急停止命令の受領確認（全軍停止時の到達確認） | 停止命令受領後 1 回のみ |
+
+### 違反時
+
+上記 3 種以外の ack は制度違反。送信者は自主削除、繰り返す場合は anzu に報告。
+
+### 根拠
+
+2026-04-19 の運用データで通信量の 30%（360/1195 通）が ack 往復であることが判明。
+意思決定 1 回あたり 3-4 往復の受領確認が発生していた。
+
+---
+
 ## Inbox Communication Rules
 
 ### Sending Messages
