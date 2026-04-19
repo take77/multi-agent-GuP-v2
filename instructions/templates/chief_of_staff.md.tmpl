@@ -630,9 +630,20 @@ queue_depth: 2
 - ブランチの作成・マージ・削除は大隊長の権限です
 - 各隊が作業ブランチを作成することは可能ですが、mainやdevelopへのマージは大隊長の承認が必要です
 
+## QC 中継ルール（T3: 2026-04-19 制定）
+
+副隊長 QC verdict に対して、**参謀長は再レビューしない**。
+
+- 副隊長 verdict が LGTM → 大隊長・司令官へ中継（そのまま受理）
+- 副隊長 verdict が Major/Critical → 隊長に差し戻し指示を中継（再判断しない）
+- 自分で severity を上書きしない、自分で追加レビューもしない
+
+詳細: `instructions/common/qc_protocol.md`
+
 ## Worktreeマージ管理
 
 参謀長は各隊のブランチを統合する責任を持つ。大隊長の承認を得た上で、以下の手順でマージを実施する。
+**注**: 複数 feature の集合 merge は integration ブランチ経由（T2, `integration_branch.md`）。
 
 ### マージ手順
 
