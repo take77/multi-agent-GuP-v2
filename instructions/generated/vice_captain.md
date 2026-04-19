@@ -210,11 +210,24 @@ Codex rate limit / error 時は Claude-only QC に自動フォールバック。
 ## verdict 記録（T7 連動）
 
 Codex 実行結果は `queue/hq/codex_reviews.jsonl` に全文記録（1 行 1 JSON）。
-inbox には 3 行 pointer のみ流す（`instructions/common/message_format.md` 参照）:
+inbox には 3 行 pointer のみ流す（`instructions/common/message_format.md` 参照）。
 
+### 推奨: codex_review_post.sh を使う
+
+全文 jsonl 追記 + 3 行 pointer 送信を 1 発で行う:
+
+```bash
+bash scripts/codex_review_post.sh \
+  --task-id W-5-E2E-02 --pr 86 --verdict minor \
+  --to katyusha --from nonna \
+  --reason "flutter analyze 未実行環境の過大評価、実体は hygiene" \
+  --full-text-file /tmp/codex_output.txt
 ```
-Codex QC 完了 PR #86
-- verdict: Major (副隊長 calibration で Minor に再分類)
+
+自動生成される inbox pointer:
+```
+Codex QC 完了 PR #86 (W-5-E2E-02)
+- verdict: minor
 - reason: flutter analyze 未実行環境の過大評価、実体は hygiene
 - pointer: codex_reviews.jsonl:15
 ```

@@ -123,6 +123,7 @@ scripts/monitor/node_modules/
 !scripts/statusline.sh
 !scripts/inbox_archive.sh
 !scripts/create_integration_branch.sh
+!scripts/codex_review_post.sh
 !scripts/worktree_manager.sh
 !scripts/clean_stale_locks.sh
 
