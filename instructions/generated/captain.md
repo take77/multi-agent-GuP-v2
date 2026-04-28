@@ -487,15 +487,15 @@ STEP 4: Send via inbox — bash scripts/inbox_write.sh ${member_name} "タスク
 
 ```bash
 # L4+タスク配信時: Opus昇格
-bash scripts/inbox_write.sh ${member_name} "/model claude-opus-4-6[1m]" model_switch ${captain_name}
-tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name 'claude-opus-4-6[1m]'
+bash scripts/inbox_write.sh ${member_name} "/model opus" model_switch ${captain_name}
+tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name 'Opus'
 
 # タスク完了後: Sonnet復帰
-bash scripts/inbox_write.sh ${member_name} "/model claude-sonnet-4-6" model_switch ${captain_name}
-tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name 'claude-sonnet-4-6'
+bash scripts/inbox_write.sh ${member_name} "/model sonnet" model_switch ${captain_name}
+tmux set-option -p -t ${CLUSTER_ID}:0.{N} @model_name 'Sonnet'
 ```
 
-`lib/model_router.sh` で自動解決も可能: `source lib/model_router.sh && get_recommended_model "L4"` → `claude-opus-4-6[1m]`
+`lib/model_router.sh` で自動解決も可能: `source lib/model_router.sh && get_recommended_model "L4"` → `opus`
 
 ## Command Writing
 
