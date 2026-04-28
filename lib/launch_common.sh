@@ -218,10 +218,10 @@ setup_squad_cluster() {
             tmux set-environment -t "${CLUSTER_ID}:agents.${p}" GUP_BRIDGE_MODE 1
         fi
 
-        # モデル設定（隊長=Opus, 副隊長=Opus, 隊員=Sonnet）
-        local model_name="Sonnet"
+        # モデル設定（隊長=Opus 1m, 副隊長=Opus 1m, 隊員=Sonnet 1m）
+        local model_name="${CLAUDE_SONNET_MODEL:-claude-sonnet-4-6}"
         if [ "$agent_role" = "captain" ] || [ "$agent_role" = "vice_captain" ]; then
-            model_name="Opus"
+            model_name="${CLAUDE_OPUS_MODEL:-claude-opus-4-6[1m]}"
         fi
         tmux set-option -p -t "${CLUSTER_ID}:agents.${p}" @model_name "$model_name"
 
@@ -261,6 +261,7 @@ start_squad_claude() {
 
         for i in $(seq 0 $((AGENT_COUNT - 1))); do
             local p=$((PANE_BASE + i))
+            local agent_id="${AGENT_IDS[$i]}"
             local agent_role="${AGENT_ROLES[$i]}"
             local agent_name="${AGENT_NAMES[$i]}"
 
@@ -272,15 +273,21 @@ start_squad_claude() {
                 continue
             fi
 
-            # モデル決定（隊長・副隊長=Opus, 隊員=Sonnet）
-            local model_opt="--model sonnet"
-            if [ "$agent_role" = "captain" ] || [ "$agent_role" = "vice_captain" ]; then
-                model_opt="--model opus"
+            # モデル決定（隊長・副隊長=Opus 1m, 隊員=Sonnet 1m）
+            local launch_cmd=""
+            if command -v build_cli_command >/dev/null 2>&1; then
+                launch_cmd=$(build_cli_command "$agent_id")
+            else
+                local model_name="${CLAUDE_SONNET_MODEL:-claude-sonnet-4-6}"
+                if [ "$agent_role" = "captain" ] || [ "$agent_role" = "vice_captain" ]; then
+                    model_name="${CLAUDE_OPUS_MODEL:-claude-opus-4-6[1m]}"
+                fi
+                launch_cmd="claude --model '$model_name' --dangerously-skip-permissions"
             fi
 
             # Claude Code起動
             tmux send-keys -t "${CLUSTER_ID}:agents.${p}" \
-                "claude $model_opt --dangerously-skip-permissions"
+                "$launch_cmd"
             sleep 0.3
             tmux send-keys -t "${CLUSTER_ID}:agents.${p}" Enter
 
@@ -348,7 +355,7 @@ launch_command_server() {
         tmux set-option -p -t "command:command.${p}" @agent_id "$agent_id"
         tmux set-option -p -t "command:command.${p}" @agent_name "$agent_name"
         tmux set-option -p -t "command:command.${p}" @agent_role "$agent_role"
-        tmux set-option -p -t "command:command.${p}" @model_name "Opus"
+        tmux set-option -p -t "command:command.${p}" @model_name "${CLAUDE_OPUS_MODEL:-claude-opus-4-6[1m]}"
         tmux set-option -p -t "command:command.${p}" @current_task ""
 
         # プロンプト設定と環境変数注入
@@ -371,9 +378,9 @@ launch_command_server() {
             local p=$((PANE_BASE + i))
             local agent_name="${AGENT_NAMES[$i]}"
 
-            # Claude Code起動（司令部は全員Opus）
+            # Claude Code起動（司令部は全員 Opus 1m）
             tmux send-keys -t "command:command.${p}" \
-                "claude --model opus --dangerously-skip-permissions"
+                "claude --model '${CLAUDE_OPUS_MODEL:-claude-opus-4-6[1m]}' --dangerously-skip-permissions"
             sleep 0.3
             tmux send-keys -t "command:command.${p}" Enter
 

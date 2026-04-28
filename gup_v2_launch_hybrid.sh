@@ -609,6 +609,8 @@ if [ "$SETUP_ONLY" = false ]; then
 
     log_war "👑 全軍に Claude Code を召喚中..."
 
+    _fallback_opus_model="${CLAUDE_OPUS_MODEL:-claude-opus-4-6[1m]}"
+
     # ─────────────────────────────────────────────────────────────────────────
     # STEP 6（HYBRID修正）: Claude 起動前にペインシェルへ環境変数を注入
     # Agent Teams 機能を有効にするため、CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS と
@@ -628,7 +630,7 @@ if [ "$SETUP_ONLY" = false ]; then
 
     # 大隊長（anzu）: CLI Adapter経由でコマンド構築
     _anzu_cli_type="claude"
-    _anzu_cmd="claude --model opus --dangerously-skip-permissions"
+    _anzu_cmd="claude --model '$_fallback_opus_model' --dangerously-skip-permissions"
     if [ "$CLI_ADAPTER_LOADED" = true ]; then
         _anzu_cli_type=$(get_cli_type "anzu")
         _anzu_cmd=$(build_cli_command "anzu")
@@ -648,7 +650,7 @@ if [ "$SETUP_ONLY" = false ]; then
 
     # 参謀長（miho）: CLI Adapter経由でコマンド構築
     _miho_cli_type="claude"
-    _miho_cmd="claude --model opus --dangerously-skip-permissions"
+    _miho_cmd="claude --model '$_fallback_opus_model' --dangerously-skip-permissions"
     if [ "$CLI_ADAPTER_LOADED" = true ]; then
         _miho_cli_type=$(get_cli_type "miho")
         _miho_cmd=$(build_cli_command "miho")

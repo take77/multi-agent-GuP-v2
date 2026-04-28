@@ -83,7 +83,7 @@ SSE 接続時はクエリパラメータで認証: `?token=your-secret-token-her
 
 `POST /api/agents/command` は3層の安全機構を持つ:
 
-1. **ホワイトリスト**: `/clear`, `/model sonnet|opus|haiku` は確認なしで送信可
+1. **ホワイトリスト**: `/clear`, `/model claude-sonnet-4-6`, `/model claude-opus-4-6[1m]` は確認なしで送信可
 2. **D001-D012 ブロック**: `rm -rf /`, `git push --force`, `sudo` 等の破壊コマンドは 403 で拒否
 3. **Audit Log**: 全コマンド（許可/拒否）を `logs/web-ui-audit.jsonl` に記録
 

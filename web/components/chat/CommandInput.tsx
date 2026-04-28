@@ -2,13 +2,17 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useAppStore } from "@/lib/store";
+import {
+  CLAUDE_OPUS_MODEL,
+  CLAUDE_SONNET_MODEL,
+} from "@/lib/command-sanitizer";
 import StopButton from "./StopButton";
 import ImagePreview from "./ImagePreview";
 
 const QUICK_ACTIONS = [
   { label: "/clear", command: "/clear" },
-  { label: "Sonnet", command: "/model sonnet" },
-  { label: "Opus", command: "/model opus" },
+  { label: "Sonnet 1m", command: `/model ${CLAUDE_SONNET_MODEL}` },
+  { label: "Opus 1m", command: `/model ${CLAUDE_OPUS_MODEL}` },
 ];
 
 const ACCEPTED_FILE_TYPES = [

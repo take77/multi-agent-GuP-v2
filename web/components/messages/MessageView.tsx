@@ -47,7 +47,7 @@ function formatTimestamp(ts: string) {
 }
 
 function extractModelName(content: string): string {
-  // "/model sonnet" → "sonnet", "/model opus" → "opus"
+  // "/model claude-sonnet-4-6" → "claude-sonnet-4-6", etc.
   const m = content.match(/\/model\s+(\S+)/);
   return m ? m[1] : content;
 }

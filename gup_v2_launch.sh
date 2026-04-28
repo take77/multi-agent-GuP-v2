@@ -743,9 +743,11 @@ if [ "$SETUP_ONLY" = false ]; then
 
     log_war "👑 全軍に Claude Code を召喚中..."
 
+    _fallback_opus_model="${CLAUDE_OPUS_MODEL:-claude-opus-4-6[1m]}"
+
     # 大隊長（anzu）: CLI Adapter経由でコマンド構築
     _anzu_cli_type="claude"
-    _anzu_cmd="claude --model opus --dangerously-skip-permissions"
+    _anzu_cmd="claude --model '$_fallback_opus_model' --dangerously-skip-permissions"
     if [ "$CLI_ADAPTER_LOADED" = true ]; then
         _anzu_cli_type=$(get_cli_type "anzu")
         _anzu_cmd=$(build_cli_command "anzu")
@@ -765,10 +767,10 @@ if [ "$SETUP_ONLY" = false ]; then
     fi
 
     # 参謀長（miho）: CLI Adapter経由でコマンド構築
-    # モデル: opus（config/settings.yaml cli.agents.miho.model で設定）
+    # モデル: claude-opus-4-6[1m]（config/settings.yaml cli.agents.miho.model で設定）
     # 理由: 施策分配判断、worktreeマージ管理、品質ゲート機能に高い推論能力が必要
     _miho_cli_type="claude"
-    _miho_cmd="claude --model opus --dangerously-skip-permissions"
+    _miho_cmd="claude --model '$_fallback_opus_model' --dangerously-skip-permissions"
     if [ "$CLI_ADAPTER_LOADED" = true ]; then
         _miho_cli_type=$(get_cli_type "miho")
         _miho_cmd=$(build_cli_command "miho")

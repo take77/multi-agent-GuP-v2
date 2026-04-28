@@ -15,9 +15,12 @@
 # Fallback 2: rc=1処理（Claude Code atomic write = tmp+rename でinode変更時）
 #
 # エスカレーション（未読メッセージが放置されている場合）:
-#   0〜2分: 通常nudge（send-keys）。ただしWorking中はスキップ
-#   2〜4分: Escape×2 + nudge（カーソル位置バグ対策）
-#   4分〜 : /clear送信（5分に1回まで。強制リセット+YAML再読）
+#   phase1 (0〜60s)  : 通常nudge（send-keys）。ただしWorking中はスキップ
+#   phase2 (60〜120s): Escape×2 + nudge（カーソル位置バグ対策）
+#   phase3 (120s〜)  : 司令官に stuck 通知 (ntfy push) + Escape+nudge 継続
+#                      自動 /clear は廃止。context 破壊は人間判断にゲート。
+#                      明示 clear_command (type=clear_command inbox) は従来通り有効。
+#                      cooldown で通知スパム防止。
 # ═══════════════════════════════════════════════════════════════
 
 # ─── Testing guard ───
@@ -519,6 +522,25 @@ send_wakeup() {
     return 1
 }
 
+# ─── Notify commander of suspected stuck agent (Plan A) ───
+# Phase 3 replacement for auto-/clear. Sends ntfy push + logs WARN.
+# Context destruction (/clear) is no longer automatic — must be human-gated
+# or triggered via explicit clear_command inbox message.
+notify_stuck_suspected() {
+    local agent="$1"
+    local age_sec="$2"
+    local unread_count="$3"
+    local age_min=$((age_sec / 60))
+    local msg="⚠️ ${agent} unresponsive ${age_min}min+ (${unread_count} unread). Investigate — auto-/clear disabled."
+
+    echo "[$(date)] [STUCK-NOTIFY] ${msg}" >&2
+
+    local ntfy_script="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/ntfy.sh"
+    if [ -x "$ntfy_script" ]; then
+        bash "$ntfy_script" "$msg" 2>/dev/null || echo "[$(date)] [STUCK-NOTIFY] ntfy push failed for $agent" >&2
+    fi
+}
+
 # ─── Send wake-up nudge with Escape prefix ───
 # Phase 2 escalation: send Escape×2 + C-c to clear stuck input, then nudge.
 # Addresses the "echo last tool call" cursor position bug and stale input.
@@ -661,17 +683,15 @@ for s in data.get('specials', []):
             echo "[$(date)] $normal_count unread for $AGENT_ID (${age}s — escalating: Escape+nudge)" >&2
             send_wakeup_with_escape "$normal_count"
         else
-            # Phase 3 (4+ min): /clear (throttled to once per 5 min)
+            # Phase 3 (120s+): notify commander, keep Escape+nudge.
+            # Auto-/clear removed (Plan A) — context destruction is human-gated.
+            # Explicit clear_command inbox still works via specials handler.
             if [ "$LAST_CLEAR_TS" -lt "$((now - ESCALATE_COOLDOWN))" ]; then
-                echo "[$(date)] ESCALATION Phase 3: Agent $AGENT_ID unresponsive for ${age}s. Sending /clear." >&2
-                send_cli_command "/clear"
+                echo "[$(date)] ESCALATION Phase 3: Agent $AGENT_ID unresponsive for ${age}s — notifying commander (no auto-/clear)." >&2
+                notify_stuck_suspected "$AGENT_ID" "$age" "$normal_count"
                 LAST_CLEAR_TS=$now
-                FIRST_UNREAD_SEEN=0  # Reset — will re-detect on next cycle
-            else
-                # Cooldown active — fall back to Escape+nudge
-                echo "[$(date)] $normal_count unread for $AGENT_ID (${age}s — /clear cooldown, using Escape+nudge)" >&2
-                send_wakeup_with_escape "$normal_count"
             fi
+            send_wakeup_with_escape "$normal_count"
         fi
     else
         # No unread messages — reset escalation tracker

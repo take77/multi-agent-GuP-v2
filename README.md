@@ -902,7 +902,7 @@ The Captain serves as the Lord's strategic advisor — not just a task relay. St
 | **Normal** (default) | Sonnet | Opus | `./gup_v2_launch.sh` |
 | **Battle** (`-k` flag) | Opus | Opus | `./gup_v2_launch.sh -k` |
 
-Half the squad runs on the cheaper Sonnet model by default. When it's crunch time, switch to Battle formation with `-k` (`--kessen`) for all-Opus maximum capability. The Vice Captain can also promote individual Member mid-session with `/model opus` when a specific task demands it.
+Half the squad runs on the cheaper Sonnet model by default. When it's crunch time, switch to Battle formation with `-k` (`--kessen`) for all-Opus maximum capability. The Vice Captain can also promote individual Member mid-session with `/model claude-opus-4-6[1m]` when a specific task demands it.
 
 ### Bloom's Taxonomy Task Classification
 
@@ -1621,10 +1621,10 @@ tmux attach-session -t darjeeling
 
 ```bash
 # Method 1: Run claude directly in the pane
-claude --model opus --dangerously-skip-permissions
+claude --model 'claude-opus-4-6[1m]' --dangerously-skip-permissions
 
 # Method 2: Vice Captain force-restarts via respawn-pane (also fixes nesting)
-tmux respawn-pane -t command:0.0 -k 'claude --model opus --dangerously-skip-permissions'
+tmux respawn-pane -t command:0.0 -k "claude --model 'claude-opus-4-6[1m]' --dangerously-skip-permissions"
 ```
 
 **If you accidentally nested tmux:**

@@ -17,15 +17,20 @@ interface Rule {
   message: string;
 }
 
+export const CLAUDE_OPUS_MODEL = "claude-opus-4-6[1m]";
+export const CLAUDE_SONNET_MODEL = "claude-sonnet-4-6";
+
 // Whitelist: these commands are always allowed without confirmation
-const WHITELIST_PATTERNS = [
-  /^\/clear$/,
-  /^\/model\s+(sonnet|opus|haiku)$/,
-];
+const WHITELISTED_MODEL_SWITCHES = new Set([
+  CLAUDE_OPUS_MODEL,
+  CLAUDE_SONNET_MODEL,
+]);
 
 export function isWhitelistedCommand(command: string): boolean {
   const trimmed = command.trim();
-  return WHITELIST_PATTERNS.some((p) => p.test(trimmed));
+  if (trimmed === "/clear") return true;
+  const match = trimmed.match(/^\/model\s+(\S+)$/);
+  return !!match && WHITELISTED_MODEL_SWITCHES.has(match[1]);
 }
 
 // Normalize command for matching: collapse whitespace, trim

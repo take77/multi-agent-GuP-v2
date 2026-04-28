@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeCommand, isWhitelistedCommand } from "../command-sanitizer";
+import {
+  sanitizeCommand,
+  isWhitelistedCommand,
+  CLAUDE_OPUS_MODEL,
+  CLAUDE_SONNET_MODEL,
+} from "../command-sanitizer";
 
 describe("sanitizeCommand", () => {
   // D001: rm -rf on root/mnt/home/~
@@ -230,7 +235,7 @@ describe("sanitizeCommand", () => {
       "cat queue/tasks/mako.yaml",
       "echo hello",
       "/clear",
-      "/model sonnet",
+      "/model claude-sonnet-4-6",
       "git push origin feature/branch",
       "git commit -m 'fix bug'",
     ];
@@ -246,14 +251,17 @@ describe("isWhitelistedCommand", () => {
   it("whitelists /clear", () => {
     expect(isWhitelistedCommand("/clear")).toBe(true);
   });
-  it("whitelists /model sonnet", () => {
-    expect(isWhitelistedCommand("/model sonnet")).toBe(true);
+  it("whitelists /model claude-sonnet-4-6", () => {
+    expect(isWhitelistedCommand(`/model ${CLAUDE_SONNET_MODEL}`)).toBe(true);
   });
-  it("whitelists /model opus", () => {
-    expect(isWhitelistedCommand("/model opus")).toBe(true);
+  it("whitelists /model claude-opus-4-6[1m]", () => {
+    expect(isWhitelistedCommand(`/model ${CLAUDE_OPUS_MODEL}`)).toBe(true);
   });
-  it("whitelists /model haiku", () => {
-    expect(isWhitelistedCommand("/model haiku")).toBe(true);
+  it("does not whitelist legacy /model sonnet", () => {
+    expect(isWhitelistedCommand("/model sonnet")).toBe(false);
+  });
+  it("does not whitelist legacy /model opus", () => {
+    expect(isWhitelistedCommand("/model opus")).toBe(false);
   });
   it("does not whitelist arbitrary commands", () => {
     expect(isWhitelistedCommand("rm -rf /")).toBe(false);
