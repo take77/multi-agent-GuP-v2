@@ -1,0 +1,9 @@
+# sample_settings.yaml — config/settings.yaml モックデータ (branch_policy テスト用)
+
+branch_policy:
+  allowed_long_lived:
+    - main
+    - develop
+  short_lived_pattern: "^(feat|fix|hotfix|worktree)/"
+  max_age_seconds: 86400
+  monitored_repos: []

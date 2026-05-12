@@ -1,11 +1,13 @@
-.PHONY: test build lint check help install-deps clean
+.PHONY: test test-e2e test-all build lint check help install-deps clean
 
 # Default target
 help:
 	@echo "Multi-CLI Shogun - Development Commands"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  make test          - Run bats unit tests"
+	@echo "  make test          - Run bats unit tests (tests/*.bats + tests/unit/)"
+	@echo "  make test-e2e      - Run bats e2e tests (tests/e2e/)"
+	@echo "  make test-all      - Run all tests (unit + e2e)"
 	@echo "  make test-int      - Run bats integration tests"
 	@echo "  make build         - Run build_instructions.sh"
 	@echo "  make lint          - Run shellcheck on lib/ and scripts/"
@@ -43,8 +45,22 @@ test-int:
 	fi
 	bats tests/integration/ --filter-tags '!copilot,!codex' --timing
 
-# Run all tests
-test-all: test test-int
+# Run e2e tests
+test-e2e:
+	@echo "Running e2e tests..."
+	@if ! command -v bats >/dev/null 2>&1; then \
+		echo "ERROR: bats not installed. Run 'make install-deps' first."; \
+		exit 1; \
+	fi
+	@if [ ! -d tests/e2e ] || ! ls tests/e2e/*.bats 1>/dev/null 2>&1; then \
+		echo "ERROR: tests/e2e/*.bats not found"; \
+		exit 1; \
+	fi
+	@echo "--- E2E tests ---"
+	@bats tests/e2e/ --timing
+
+# Run all tests (unit + e2e)
+test-all: test test-e2e
 
 # Build instructions (Phase 2 feature)
 build:

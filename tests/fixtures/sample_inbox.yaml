@@ -1,0 +1,22 @@
+# sample_inbox.yaml — stop_hook_inbox.sh e2e テスト用 inbox モックデータ
+# 未読2件 + 既読1件の混在inbox
+
+messages:
+  - id: msg_20260512_001
+    from: maho
+    timestamp: "2026-05-12T10:00:00"
+    type: task_assigned
+    content: "T10-7 Part A 着手せよ。tests/e2e/ に3ファイル作成。"
+    read: false
+  - id: msg_20260512_002
+    from: erika
+    timestamp: "2026-05-12T10:05:00"
+    type: info
+    content: "tests/unit/ は触るな。fukuda 担当。"
+    read: false
+  - id: msg_20260511_001
+    from: maho
+    timestamp: "2026-05-11T09:00:00"
+    type: task_assigned
+    content: "過去タスク（既読済み）。"
+    read: true
