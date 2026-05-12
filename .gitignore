@@ -207,6 +207,13 @@ scripts/monitor/node_modules/
 !queue/hq/
 !queue/hq/**
 
+# Queue HQ runtime artifacts (not source control)
+queue/hq/codex_status.yaml
+queue/hq/codex_reviews.jsonl
+queue/hq/codex_reviews.jsonl.lock
+queue/hq/*.lock
+queue/hq/dashboard.md
+
 worktrees/
 
 # macOS Finder metadata
