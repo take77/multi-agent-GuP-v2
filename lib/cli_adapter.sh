@@ -7,7 +7,7 @@
 #   build_cli_command(agent_id)             → 完全なコマンド文字列
 #   get_instruction_file(agent_id [,cli_type]) → 指示書パス
 #   validate_cli_availability(cli_type)     → 0=OK, 1=NG
-#   get_agent_model(agent_id)               → "opus" | "sonnet" | "haiku" | "k2.5"
+#   get_agent_model(agent_id)               → full model id for Claude/Kimi
 
 # プロジェクトルートを基準にsettings.yamlのパスを解決
 # zsh では BASH_SOURCE が空になるため、git root をフォールバックに使用
@@ -19,6 +19,10 @@ else
     CLI_ADAPTER_PROJECT_ROOT="$(git -C "${0:a:h}" rev-parse --show-toplevel 2>/dev/null || pwd)"
 fi
 CLI_ADAPTER_SETTINGS="${CLI_ADAPTER_SETTINGS:-${CLI_ADAPTER_PROJECT_ROOT}/config/settings.yaml}"
+
+# Fixed Claude model IDs used throughout the project.
+CLAUDE_OPUS_MODEL="${CLAUDE_OPUS_MODEL:-claude-opus-4-6[1m]}"
+CLAUDE_SONNET_MODEL="${CLAUDE_SONNET_MODEL:-claude-sonnet-4-6}"
 
 # 許可されたCLI種別
 CLI_ADAPTER_ALLOWED_CLIS="claude codex copilot kimi"
@@ -143,7 +147,7 @@ build_cli_command() {
         claude)
             local cmd="claude"
             if [[ -n "$model" ]]; then
-                cmd="$cmd --model $model"
+                cmd="$cmd --model '$model'"
             fi
             if [[ -n "$effort" ]]; then
                 cmd="$cmd --effort $effort"
@@ -275,17 +279,17 @@ get_agent_model() {
             esac
             ;;
         *)
-            # Claude Code/Codex/Copilot用デフォルトモデル（kessen/heiji互換）
+            # Claude Code/Codex/Copilot用デフォルトモデル
             case "$agent_id" in
                 # 司令部: 大隊長・参謀長
-                anzu|miho)       echo "opus" ;;
+                anzu|miho)       echo "$CLAUDE_OPUS_MODEL" ;;
                 # 各隊: 隊長・副隊長
-                captain|vice_captain)    echo "opus" ;;
-                darjeeling|pekoe|katyusha|nonna|kay|arisa|maho|erika) echo "opus" ;;
+                captain|vice_captain)    echo "$CLAUDE_OPUS_MODEL" ;;
+                darjeeling|pekoe|katyusha|nonna|kay|arisa|maho|erika) echo "$CLAUDE_OPUS_MODEL" ;;
                 # 隊員
-                member[1-4])  echo "sonnet" ;;
-                member[5-8])  echo "opus" ;;
-                *)              echo "sonnet" ;;
+                member[1-4])  echo "$CLAUDE_SONNET_MODEL" ;;
+                member[5-8])  echo "$CLAUDE_OPUS_MODEL" ;;
+                *)              echo "$CLAUDE_SONNET_MODEL" ;;
             esac
             ;;
     esac

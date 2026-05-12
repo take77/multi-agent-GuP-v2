@@ -31,22 +31,22 @@ cli:
   agents:
     captain:
       type: claude
-      model: opus
+      model: "claude-opus-4-6[1m]"
     vice_captain:
       type: claude
-      model: opus
+      model: "claude-opus-4-6[1m]"
     member1:
       type: claude
-      model: sonnet
+      model: "claude-sonnet-4-6"
     member2:
       type: claude
-      model: sonnet
+      model: "claude-sonnet-4-6"
     member3:
       type: claude
-      model: sonnet
+      model: "claude-sonnet-4-6"
     member4:
       type: claude
-      model: sonnet
+      model: "claude-sonnet-4-6"
     member5:
       type: codex
     member6:
@@ -103,7 +103,7 @@ cli:
       type: codex
       model: gpt-5
 models:
-  vice_captain: sonnet
+  vice_captain: "claude-sonnet-4-6"
 YAML
 
     # kimi CLI settings
@@ -132,7 +132,7 @@ cli:
   agents:
     captain:
       type: claude
-      model: opus
+      model: "claude-opus-4-6[1m]"
     member5:
       type: codex
     member7:
@@ -288,10 +288,10 @@ load_adapter_with() {
 # build_cli_command テスト
 # =============================================================================
 
-@test "build_cli_command: claude + model → claude --model opus --dangerously-skip-permissions" {
+@test "build_cli_command: claude + model → fixed model command" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
     result=$(build_cli_command "captain")
-    [ "$result" = "claude --model opus --dangerously-skip-permissions" ]
+    [ "$result" = "claude --model 'claude-opus-4-6[1m]' --dangerously-skip-permissions" ]
 }
 
 @test "build_cli_command: codex → codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen" {
@@ -337,7 +337,7 @@ load_adapter_with() {
 @test "build_cli_command: claude with default_effort high appends --effort flag" {
     load_adapter_with "${TEST_TMP}/settings_effort_high.yaml"
     result=$(build_cli_command "captain")
-    [ "$result" = "claude --model opus --effort high --dangerously-skip-permissions" ]
+    [ "$result" = "claude --model 'claude-opus-4-6[1m]' --effort high --dangerously-skip-permissions" ]
 }
 
 @test "build_cli_command: codex with default_effort high appends -c model_reasoning_effort" {
@@ -361,7 +361,7 @@ load_adapter_with() {
 @test "build_cli_command: default_effort undefined does not add effort flag" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
     result=$(build_cli_command "captain")
-    [ "$result" = "claude --model opus --dangerously-skip-permissions" ]
+    [ "$result" = "claude --model 'claude-opus-4-6[1m]' --dangerously-skip-permissions" ]
 }
 
 # =============================================================================
@@ -531,28 +531,28 @@ load_adapter_with() {
 # get_agent_model テスト
 # =============================================================================
 
-@test "get_agent_model: cliセクションなし captain → opus (デフォルト)" {
+@test "get_agent_model: cliセクションなし captain → fixed opus model (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
     result=$(get_agent_model "captain")
-    [ "$result" = "opus" ]
+    [ "$result" = "claude-opus-4-6[1m]" ]
 }
 
-@test "get_agent_model: cliセクションなし vice_captain → opus (デフォルト)" {
+@test "get_agent_model: cliセクションなし vice_captain → fixed opus model (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
     result=$(get_agent_model "vice_captain")
-    [ "$result" = "opus" ]
+    [ "$result" = "claude-opus-4-6[1m]" ]
 }
 
-@test "get_agent_model: cliセクションなし member1 → sonnet (デフォルト)" {
+@test "get_agent_model: cliセクションなし member1 → fixed sonnet model (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
     result=$(get_agent_model "member1")
-    [ "$result" = "sonnet" ]
+    [ "$result" = "claude-sonnet-4-6" ]
 }
 
-@test "get_agent_model: cliセクションなし member5 → opus (デフォルト)" {
+@test "get_agent_model: cliセクションなし member5 → fixed opus model (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
     result=$(get_agent_model "member5")
-    [ "$result" = "opus" ]
+    [ "$result" = "claude-opus-4-6[1m]" ]
 }
 
 @test "get_agent_model: YAML指定 member1 → haiku (オーバーライド)" {
@@ -561,10 +561,10 @@ load_adapter_with() {
     [ "$result" = "haiku" ]
 }
 
-@test "get_agent_model: modelsセクションから取得 vice_captain → sonnet" {
+@test "get_agent_model: modelsセクションから取得 vice_captain → fixed sonnet model" {
     load_adapter_with "${TEST_TMP}/settings_with_models.yaml"
     result=$(get_agent_model "vice_captain")
-    [ "$result" = "sonnet" ]
+    [ "$result" = "claude-sonnet-4-6" ]
 }
 
 @test "get_agent_model: codexエージェントのmodel member5 → gpt-5" {
@@ -573,10 +573,10 @@ load_adapter_with() {
     [ "$result" = "gpt-5" ]
 }
 
-@test "get_agent_model: 未知agent → sonnet (デフォルト)" {
+@test "get_agent_model: 未知agent → fixed sonnet model (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
     result=$(get_agent_model "unknown_agent")
-    [ "$result" = "sonnet" ]
+    [ "$result" = "claude-sonnet-4-6" ]
 }
 
 @test "get_agent_model: kimi CLI member3 → k2.5 (YAML指定)" {

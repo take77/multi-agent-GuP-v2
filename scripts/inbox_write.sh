@@ -6,6 +6,14 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# --force フラグ処理（長文ブロック解除）
+FORCE=0
+if [ "$1" = "--force" ]; then
+    FORCE=1
+    shift
+fi
+
 TARGET="$1"
 CONTENT="$2"
 TYPE="${3:-wake_up}"
@@ -18,9 +26,34 @@ mkdir -p "$SCRIPT_DIR/logs"
 
 # Validate arguments
 if [ -z "$TARGET" ] || [ -z "$CONTENT" ]; then
-    echo "Usage: inbox_write.sh <target_agent> <content> [type] [from]" >&2
+    echo "Usage: inbox_write.sh [--force] <target_agent> <content> [type] [from]" >&2
     exit 1
 fi
+
+# 行数制約チェック（T8: 長文メッセージ制約）
+LINE_COUNT=$(echo "$CONTENT" | wc -l | tr -d ' ')
+if [ "$LINE_COUNT" -ge 21 ] && [ "$FORCE" -eq 0 ]; then
+    echo "[inbox_write] BLOCK: メッセージが ${LINE_COUNT} 行（上限 20 行）。短文化するか、queue/reports/ に詳細を書いて pointer だけ送信してください。" >&2
+    echo "[inbox_write] 強制送信が必要な場合は --force フラグを使用: bash scripts/inbox_write.sh --force ${TARGET} \"...\" ${TYPE} ${FROM}" >&2
+    echo "[inbox_write] 参照: instructions/common/message_format.md" >&2
+    echo "[$(date '+%Y-%m-%dT%H:%M:%S')] [BLOCK_LINES] ${FROM} → ${TARGET} (type=${TYPE}) lines=${LINE_COUNT}" >> "$DELIVERY_LOG"
+    exit 2
+elif [ "$LINE_COUNT" -ge 11 ]; then
+    echo "[inbox_write] WARNING: メッセージが ${LINE_COUNT} 行（推奨 10 行以内）。短文化を検討してください。" >&2
+    echo "[$(date '+%Y-%m-%dT%H:%M:%S')] [WARN_LINES] ${FROM} → ${TARGET} (type=${TYPE}) lines=${LINE_COUNT}" >> "$DELIVERY_LOG"
+fi
+
+# ACK 廃止チェック（T1: 節目以外の ack を warning）
+case "$TYPE" in
+    ack|ack_done|ack_progress|ack_merge|ack_merge_plus_followup|decision_ack|direction_ack|directive_ack|info_ack|review_ack|qc_ack|qc_relay_ack|qc_result_ack|task_ack|task_complete_ack|task_done_ack|task_assignment_ack|task_assigned|notification_ack|report_received|coordination_ack|standby_ack|closing_ack|merge_approval_ack|decision_response|report_ack|approval_ack|qc_standby_ack|qc_pass_ack|qc_briefing_ack|qc_acknowledgment|recovery_ack)
+        # 許可 3 種: merge_complete / task_assigned_ack（タスク着手前の正式受領） / emergency_stop_ack
+        if [ "$TYPE" != "merge_complete" ] && [ "$TYPE" != "task_assigned_ack" ] && [ "$TYPE" != "emergency_stop_ack" ]; then
+            echo "[inbox_write] WARNING: ack型メッセージ（type=${TYPE}）は原則廃止。許可されるのは merge_complete / task_assigned_ack / emergency_stop_ack のみ。" >&2
+            echo "[inbox_write] 参照: instructions/common/protocol.md § ACK Abolition Rule" >&2
+            echo "[$(date '+%Y-%m-%dT%H:%M:%S')] [WARN_ACK] ${FROM} → ${TARGET} (type=${TYPE})" >> "$DELIVERY_LOG"
+        fi
+        ;;
+esac
 
 # Initialize inbox if not exists
 if [ ! -f "$INBOX" ]; then
@@ -119,6 +152,20 @@ except Exception as e:
         fi
 
         echo "[$(date '+%Y-%m-%dT%H:%M:%S')] [inbox_write] SUCCESS: ${FROM} → ${TARGET} (type=${TYPE})" >&2
+
+        # T5: inbox bloat 自動抑制 — メッセージ総数が 30 件を超えたら非同期でアーカイブを発火
+        MSG_COUNT=$(python3 -c "
+import yaml
+try:
+    data = yaml.safe_load(open('$INBOX')) or {}
+    print(len(data.get('messages', []) or []))
+except:
+    print(0)
+" 2>/dev/null || echo 0)
+        if [ "${MSG_COUNT:-0}" -ge 30 ]; then
+            nohup bash "$SCRIPT_DIR/scripts/inbox_archive.sh" --threshold 20 --keep-recent 10 "$TARGET" >/dev/null 2>&1 &
+        fi
+
         exit 0
     else
         # Lock timeout or error

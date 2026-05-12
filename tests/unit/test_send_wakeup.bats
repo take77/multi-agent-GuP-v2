@@ -271,10 +271,10 @@ MOCK
 # --- T-SW-009: /model still uses send-keys ---
 
 @test "T-SW-009: send_cli_command /model still uses send-keys (kept)" {
-    run bash -c "source '$TEST_HARNESS' && send_cli_command '/model opus'"
+    run bash -c "source '$TEST_HARNESS' && send_cli_command '/model claude-opus-4-6[1m]'"
     [ "$status" -eq 0 ]
 
-    grep -q "send-keys -t test:0.0 /model opus" "$MOCK_LOG"
+    grep -q "send-keys -t test:0.0 /model claude-opus-4-6\[1m\]" "$MOCK_LOG"
     ! grep -q "paste-buffer" "$MOCK_LOG"
 }
 

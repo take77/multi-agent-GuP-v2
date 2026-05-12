@@ -30,7 +30,7 @@ agent_teams:
 
   lead:
     agent_id: anzu
-    model: opus
+    model: "claude-opus-4-6[1m]"
     effort: high
     delegate_mode: true
     session: command
@@ -49,19 +49,19 @@ agent_teams:
 
   teammates:
     - agent_id: darjeeling
-      model: sonnet
+      model: "claude-sonnet-4-6"
       cluster_session: darjeeling
       bridge_mode: true
     - agent_id: katyusha
-      model: sonnet
+      model: "claude-sonnet-4-6"
       cluster_session: katyusha
       bridge_mode: true
     - agent_id: kay
-      model: sonnet
+      model: "claude-sonnet-4-6"
       cluster_session: kay
       bridge_mode: true
     - agent_id: maho
-      model: sonnet
+      model: "claude-sonnet-4-6"
       cluster_session: maho
       bridge_mode: true
 
@@ -87,9 +87,9 @@ cli:
   default_effort: high
   agents:
     anzu:
-      model: opus
+      model: "claude-opus-4-6[1m]"
     miho:
-      model: opus   # 参謀長は Opus（施策分配 + ブランチマージ判断 + 品質ゲート）
+      model: "claude-opus-4-6[1m]"   # 参謀長は Opus（施策分配 + ブランチマージ判断 + 品質ゲート）
     # 副隊長（QC専任）は Claude CLI で起動し、Codex Plugin (/codex:adversarial-review)
     # を Step 3.5 で呼び出す方針（cmd_164 で整備）。ここで type:codex を指定すると
     # プラグイン経由の adversarial-review が使えなくなるので指定しない。
@@ -103,19 +103,19 @@ bloom_routing:
       model: haiku
       description: "記憶・再現タスク"
     L2:  # Understand（理解）: 整理、分類、フォーマット変換
-      model: sonnet
+      model: "claude-sonnet-4-6"
       description: "理解・分類タスク"
     L3:  # Apply（適用）: テンプレート適用、定型修正
-      model: sonnet
+      model: "claude-sonnet-4-6"
       description: "適用・定型実装タスク"
     L4:  # Analyze（分析）: 原因調査、コードレビュー、デバッグ
-      model: opus
+      model: "claude-opus-4-6[1m]"
       description: "分析・調査タスク"
     L5:  # Evaluate（評価）: 設計評価、アーキテクチャレビュー
-      model: opus
+      model: "claude-opus-4-6[1m]"
       description: "評価・比較タスク"
     L6:  # Create（創造）: 新規設計、要件定義、戦略立案
-      model: opus
+      model: "claude-opus-4-6[1m]"
       description: "創造・設計タスク"
 
   # Sonnet/Opus 境界
@@ -125,7 +125,7 @@ bloom_routing:
   opus_min: L4
 
   # モデル切替コマンド（隊長が隊員に送信）
-  # bash scripts/inbox_write.sh ${member} "/model opus" model_switch ${captain}
+  # bash scripts/inbox_write.sh ${member} "/model claude-opus-4-6[1m]" model_switch ${captain}
   switch_type: model_switch
 
 codex_plugin:

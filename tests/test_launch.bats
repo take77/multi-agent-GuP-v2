@@ -97,6 +97,30 @@ EOF
   echo "$result" | grep -q "SUCCESS: 1"
 }
 
+@test ".claude/settings.json に SessionStart hook が設定されている" {
+  run python3 - <<'PY'
+import json
+
+with open(".claude/settings.json", "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+hooks = data.get("hooks", {})
+session_start = hooks.get("SessionStart", [])
+commands = [
+    hook.get("command", "")
+    for entry in session_start
+    for hook in entry.get("hooks", [])
+]
+
+if any("bash .claude/hooks/session_start.sh" in cmd for cmd in commands):
+    print("SUCCESS")
+else:
+    print("FAIL")
+PY
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q "SUCCESS"
+}
+
 @test "ヘルプに --worktree が表示される" {
   ./gup_v2_launch.sh -h | grep -q "\-\-worktree"
 }

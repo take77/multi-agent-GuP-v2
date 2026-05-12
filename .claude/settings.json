@@ -82,6 +82,17 @@
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/session_start.sh"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "matcher": "",
