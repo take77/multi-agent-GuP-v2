@@ -71,6 +71,7 @@ scripts/monitor/node_modules/
 !lib/cli_adapter.sh
 !lib/ntfy_auth.sh
 !lib/launch_common.sh
+!lib/branch_policy.sh
 
 # Multi-CLI: Codex auto-load file
 !AGENTS.md
@@ -129,6 +130,8 @@ scripts/monitor/node_modules/
 !scripts/worktree_manager.sh
 !scripts/clean_stale_locks.sh
 !scripts/dashboard-viewer.py
+!scripts/auto_merge_short_lived.sh
+!scripts/pre_deploy_verify.sh
 
 # SayTask (sample template only, not actual data)
 !saytask/
