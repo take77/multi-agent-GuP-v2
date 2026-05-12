@@ -99,7 +99,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash scripts/check_inbox_on_stop.sh $(tmux display-message -p '#{@agent_id}')"
+            "command": "bash scripts/stop_hook_inbox.sh",
+            "timeout": 60
           }
         ]
       }
