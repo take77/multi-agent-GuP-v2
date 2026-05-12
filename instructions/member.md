@@ -27,9 +27,9 @@ forbidden_actions:
     action: skip_context_reading
     description: "Start work without reading context"
   - id: F006
-    action: skip_post_task_inbox_check
-    description: "タスク完了後に inbox を確認せずに idle に入る"
-    reason: "redo 指示や次タスクの通知を見逃す。4分間スタックする原因になる"
+    action: skip_inbox_check
+    description: "タスク完了前後の inbox チェックをスキップする"
+    reason: "仕様変更・補足情報の見逃し、redo 指示や次タスク通知の見逃しが発生する"
 
 workflow:
   - step: 1
@@ -45,6 +45,18 @@ workflow:
     value: in_progress
   - step: 4
     action: execute_task
+    note: "実行中は inbox 通知に反応しない（urgent 以外）。集中を維持する"
+  - step: 4.5
+    action: pre_completion_inbox_check
+    description: "完了報告の前に inbox を確認し、仕様変更・補足情報があれば反映する"
+    note: |
+      タスク実装完了後、レポート作成の前に inbox を確認する。
+      read: false のメッセージがあれば内容を確認し:
+      - 現在のタスクに影響する内容（仕様変更、補足情報等）→ 反映してから完了
+      - 現在のタスクに無関係（次タスク通知等）→ read: true にして完了後に対応
+      - type: urgent → 即座に対応（タスク中断も許容）
+    command: "Read queue/inbox/${AGENT_ID}.yaml"
+    mandatory: true
   - step: 5
     action: write_report
     target: "queue/reports/member{N}_report.yaml"
@@ -58,9 +70,9 @@ workflow:
     mandatory: true
   - step: 7.5
     action: post_task_inbox_check
-    description: "MANDATORY inbox check after task completion"
+    description: "完了報告後に inbox を確認し、次タスクや追加指示を処理する"
     note: |
-      タスク完了後、隊長への報告後、即座にinboxを確認せよ。
+      完了報告後、idle に入る前に inbox を再確認する。
       新しいメッセージ（read: false）があれば処理すること。
       これをスキップすると、新タスクに気づかずアイドル状態が続く。
     command: "Read queue/inbox/${AGENT_ID}.yaml"
@@ -213,15 +225,35 @@ inbox_write.sh を実行した後、必ず以下を確認すること:
 3. 「報告済み」「送信済み」と記載する前に、必ず SUCCESS 確認を完了すること
 
 ---
-## Post-Task Inbox Check（必須）
+## Inbox Check ルール（必須・2段階）
 
-タスク完了 → report YAML 書き込み → inbox_write 送信の後、idle に入る前に必ず自分の inbox を確認すること。
+### Step 4.5: 完了前 Inbox Check（Pre-Completion）
+
+タスク実装完了後、レポート作成の **前に** inbox を確認する。
+
+1. Read queue/inbox/{AGENT_ID}.yaml
+2. read: false のエントリを確認
+3. **現在のタスクに影響する内容**（仕様変更、補足情報、追加要件）→ タスクに反映してから完了
+4. **無関係な内容**（次タスク通知等）→ read: true にして完了後に対応
+5. **type: urgent** → 即座に対応（タスク中断も許容）
+
+これにより「仕様変更が来てたのに旧仕様で実装完了」を防ぐ。
+
+### Step 7.5: 完了後 Inbox Check（Post-Completion）
+
+report YAML 書き込み → inbox_write 送信の後、idle に入る前に再度 inbox を確認する。
 
 1. Read queue/inbox/{AGENT_ID}.yaml
 2. read: false のエントリがあれば処理する
 3. 全て処理してから idle に入る
 
-これは **NOT optional**。省略した場合（F006 違反）、redo 指示を見逃し 4 分間スタックする。
+### タスク実行中の Inbox 通知について
+
+タスク実行中（status: in_progress）は **inbox 通知に反応しない**（集中を維持）。
+ただし **type: urgent のメッセージのみ即座に処理**する。
+通常の通知は Step 4.5 または Step 7.5 でまとめて処理する。
+
+これは **NOT optional**。省略した場合（F006 違反）、仕様変更を見逃すか、次タスクに気づかずスタックする。
 ---
 
 ## Report Format (v2.0)
