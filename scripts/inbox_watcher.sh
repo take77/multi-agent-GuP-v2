@@ -77,6 +77,9 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
     fi
 fi
 
+# ─── Agent status library ───
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/agent_status.sh"
+
 # ─── Escalation state ───
 # Time-based escalation: track how long unread messages have been waiting
 FIRST_UNREAD_SEEN=${FIRST_UNREAD_SEEN:-0}
@@ -415,18 +418,10 @@ agent_has_self_watch() {
 }
 
 # ─── Agent busy detection ───
-# Check if the agent's CLI is currently processing (Working/thinking/etc).
-# Sending nudge during Working causes text to queue but Enter to be lost.
-# Returns 0 (true) if agent is busy, 1 if idle.
+# lib/agent_status.sh の detect_agent_state を使い busy 判定を行う wrapper。
+# Returns 0 (true) if agent is busy, 1 if idle or not_found.
 agent_is_busy() {
-    local pane_content
-    pane_content=$(timeout 2 tmux capture-pane -t "$PANE_TARGET" -p 2>/dev/null | tail -15)
-    # Codex CLI: "Working", "Thinking", "Planning", "Sending"
-    # Claude CLI: thinking spinner, tool execution
-    if echo "$pane_content" | grep -qiE '(Working|Thinking|Planning|Sending|esc to interrupt)'; then
-        return 0  # busy
-    fi
-    return 1  # idle
+    [[ "$(detect_agent_state "${AGENT_ID:-}")" == "busy" ]]
 }
 
 # ─── Hybrid mode bridge: signal relay to Battalion Commander ───

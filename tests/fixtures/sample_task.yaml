@@ -1,0 +1,23 @@
+# sample_task.yaml — queue/tasks/ モックデータ (v2.0 形式)
+
+task:
+  task_id: cmd_T10_7_aki_e2e_fixture
+  parent_cmd: cmd_T10_7_test_infrastructure
+  status: assigned
+  captain: maho
+  assigned_to: aki
+  assigned_by: maho
+  assigned_at: "2026-05-12T16:36:00"
+  bloom_level: L4
+  project: multi_agent_gup_v2
+  priority: medium
+  merge_to_main: false
+  integration_branch: feat/T10-shogun-backport
+  context_file: context/T10_shogun_backport.md
+  description: |
+    Fixture: T10-7 e2e テスト + fixtures 整備サンプルタスク
+  acceptance_criteria:
+    - "tests/e2e/ に3ファイル以上の bats テスト"
+    - "tests/fixtures/ に4ファイル以上の YAML fixture"
+    - "Makefile に test-e2e ターゲット追加"
+    - "make test-all で全テストパス"

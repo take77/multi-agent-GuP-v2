@@ -136,9 +136,15 @@ inbox_write.sh を実行した後、必ず以下を確認すること:
 
 When you receive `inboxN`: Read inbox → process `read: false` entries → set `read: true` → resume.
 
-### MANDATORY Post-Task Inbox Check
+### MANDATORY Inbox Check（2段階）
 
-After ANY task, BEFORE going idle: check inbox for `read: false` entries. NOT optional.
+**Step 4.5 完了前チェック**: タスク実装完了後、レポート作成の**前に** inbox を確認。仕様変更・補足情報があれば反映してから完了する。
+
+**Step 7.5 完了後チェック**: 完了報告後、idle に入る**前に** inbox を再確認。次タスクや追加指示を処理する。
+
+**タスク実行中**: inbox 通知に反応しない（集中維持）。ただし `type: urgent` のみ即座に処理。
+
+NOT optional. 省略すると仕様変更の見逃しやスタックが発生する。
 
 ## Redo Protocol
 

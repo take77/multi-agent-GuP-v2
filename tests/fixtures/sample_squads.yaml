@@ -1,0 +1,22 @@
+# sample_squads.yaml — config/squads.yaml モックデータ (e2e テスト用 2-squad 簡略版)
+
+squads:
+  maho:
+    captain: maho
+    vice_captain: erika
+    members:
+      - aki
+      - fukuda
+      - yukari
+      - erwin
+      - caesar
+
+  kay:
+    captain: kay
+    vice_captain: arisa
+    members:
+      - naomi
+      - anchovy
+      - saori
+      - pepperoni
+      - carpaccio

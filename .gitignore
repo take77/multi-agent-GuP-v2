@@ -71,6 +71,8 @@ scripts/monitor/node_modules/
 !lib/cli_adapter.sh
 !lib/ntfy_auth.sh
 !lib/launch_common.sh
+!lib/branch_policy.sh
+!lib/agent_status.sh
 
 # Multi-CLI: Codex auto-load file
 !AGENTS.md
@@ -104,6 +106,7 @@ scripts/monitor/node_modules/
 !context/
 !context/README.md
 !context/fukugyo_sensei_react.md
+!context/T10_shogun_backport.md
 
 # Scripts
 !scripts/
@@ -113,6 +116,7 @@ scripts/monitor/node_modules/
 !scripts/ntfy_listener.sh
 !scripts/build_instructions.sh
 !scripts/check_inbox_on_stop.sh
+!scripts/stop_hook_inbox.sh
 !scripts/watcher_supervisor.sh
 !scripts/bridge_relay.sh
 !scripts/fallback_to_tmux.sh
@@ -126,6 +130,10 @@ scripts/monitor/node_modules/
 !scripts/codex_review_post.sh
 !scripts/worktree_manager.sh
 !scripts/clean_stale_locks.sh
+!scripts/dashboard-viewer.py
+!scripts/auto_merge_short_lived.sh
+!scripts/pre_deploy_verify.sh
+!scripts/ratelimit_check.sh
 
 # SayTask (sample template only, not actual data)
 !saytask/
@@ -206,6 +214,13 @@ scripts/monitor/node_modules/
 !queue/
 !queue/hq/
 !queue/hq/**
+
+# Queue HQ runtime artifacts (not source control)
+queue/hq/codex_status.yaml
+queue/hq/codex_reviews.jsonl
+queue/hq/codex_reviews.jsonl.lock
+queue/hq/*.lock
+queue/hq/dashboard.md
 
 worktrees/
 
