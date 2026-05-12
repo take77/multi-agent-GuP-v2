@@ -28,6 +28,8 @@ set -euo pipefail
 
 SCRIPT_DIR="${__STOP_HOOK_SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
+source "${SCRIPT_DIR}/lib/agent_status.sh"
+
 # ─── stdin から hook 入力 JSON 取得 ───
 INPUT=$(cat || true)
 
@@ -63,40 +65,6 @@ if [ "$STOP_HOOK_ACTIVE" = "True" ]; then
     touch "$IDLE_FLAG" 2>/dev/null || true
     exit 0
 fi
-
-# ─── captain 動的解決 (config/squads.yaml) ───
-# squads 外（chief_of_staff/shogun/anzu 等）や captain 本人 → 空文字
-get_captain_for_agent() {
-    local agent="$1"
-    AGENT_INPUT="$agent" SQUADS_PATH="$SCRIPT_DIR/config/squads.yaml" \
-    python3 -c '
-import os, sys
-try:
-    import yaml
-except Exception:
-    sys.exit(0)
-agent = os.environ.get("AGENT_INPUT", "")
-path = os.environ.get("SQUADS_PATH", "")
-try:
-    with open(path) as f:
-        data = yaml.safe_load(f) or {}
-    for _, sq in (data.get("squads") or {}).items():
-        cap = sq.get("captain")
-        vice = sq.get("vice_captain")
-        members = sq.get("members") or []
-        if agent == cap:
-            return_cap = ""  # captain 本人 → 自己通知禁止
-        elif agent == vice or agent in members:
-            return_cap = cap or ""
-        else:
-            continue
-        print(return_cap)
-        sys.exit(0)
-    print("")
-except Exception:
-    print("")
-' 2>/dev/null || true
-}
 
 # ─── last_assistant_message 解析 → captain 通知 ───
 LAST_MSG=$(printf '%s' "$INPUT" | python3 -c "import sys,json;

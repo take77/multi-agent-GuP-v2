@@ -72,6 +72,7 @@ scripts/monitor/node_modules/
 !lib/ntfy_auth.sh
 !lib/launch_common.sh
 !lib/branch_policy.sh
+!lib/agent_status.sh
 
 # Multi-CLI: Codex auto-load file
 !AGENTS.md
