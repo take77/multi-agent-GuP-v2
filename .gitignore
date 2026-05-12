@@ -127,6 +127,7 @@ scripts/monitor/node_modules/
 !scripts/codex_review_post.sh
 !scripts/worktree_manager.sh
 !scripts/clean_stale_locks.sh
+!scripts/dashboard-viewer.py
 
 # SayTask (sample template only, not actual data)
 !saytask/
