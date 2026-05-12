@@ -133,6 +133,7 @@ scripts/monitor/node_modules/
 !scripts/dashboard-viewer.py
 !scripts/auto_merge_short_lived.sh
 !scripts/pre_deploy_verify.sh
+!scripts/ratelimit_check.sh
 
 # SayTask (sample template only, not actual data)
 !saytask/
