@@ -104,6 +104,7 @@ scripts/monitor/node_modules/
 !context/
 !context/README.md
 !context/fukugyo_sensei_react.md
+!context/T10_shogun_backport.md
 
 # Scripts
 !scripts/
