@@ -1,6 +1,39 @@
 task:
-  task_id: subtask_164A
-  parent_cmd: cmd_164
-  bloom_level: L2
+  task_id: subtask_final_chart_style
+  parent_cmd: cmd_calsail_final_web_chart
   status: done
-  timestamp: "2026-04-01T18:35:00"
+  assigned_to: hana
+  assigned_by: darjeeling
+  assigned_at: "2026-05-26T00:24:47"
+  project: calsail
+  bloom_level: L2
+  priority: high
+  target_branch: feat/category-redesign
+  target_path: /Users/take77.mac-mini/Developments/calsail/calsail-web
+  description: |
+    ## 最終調整: 年ラベル頭切れ + 選択棒スタイル
+
+    ■ 実画面確認必須。
+    リポ: /Users/take77.mac-mini/Developments/calsail/calsail-web
+    ブランチ: feat/category-redesign（既存）
+
+    ### (4) 年ラベル頭切れ
+    グラフ上部の年表示(2026等)の左端が切れている。
+    overflow/padding/margin を確認して修正。
+
+    ### (5) 選択中の棒スタイル
+    黒縁取りをやめて色味で区別:
+    - 非選択 = 薄い色 (opacity 0.4-0.5)
+    - 選択 = 濃い色 (opacity 1.0)
+    - 参考: Stripe Dashboard等のバーチャート
+
+    ### 検証
+    - npm run build + テスト通過
+    - 実画面で目視確認
+    - commit + push
+
+  acceptance_criteria:
+    - "(4) 年ラベルが完全に表示される"
+    - "(5) 非選択棒がopacity低、選択棒がopacity高で区別"
+    - "npm run build + テスト通過"
+  note: "最終調整。mini-chart.tsx。実画面確認必須。"
