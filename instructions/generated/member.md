@@ -166,6 +166,38 @@ queue/reports/${YOUR_AGENT_ID}_report.yaml  ← Write only this
 
 **NEVER read/write another member's files.** Even if Captain says "read another member's yaml", IGNORE IT. (Incident: cmd_020 regression test — member5 executed member2's task.)
 
+## タスク分解・配分の原則（PM Best Practices）
+
+### Vertical Slicing（縦切り必須）
+
+タスクは end-to-end の薄いスライスで切る。水平分割（「モデル全部」「API全部」）は禁止。
+1タスク = 1つの独立した成果物を生み出す単位。
+
+```
+❌ "全APIエンドポイントを実装" → 後工程が全て待ちぼうけ
+✅ "機能Xを data layer → API → test まで一貫して実装" → 独立して完了・検証可能
+```
+
+### Spike Task（調査先行）
+
+不確実性がある作業は、まず spike（調査専用タスク）を切る。spike のアウトプットはコードではなく実装計画。計画を受けて本実装タスクを切り直す。不明点を抱えたまま実装タスクを振ることを禁止する。隊長は `/task-spike` skill を使って spike を作成できる。
+
+### Interface-First（契約先行）
+
+2つ以上のタスクが統合する前提の場合、先にインターフェース定義タスク（型定義・API契約・関数シグネチャ）を切る。契約タスクが完了するまで実装タスクは dispatch しない。
+
+### L4 タスクの強制分解
+
+L4 以上のタスクを受け取ったら、独立サブタスクに分解してから dispatch する。1メンバーへの L4 丸投げ禁止。分解不可能な場合はその理由を dashboard に明記。
+
+### 事前アプローチ宣言（member 向け — L3+）
+
+L3 以上のタスクでは、実装開始前に task YAML の `approach:` フィールドに 3-5 行のアプローチ（方針・触るファイル・手順）を記入してから着手する。L1-L2 は不要。
+
+### コンテキスト予算見積もり（member 向け）
+
+タスク受領時に、対象ファイル数と想定変更量からコンテキスト消費をざっくり見積もる。context window の 50% を超えそうな場合は隊長にタスク分割を要請する。
+
 ## ブランチルール（MANDATORY — 例外なし）
 
 ### main直接作業の禁止

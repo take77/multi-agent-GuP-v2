@@ -88,6 +88,29 @@ task_id, parent_cmd, bloom_level, description, target_path, target_branch, statu
 2. 全 task YAML の `status: blocked` をスキャン
 3. `blocked_by` に完了 task_id があれば削除。リスト空なら `assigned` に変更 + inbox_write
 
+### 7. Pull-based Assignment（プル型配信）
+
+メンバーがタスク完了を報告したとき、隊長は次のタスクを push する代わりに Ready キューから pull させることができる。
+
+**いつ使うか**: 独立タスクが 3 件以上キューにあり、特定メンバーに振る理由がない場合。
+
+**手順**:
+1. 全サブタスクを `status: ready` で task YAML に書く（`assigned` ではなく `ready`）
+2. メンバーの完了報告を受領したら、最も priority が高い `ready` タスクを `assigned` に変更
+3. その task YAML のパスを inbox_write で通知
+
+**メリット**: 隊長が「誰に振るか」を毎回判断しなくてよい。完了した人から順に次を取る。
+
+```
+❌ Push: captain が member1 を指名 → member2-5 は idle のまま
+✅ Pull: 完了順に ready キューから取得 → 全員が稼働
+```
+
+### 8. Definition of Ready（着手可能条件）
+
+task YAML を dispatch する前に `bash scripts/validate_task_ready.sh <yaml_path>` を実行する。
+不足フィールドがあれば WARNING が表示される。修正してから dispatch すること。
+
 ## Notes
 
 - dashboard のみの更新は配信ではない。YAML + inbox_write が必須。

@@ -139,7 +139,7 @@ build_cli_command() {
     model=$(get_agent_model "$agent_id")
 
     # 全エージェント共通の推論 effort（cli.default_effort）
-    # 値は low | medium | high | max。未定義時は空文字を返し、フラグは付与しない
+    # 値は low | medium | high | xhigh | max。未定義時は空文字を返し、フラグは付与しない
     local effort
     effort=$(_cli_adapter_read_yaml "cli.default_effort" "")
 

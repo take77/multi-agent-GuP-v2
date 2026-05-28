@@ -31,6 +31,9 @@ scripts/monitor/node_modules/
 !.claude/hooks/session_start.sh
 !.claude/agents/
 !.claude/agents/*.md
+!.claude/skills/
+!.claude/skills/*/
+!.claude/skills/*/SKILL.md
 
 # Persona files (character definitions — safe for OSS)
 !persona/
@@ -134,6 +137,8 @@ scripts/monitor/node_modules/
 !scripts/auto_merge_short_lived.sh
 !scripts/pre_deploy_verify.sh
 !scripts/ratelimit_check.sh
+!scripts/validate_task_ready.sh
+!scripts/compaction_lock.sh
 
 # SayTask (sample template only, not actual data)
 !saytask/
@@ -148,6 +153,8 @@ scripts/monitor/node_modules/
 !docs/multi-cli-evaluation.md
 !docs/web-ui-summary.md
 !docs/skipped_branches_cmd163.yaml
+!docs/retrospectives/
+!docs/retrospectives/*.md
 
 # Screenshots (masked — no secrets)
 !images/
