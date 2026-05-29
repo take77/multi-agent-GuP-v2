@@ -30,7 +30,7 @@ agent_teams:
 
   lead:
     agent_id: anzu
-    model: "claude-opus-4-6[1m]"
+    model: "claude-opus-4-8"
     effort: high
     delegate_mode: true
     session: command
@@ -89,9 +89,9 @@ cli:
   default_effort: max
   agents:
     anzu:
-      model: "claude-opus-4-6[1m]"
+      model: "claude-opus-4-8"
     miho:
-      model: "claude-opus-4-6[1m]"   # 参謀長は Opus（施策分配 + ブランチマージ判断 + 品質ゲート）
+      model: "claude-opus-4-8"   # 参謀長は Opus（施策分配 + ブランチマージ判断 + 品質ゲート）
     # 副隊長（QC専任）は Claude CLI で起動し、Codex Plugin (/codex:adversarial-review)
     # を Step 3.5 で呼び出す方針（cmd_164 で整備）。ここで type:codex を指定すると
     # プラグイン経由の adversarial-review が使えなくなるので指定しない。
@@ -111,13 +111,13 @@ bloom_routing:
       model: "claude-sonnet-4-6"
       description: "適用・定型実装タスク"
     L4:  # Analyze（分析）: 原因調査、コードレビュー、デバッグ
-      model: "claude-opus-4-6[1m]"
+      model: "claude-opus-4-8"
       description: "分析・調査タスク"
     L5:  # Evaluate（評価）: 設計評価、アーキテクチャレビュー
-      model: "claude-opus-4-6[1m]"
+      model: "claude-opus-4-8"
       description: "評価・比較タスク"
     L6:  # Create（創造）: 新規設計、要件定義、戦略立案
-      model: "claude-opus-4-6[1m]"
+      model: "claude-opus-4-8"
       description: "創造・設計タスク"
 
   # Sonnet/Opus 境界
@@ -127,7 +127,7 @@ bloom_routing:
   opus_min: L4
 
   # モデル切替コマンド（隊長が隊員に送信）
-  # bash scripts/inbox_write.sh ${member} "/model claude-opus-4-6[1m]" model_switch ${captain}
+  # bash scripts/inbox_write.sh ${member} "/model claude-opus-4-8" model_switch ${captain}
   switch_type: model_switch
 
 codex_plugin:

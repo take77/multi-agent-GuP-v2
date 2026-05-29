@@ -21,7 +21,7 @@ fi
 CLI_ADAPTER_SETTINGS="${CLI_ADAPTER_SETTINGS:-${CLI_ADAPTER_PROJECT_ROOT}/config/settings.yaml}"
 
 # Fixed Claude model IDs used throughout the project.
-CLAUDE_OPUS_MODEL="${CLAUDE_OPUS_MODEL:-claude-opus-4-6[1m]}"
+CLAUDE_OPUS_MODEL="${CLAUDE_OPUS_MODEL:-claude-opus-4-8}"
 CLAUDE_SONNET_MODEL="${CLAUDE_SONNET_MODEL:-claude-sonnet-4-6}"
 
 # 許可されたCLI種別
