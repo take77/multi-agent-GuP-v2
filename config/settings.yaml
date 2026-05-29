@@ -84,9 +84,9 @@ cli:
   # Claude CLI: --effort フラグに渡される
   # Codex CLI: -c model_reasoning_effort=<value> に渡される
   # 未定義時は CLI のデフォルトを使用
-  # 2026-05-28: high → max に引き上げ（実装精度向上のため）
-  # xhigh は Opus 4.7 専用。Opus 4.6 / Sonnet 4.6 では max が最高
-  default_effort: max
+  # 2026-05-28: high → xhigh に引き上げ（実装精度向上のため）
+  # Opus 4.8 は全5段階対応。微妙なら max に昇格
+  default_effort: xhigh
   agents:
     anzu:
       model: "claude-opus-4-8"
