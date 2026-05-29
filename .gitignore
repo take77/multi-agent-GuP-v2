@@ -155,6 +155,8 @@ scripts/monitor/node_modules/
 !docs/skipped_branches_cmd163.yaml
 !docs/retrospectives/
 !docs/retrospectives/*.md
+!docs/spike/
+!docs/spike/*.md
 
 # Screenshots (masked — no secrets)
 !images/
