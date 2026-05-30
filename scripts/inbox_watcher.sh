@@ -537,7 +537,7 @@ notify_stuck_suspected() {
 }
 
 # ─── Send wake-up nudge with Escape prefix ───
-# Phase 2 escalation: send Escape×2 + C-c to clear stuck input, then nudge.
+# Phase 2 escalation: send single Escape + C-c to clear stuck input, then nudge.
 # Addresses the "echo last tool call" cursor position bug and stale input.
 send_wakeup_with_escape() {
     local unread_count="$1"
@@ -566,9 +566,10 @@ send_wakeup_with_escape() {
         return 0
     fi
 
-    echo "[$(date)] [SEND-KEYS] ESCALATION Phase 2: Escape×2 + nudge for $AGENT_ID (cli=$effective_cli)" >&2
-    # Escape×2 to exit any mode
-    timeout 5 tmux send-keys -t "$PANE_TARGET" Escape Escape 2>/dev/null
+    echo "[$(date)] [SEND-KEYS] ESCALATION Phase 2: Escape + nudge for $AGENT_ID (cli=$effective_cli)" >&2
+    # Single Escape to exit any mode. NOTE: Escape×2 (Esc-Esc) triggers Claude Code's
+    # Rewind menu chord, which blocks the agent in a stall loop — fixed 2026-05-30.
+    timeout 5 tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
     sleep 0.5
     # C-c to clear stale input (but Codex CLI terminates on C-c when idle, so skip it)
     if [[ "$effective_cli" != "codex" ]]; then
