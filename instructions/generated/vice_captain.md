@@ -154,6 +154,18 @@ member 実装完了
 詳細は memory の `feedback_qc_component_commit_mandatory.md` 参照。
 本プロトコルでは「副隊長が単独で」これを実施し、verdict を確定する。
 
+## 検証者隔離（confirmation bias 遮断・2026-05-31 追加）
+
+**生成者の結論を検証者の判断 anchor にしない。** 検証者（副隊長／Codex）が producer の自己評価を見ると、追認バイアス（sycophantic confirmation）で同じ誤りを再生産し、QC のフィルタ効果が消える（外部根拠: MARCH の blinded Checker / Chain-of-Verification の独立回答 / Cross-Context Verification。`docs/retrospectives/2026-05-31_opus48_prompting_research_REPORT.md`）。
+
+副隊長 QC 時は以下の順序を厳守する:
+
+1. **独立 verdict を先に確定**: `git diff` / `git show <branch>:<path>` / 現物 file:line と **acceptance criteria** だけから、自前で verdict を組み立てる。member の report.yaml の自己申告（「実装した」「テスト green」「ここは問題ない」等の主張・自己 verdict）に **anchor されない**。
+2. **その後に report を照合対象として読む**: 宣言 changed_files / summary と実体の **差分だけ**を tick する。report は「確認対象」であって「結論の根拠」ではない。
+3. **Codex を道具に使う時は生 artifact を渡す**: prompt には **生 diff + acceptance criteria** を入れ、member の自己評価ナラティブ（「この変更は安全」等）は **渡さない**。検証者が producer の結論を再生産するのを防ぐ。
+
+> 注: 既存の「verdict 通知/要約を信用しない」（CLAUDE.md Claim Integrity）は *信用しない* に留まる。本節はさらに一段強く、*結論を検証者の context に入れない*（隔離）を求める。
+
 ## 根拠
 
 2026-04-19 までの運用で 4 層（副隊長 → 隊長 → miho → 大隊長）の冗長 QC が
