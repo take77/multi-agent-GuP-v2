@@ -20,6 +20,7 @@ TODAY=$(date "+%Y-%m-%d")
 # デフォルト設定
 KEEP_RECENT=10      # 直近 read メッセージを何件 inbox に残すか（直近 context 保持）
 THRESHOLD=20        # メッセージ総数がこの値以上の inbox のみアーカイブ対象
+MAX_BYTES=15360     # byte サイズがこの値以上の inbox もアーカイブ対象（件数 OR byte）
 FORCE_ALL=0         # --all 時: 閾値無視
 TARGET_AGENT=""
 
@@ -38,6 +39,10 @@ while [ $# -gt 0 ]; do
             FORCE_ALL=1
             THRESHOLD=0
             shift
+            ;;
+        --max-bytes)
+            MAX_BYTES="$2"
+            shift 2
             ;;
         -*)
             echo "[inbox_archive] Unknown flag: $1" >&2
@@ -77,7 +82,7 @@ for INBOX in "${TARGETS[@]}"; do
         }
 
         IA_INBOX="$INBOX" IA_ARCHIVE="$ARCHIVE_FILE" \
-        IA_KEEP_RECENT="$KEEP_RECENT" IA_THRESHOLD="$THRESHOLD" \
+        IA_KEEP_RECENT="$KEEP_RECENT" IA_THRESHOLD="$THRESHOLD" IA_MAX_BYTES="$MAX_BYTES" \
         python3 -c "
 import yaml, sys, os, tempfile
 
@@ -85,8 +90,10 @@ inbox_path = os.environ['IA_INBOX']
 archive_path = os.environ['IA_ARCHIVE']
 keep_recent = int(os.environ['IA_KEEP_RECENT'])
 threshold = int(os.environ['IA_THRESHOLD'])
+max_bytes = int(os.environ['IA_MAX_BYTES'])
 
 try:
+    file_bytes = os.path.getsize(inbox_path)
     with open(inbox_path) as f:
         content = f.read().strip()
     if not content:
@@ -100,8 +107,8 @@ try:
     if not messages:
         sys.exit(0)
 
-    # 閾値: メッセージ総数が threshold 未満ならスキップ
-    if len(messages) < threshold:
+    # 閾値: 件数 AND byte 両方が閾値未満のときのみスキップ（OR 発動）
+    if len(messages) < threshold and file_bytes < max_bytes:
         sys.exit(0)
 
     # read:true を時系列で分離、直近 keep_recent 件は inbox に残す
