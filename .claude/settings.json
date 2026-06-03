@@ -127,6 +127,16 @@
             "timeout": 60
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/stop_hook_reflect_probe.sh",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }
