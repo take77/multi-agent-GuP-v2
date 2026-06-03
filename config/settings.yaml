@@ -87,11 +87,14 @@ cli:
   # 2026-05-28: high → xhigh に引き上げ（実装精度向上のため）
   # Opus 4.8 は全5段階対応。微妙なら max に昇格
   default_effort: xhigh
-  # --- C1: 1M context（2026-06-03 反省会フォローアップ・現物確認済）---
-  # Opus 4.8 は 1M トークン context window が「モデル既定」で常時有効（Claude API / サブスク認証で自動）。
-  # → ここで有効化する config / フラグは不要かつ存在しない。--betas は "API key users only" ゆえ
-  #   サブスク認証では使えず、そもそも不要。「未設定だから有効化」は誤解（reqの前提が誤り）。
-  # 出典: platform.claude.com/docs whats-new-claude-4-8（"1M token context window by default"）。
+  # --- C1: 1M context（2026-06-03 反省会フォローアップ・現物確認済・cite-before-claim）---
+  # Opus 4.8 は 1M トークン context window が Claude API で「既定」（beta header 不要）。
+  #   出典(逐語): platform.claude.com/docs whats-new-claude-4-8 =
+  #   "supports the 1M token context window by default on the Claude API, Amazon Bedrock, and Vertex AI"。
+  # → これを有効化する config / フラグは存在しない（cli_adapter.sh にも context window 設定なし）。
+  #   --betas は "API key users only" ゆえサブスク認証では使えず、いずれにせよ enable 対象が無い。
+  # ※「サブスク Claude Code セッションが実際に full 1M を使うか」は doc 未記載＝未確証（断定しない）。
+  #   いずれにせよ設定すべき config は無い → C1 は no-op（推測 config を書かない）。
   agents:
     anzu:
       model: "claude-opus-4-8"
