@@ -132,6 +132,13 @@ inbox_write.sh を実行した後、必ず以下を確認すること:
 2. SUCCESS が確認できない場合、再実行すること
 3. 「報告済み」「送信済み」「配信済み」と記載する前に、必ず SUCCESS 確認を完了すること
 
+## メッセージ規律 — ポインタ + 差分 (C2)
+
+**長文 inbox を禁止する。** inbox メッセージは「ポインタ（doc / `file:line` / commit / PR への参照）＋ 差分（前回からの変化）」に圧縮する。詳細・全文は doc 化（`docs/` / `report.yaml`）し、inbox はその所在を指すだけにする。理由: 長文メッセージ1通が context を食い、inbox 肥大が truncation と idle stall を誘発する（2026-06-03 反省会 = miho inbox 24KB で約1時間 stall・件数ベース archive が no-op）。出典: `feedback_spec_doc_pointer_ops` / `ops_inbox_bloat_stall`。
+
+- 企画・仕様・調査結果は doc 化 → inbox はポインタ + 差分のみ（バッククォート不可 = `ops_inbox_write_no_backticks`）。
+- inbox は節目ごとに `scripts/inbox_archive.sh <agent> --keep-recent 5`（未読保持・冪等）。**件数だけでなく byte サイズでも archive を発動**する（C2-script で実装・15KB 警告だけ出て archive が no-op だった問題を解消）。
+
 ## Inbox Processing Protocol
 
 When you receive `inboxN`: Read inbox → process `read: false` entries → set `read: true` → resume.
@@ -150,13 +157,23 @@ NOT optional. 省略すると仕様変更の見逃しやスタックが発生す
 
 Captain writes new task YAML (`redo_of` field) → sends `clear_command` inbox → agent recovers via Session Start.
 
+## 司令官エスカレーション窓口 = anzu 一本化 (B1)
+
+**司令官への「決定要求・確認要求」は anzu（大隊長）に一本化する。** captain / member / miho（参謀長）は司令官へ直接上げず、anzu に集約し anzu が司令官へ取り次ぐ。司令官の認知負荷を下げ判断経路を単線化するため（出典: `feedback_commander_escalation_single_channel`・2026-06-03 反省会 = 複数窓口で認知負荷増の根本原因）。
+
+- **スコープ内自己判断を徹底**: タスクスコープ内の判断は自分で完結させ、司令官に上げない（出典: `feedback_self_judgment_within_task_scope`）。司令官判断が要るのは重大 Fail・スコープ外・方針分岐のみ。
+- **運用判断を prompt で強制しない**: agent /clear 等の運用判断は AskUserQuestion 等で強制せず、通常 status で surface し司令官の任意タイミングに委ねる（出典: `feedback_no_force_ops_decisions_via_prompt`）。
+
 ## Report Flow
+
+階層: 司令官 ↔ **anzu（大隊長）** ↔ **miho（参謀長 / CoS）** ↔ 隊長 ↔ 隊員。**司令官窓口は anzu 一本化（B1）— CoS→Commander 直の経路は廃止（B2）**。miho は anzu に上げ、anzu が司令官へ取り次ぐ。
 
 | Direction | Method |
 |-----------|--------|
 | Member → Captain | Report YAML + inbox_write |
-| Captain → Chief of Staff | done/failed: inbox_write, otherwise dashboard.md |
-| Chief of Staff → Commander | done/failed: inbox_write, otherwise dashboard.md |
+| Captain → Chief of Staff (miho) | done/failed: inbox_write, otherwise dashboard.md |
+| Chief of Staff (miho) → Battalion Commander (anzu) | done/failed: inbox_write, otherwise dashboard.md |
+| Battalion Commander (anzu) → Commander | done/failed: inbox_write（司令官窓口は anzu に一本化）|
 | Top → Down | YAML + inbox_write |
 
 ## File Operation Rule
@@ -225,6 +242,18 @@ System manages ALL white-collar work. Project folders can be external. `projects
 2. **Preflight check**: 前提条件を確認。満たせないなら実行せず報告。
 3. **E2Eテストは隊長が担当**: 隊員はユニットテストのみ。
 4. **テスト計画レビュー**: 隊長が事前レビュー。
+5. **本番ビルド必須 (Next.js/TS)**: QC・完了条件に `npm run build`（本番 `tsc` 型チェック）必須。vitest/eslint は型チェックせず素通りする。出典: `feedback_nextjs_qc_run_build`（2026-06-03 PR#140 `useAccount.ts` TS2532 が vitest+eslint+Codex をすり抜け Cloudflare CI のみ捕捉）。
+6. **pre-merge 再点検 = CI green 必須 (A2)**: merge 前の再点検で `gh pr checks <PR>` が全 green であることを必須確認する。CI 失敗（`mergeStateStatus=UNSTABLE` 等）での force-merge は禁止（D003/D004 厳守）。green 未確認のまま「merge 可」と報告しない（verify-then-write）。
+
+## Integration Smoke Gate / 統合ブランチ実行スモークゲート (A1・承認前ゲート)
+
+**目的**: 静的 QC 4層（member / captain / Codex / miho）は全て静的で、誰もアプリを実行しない。型チェックすら走らない層に4失敗が落ちた（2026-06-03 auth Wave 反省会）。→ **統合ブランチに変更が一通り反映された時点で、承認前に1回、エージェントがアプリを実行するスモークを必須化**する。出典: `feedback_integration_branch_smoke_gate`。
+
+- **トリガ**: 統合ブランチ完成時に **1回**（per-commit ではない・コスト配慮）。承認 / マージ判断の **前**。
+- **Web**: `npm run build`（本番ビルド = 型チェック通過）＋ Playwright スモーク（主要フロー）。
+- **Mobile（★重点 — E2E 未運用）**: Android emulator ＋ iOS simulator で `flutter run` のスモーク起動。item C の manifest/CustomTab 起動・deep-link 戻り redirect のような runtime / 統合層の失敗を捕捉する。
+- **不能時**: emulator/simulator 等の前提が満たせなければ実行せず、その旨を明記して報告（Preflight check）。silent skip 禁止。
+- **tooling**: harness 実装（Playwright・emulator/simulator 自動化）は別 project backlog（A1-tooling）。手順 runbook: `docs/runbooks/integration_smoke_gate.md`。
 
 # Destructive Operation Safety (all agents)
 
