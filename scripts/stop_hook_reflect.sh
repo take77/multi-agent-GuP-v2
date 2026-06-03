@@ -39,14 +39,27 @@ ENABLE_FLAG="${SCRIPT_DIR}/queue/inbox/.reflect_enabled_${AGENT_ID}"
 [ -f "$ENABLE_FLAG" ] || exit 0
 
 # ─── ① stop_hook_active ガード（multi-block 連鎖禁止） ───
-STOP_HOOK_ACTIVE=$(printf '%s' "$INPUT" | python3 -c "
+# H2: truthy 判定。True/true/1/yes 等 = active → exit0。
+# ★parse失敗・曖昧・欠落 = active 扱い（fail-open バイアス＝迷ったら止めない）。
+# false のみ inactive（block 経路へ進む）。
+IS_ACTIVE=$(printf '%s' "$INPUT" | python3 -c "
 import sys, json
 try:
-    print(json.load(sys.stdin).get('stop_hook_active', False))
+    v = json.load(sys.stdin).get('stop_hook_active', None)
+    if v is None:
+        print('active')
+    elif isinstance(v, bool):
+        print('active' if v else 'inactive')
+    elif isinstance(v, (int, float)):
+        print('active' if v else 'inactive')
+    elif isinstance(v, str):
+        print('active' if v.lower() in ('true', '1', 'yes', 'on') else 'inactive')
+    else:
+        print('active')
 except Exception:
-    print(False)
-" 2>/dev/null || echo "False")
-[ "$STOP_HOOK_ACTIVE" = "True" ] && exit 0
+    print('active')
+" 2>/dev/null || echo "active")
+[ "$IS_ACTIVE" = "active" ] && exit 0
 
 # ─── ② session スコープ flag（1session1回） ───
 SESSION_ID=$(printf '%s' "$INPUT" | python3 -c "
@@ -93,8 +106,11 @@ except Exception:
 [ "$IS_TRUE_STOP" != "true" ] && exit 0
 
 # ─── ⑥ 振り返りプロンプトを block + reason で 1 回注入 ───
-# flag を先にセット → 次 Stop 発火時に ② でガード
+# H1: flag を先にセット → 次 Stop 発火時に ② でガード。
+# ★flag durable 確認: touch 失敗で flag 不在なら block 抑止（exit0）。
+# 不変条件「block 出力 ⟹ flag durable」を保証。
 touch "$REFLECT_FLAG" 2>/dev/null || true
+[ -f "$REFLECT_FLAG" ] || exit 0   # H1: flag 不在（touch 失敗） → block 抑止
 
 REASON="停止前チェック(auto_stophook): 直近で司令官/QCから明示訂正(違う/そうじゃない/やり直し/却下/それは誤り 等)があったか。あれば現物引用のうえ feedback メモ1件作成(metadata.source:auto_stophook, provisional:true)し MEMORY.md に1行 Edit append(full write 禁止)。無ければ何もせず停止してよい。"
 
