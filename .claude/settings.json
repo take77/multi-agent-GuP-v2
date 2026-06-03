@@ -133,8 +133,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash scripts/stop_hook_reflect_probe.sh",
-            "timeout": 10
+            "command": "bash scripts/stop_hook_reflect.sh",
+            "timeout": 30
           }
         ]
       }

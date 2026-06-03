@@ -121,6 +121,7 @@ scripts/monitor/node_modules/
 !scripts/check_inbox_on_stop.sh
 !scripts/stop_hook_inbox.sh
 !scripts/stop_hook_reflect_probe.sh
+!scripts/stop_hook_reflect.sh
 !scripts/watcher_supervisor.sh
 !scripts/bridge_relay.sh
 !scripts/fallback_to_tmux.sh
