@@ -33,6 +33,11 @@ else
 fi
 [ -z "$AGENT_ID" ] && exit 0   # 特定不能 → fail-open
 
+# ─── enable-gate（最上位・既定 off） ───
+# flag 不在なら発火しない。Phase3 で test agent のみ flag を作成して限定試験。
+ENABLE_FLAG="${SCRIPT_DIR}/queue/inbox/.reflect_enabled_${AGENT_ID}"
+[ -f "$ENABLE_FLAG" ] || exit 0
+
 # ─── ① stop_hook_active ガード（multi-block 連鎖禁止） ───
 STOP_HOOK_ACTIVE=$(printf '%s' "$INPUT" | python3 -c "
 import sys, json
