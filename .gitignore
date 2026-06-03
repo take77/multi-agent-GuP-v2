@@ -120,6 +120,7 @@ scripts/monitor/node_modules/
 !scripts/build_instructions.sh
 !scripts/check_inbox_on_stop.sh
 !scripts/stop_hook_inbox.sh
+!scripts/stop_hook_reflect_probe.sh
 !scripts/watcher_supervisor.sh
 !scripts/bridge_relay.sh
 !scripts/fallback_to_tmux.sh
