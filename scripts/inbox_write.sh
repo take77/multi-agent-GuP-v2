@@ -179,7 +179,8 @@ try:
 except:
     print(0)
 " 2>/dev/null || echo 0)
-        if [ "${MSG_COUNT:-0}" -ge 30 ] || [ "${INBOX_SIZE:-0}" -ge 15360 ]; then
+        CUR_BYTES=$(wc -c < "$INBOX" 2>/dev/null | tr -d ' ')
+        if [ "${MSG_COUNT:-0}" -ge 30 ] || [ "${CUR_BYTES:-0}" -ge 15360 ]; then
             nohup bash "$SCRIPT_DIR/scripts/inbox_archive.sh" --threshold 20 --keep-recent 10 --max-bytes 15360 "$TARGET" >/dev/null 2>&1 &
         fi
 
