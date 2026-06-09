@@ -87,6 +87,30 @@ detect_skip_count() {
   echo 0
 }
 
+# flutter test 非ゼロ終了ログを分類し CLS_STATUS / CLS_DETAIL を設定する。
+# ★「Unable to start the app」は build 失敗・install 失敗の両方で出る下流文言ゆえ、
+#   それで判定せず【specific な上流原因】で切り分ける(feedback_map_error_string_to_branch)。
+#  1) infra/install/device(例: emulator storage 満杯 INSUFFICIENT_STORAGE・offline・adb install 失敗)
+#     → blocked(判定不能=要 device 復旧・契約 §3 の「emulator 等で実行できない」に該当。fail とは別シグナル)
+#  2) build/link/toolchain(例: iOS MLImage arm64 sim link・Gradle task failed)
+#     → fail(app が起動せず・maho 裁定で iOS build block は fail 計上)
+#  3) それ以外(app は起動・assertion 赤 / timeout) → fail
+classify_outcome() {
+  local f="$1" os="$2"
+  if grep -qiE 'INSUFFICIENT_STORAGE|INSTALL_FAILED|adb: failed to install|device .*offline|No devices? found|DELETE_FAILED' "$f" 2>/dev/null; then
+    CLS_STATUS="blocked"
+    CLS_DETAIL="${os} smoke could not execute: device/install infra failure (e.g. emulator storage full / device offline) — free device storage or re-provision and retry. NOT a smoke/code regression. see log artifact"
+    return
+  fi
+  if grep -qiE 'Could not build the application|Failed to build|Linker command failed|xcodebuild.*[Ee]rror|Gradle task .* failed' "$f" 2>/dev/null; then
+    CLS_STATUS="fail"
+    CLS_DETAIL="${os} app BUILD failed (native toolchain/deps — app did not run; NOT a smoke assertion regression). see log artifact"
+    return
+  fi
+  CLS_STATUS="fail"
+  CLS_DETAIL="${os} flutter test did not pass (assertion failure or timeout; app ran). see log artifact"
+}
+
 # flutter test 駆動(timeout 在れば wrap)。戻り値 = flutter の exit code。
 run_device_smoke() {
   local dev="$1" log="$2"
@@ -226,16 +250,38 @@ fi
 # boot ヘルパ
 # ────────────────────────────────────────────────────────────
 
+# 起動中 emulator から ANDROID_AVD に一致する serial を返す(無ければ空・非ゼロ)
+# ★複数 emulator 同時起動時に「最初の emulator-」でなく【AVD 名一致】で正しい台を選ぶ。
+find_android_serial_by_avd() {
+  local s name
+  for s in $(adb devices 2>/dev/null | awk '/^emulator-/{print $1}'); do
+    name="$(adb -s "$s" emu avd name 2>/dev/null | head -1 | tr -d '\r')"
+    if [[ "$name" == "${ANDROID_AVD}" ]]; then echo "$s"; return 0; fi
+  done
+  return 1
+}
+
 # Android emulator(Pixel_8_Pro)を起動 → boot_completed 待ち → serial 解決
+# ★既に該当 AVD が起動済なら reuse(BOOTED_ANDROID は立てない=teardown 対象外。他者が起動した台を殺さない)。
 boot_android() {
   adb start-server >/dev/null 2>&1 || true
-  # 既に該当 AVD が起動済かは serial では判別しづらいため、launch を試みる
+  local existing bc
+  existing="$(find_android_serial_by_avd)"
+  if [[ -n "$existing" ]]; then
+    bc="$(adb -s "$existing" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
+    if [[ "$bc" == "1" ]]; then
+      ANDROID_SERIAL="$existing"
+      echo "[smoke] android: reuse already-running ${ANDROID_AVD} (${ANDROID_SERIAL}) — teardown 対象外"
+      return 0
+    fi
+  fi
+  # 未起動 → launch(このとき初めて BOOTED_ANDROID=1 = teardown 対象)
   flutter emulators --launch "${ANDROID_AVD}" >/dev/null 2>&1 || \
     ( emulator -avd "${ANDROID_AVD}" -no-snapshot -no-boot-anim >/dev/null 2>&1 & )
   BOOTED_ANDROID=1
-  local waited=0 serial="" bc=""
+  local waited=0 serial=""
   while [[ $waited -lt $ANDROID_BOOT_TIMEOUT ]]; do
-    serial="$(adb devices 2>/dev/null | awk '/^emulator-/{print $1; exit}')"
+    serial="$(find_android_serial_by_avd)"
     if [[ -n "$serial" ]]; then
       bc="$(adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
       if [[ "$bc" == "1" ]]; then
@@ -250,10 +296,20 @@ boot_android() {
 }
 
 # iOS simulator(iPhone 16 Pro)の UDID を name から解決 → boot → bootstatus 待ち
+# ★既に Booted な該当 sim を優先 reuse(BOOTED_IOS は立てない=teardown 対象外。二重 boot/他者の台 shutdown を避ける)。
+UDID_RE='[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}'
 boot_ios() {
-  local line state
+  local line booted_line state
+  booted_line="$(xcrun simctl list devices 2>/dev/null | grep -E "${IOS_DEVICE_NAME} \(" | grep '(Booted)' | head -1)"
+  if [[ -n "$booted_line" ]]; then
+    IOS_UDID="$(echo "$booted_line" | grep -oE "$UDID_RE" | head -1)"
+    if [[ -n "$IOS_UDID" ]]; then
+      echo "[smoke] ios: reuse already-booted ${IOS_DEVICE_NAME} — teardown 対象外"
+      return 0
+    fi
+  fi
   line="$(xcrun simctl list devices available 2>/dev/null | grep -E "${IOS_DEVICE_NAME} \(" | head -1)"
-  IOS_UDID="$(echo "$line" | grep -oE '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}' | head -1)"
+  IOS_UDID="$(echo "$line" | grep -oE "$UDID_RE" | head -1)"
   [[ -z "$IOS_UDID" ]] && return 1
   state="$(xcrun simctl list devices 2>/dev/null | grep "$IOS_UDID" | grep -oE '\((Booted|Shutdown|Booting)\)' | tr -d '()' | head -1)"
   if [[ "$state" != "Booted" ]]; then
@@ -291,9 +347,10 @@ else
   else
     echo "[smoke] check A android_smoke: flutter test on ${ANDROID_SERIAL} ..."
     if ! run_device_smoke "${ANDROID_SERIAL}" "${ANDROID_LOG}"; then
-      android_status="fail"
-      android_detail="flutter test failed (or timeout) on Android — see ${ANDROID_LOG}"
-      set_status "fail"
+      classify_outcome "${ANDROID_LOG}" Android
+      android_status="$CLS_STATUS"
+      android_detail="$CLS_DETAIL"
+      set_status "$android_status"
     else
       skip_n="$(detect_skip_count "${ANDROID_LOG}")"
       if [[ "${skip_n:-0}" -gt 0 ]]; then
@@ -339,9 +396,10 @@ else
   else
     echo "[smoke] check B ios_smoke: flutter test on iOS simulator ..."
     if ! run_device_smoke "${IOS_UDID}" "${IOS_LOG}"; then
-      ios_status="fail"
-      ios_detail="flutter test failed (or timeout) on iOS — see ${IOS_LOG}"
-      set_status "fail"
+      classify_outcome "${IOS_LOG}" iOS
+      ios_status="$CLS_STATUS"
+      ios_detail="$CLS_DETAIL"
+      set_status "$ios_status"
     else
       skip_n="$(detect_skip_count "${IOS_LOG}")"
       if [[ "${skip_n:-0}" -gt 0 ]]; then
