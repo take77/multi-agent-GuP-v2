@@ -260,22 +260,24 @@ else
   covered+=("authed e2e flows (csv-button / login / mobile-menu / receipts / yearly-filter)")
 fi
 
-# YAML リスト生成
-yaml_list() {
+# YAML フィールド生成(key 込み): 空=「key: []」inline / 非空=block list
+# ★別行 "[]" にすると "key:\n[]" でパース不能(P3 run_gate ブロッカー)
+yaml_field() {
+  local key="$1"; shift
   local arr=("$@")
   if [[ ${#arr[@]} -eq 0 ]]; then
-    echo "[]"
+    printf '%s: []' "$key"
   else
-    local out=""
+    printf '%s:' "$key"
+    local item
     for item in "${arr[@]}"; do
-      out+="  - \"${item}\"\n"
+      printf '\n  - "%s"' "$item"
     done
-    printf "%b" "$out"
   fi
 }
 
-covered_yaml="$(yaml_list "${covered[@]+"${covered[@]}"}")"
-uncovered_yaml="$(yaml_list "${uncovered[@]+"${uncovered[@]}"}")"
+covered_field="$(yaml_field covered "${covered[@]+"${covered[@]}"}")"
+uncovered_field="$(yaml_field uncovered "${uncovered[@]+"${uncovered[@]}"}")"
 
 # blocked セクション
 if [[ -z "$blocked_entries" ]]; then
@@ -319,10 +321,8 @@ checks:
     duration_s: ${authed_dur}
     detail: "${authed_detail}"
     artifact: "${PW_AUTHED_DIR}/"
-covered:
-${covered_yaml}
-uncovered:
-${uncovered_yaml}
+${covered_field}
+${uncovered_field}
 blocked: ${blocked_yaml}
 summary: "${summary}"
 YAML
