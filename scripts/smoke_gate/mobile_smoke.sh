@@ -3,16 +3,18 @@
 # 契約: docs/plans/a1_smoke_gate_harness_contract.md §2/§3/§4 逐語準拠
 # 雛形: scripts/smoke_gate/web_smoke.sh (P1・kay 隊・同一スキーマ/同構造)
 # seam: ST-B(aki) = `flutter test integration_test/app_smoke_test.dart -d <device_id>`
-#       (calsail-mobile feat/integration-smoke-test に新設・単一テストが
-#        アプリ起動 / 主要画面遷移 / deep-link 戻り redirect / crash 無し を exercise)
+#       (calsail-mobile feat/integration-smoke-test・単一テストが boot / login UI / gotrue callback-URL parse /
+#        router redirect machinery を exercise)
 # 成果物: queue/reports/smoke_gate/mobile_<ts>.yaml + artifacts/
 # exit 0=pass / 1=fail / 2=blocked
 #
 # ★設計メモ — checks=2 本(android_smoke / ios_smoke):
-#   seam は OS あたり【単一テストファイル 1 invocation】ゆえ、OS ごとに 1 pass/fail しか得られない。
-#   deep-link 戻り redirect は aki テスト内の sub-scenario であり【独立に invoke できない】ため、
-#   独立 check 化せず covered[] に明記する(「未実行」と取り違えない誠実な 2-check 分解)。
-#   契約 §2 例の "deep_link 等" の "等" に従い、機械可読 id は android_smoke / ios_smoke の 2 本とする。
+#   seam は OS あたり【単一テストファイル 1 invocation】ゆえ OS ごとに 1 結果。機械可読 id は android_smoke/ios_smoke。
+# ★coverage の誠実さ(redo R1/R2):
+#   - covered = smoke が【実走(executed)】し exercise した領域のみ。build/install/infra で走る前に死んだら uncovered。
+#   - aki Phase3 は getSessionFromUrl を【直呼び】ゆえ item C の OS-delivery 受信層(manifest intent-filter /
+#     FlutterFragmentActivity / SDK AppLinks 購読 / _handleDeeplink / _isAuthCallbackDeeplink gate)は
+#     【exercise しない】→ SMOKE_NEVER_COVERS で常に uncovered に明記(over-claim 禁止)。
 
 set -uo pipefail
 
@@ -87,28 +89,43 @@ detect_skip_count() {
   echo 0
 }
 
-# flutter test 非ゼロ終了ログを分類し CLS_STATUS / CLS_DETAIL を設定する。
-# ★「Unable to start the app」は build 失敗・install 失敗の両方で出る下流文言ゆえ、
-#   それで判定せず【specific な上流原因】で切り分ける(feedback_map_error_string_to_branch)。
-#  1) infra/install/device(例: emulator storage 満杯 INSUFFICIENT_STORAGE・offline・adb install 失敗)
-#     → blocked(判定不能=要 device 復旧・契約 §3 の「emulator 等で実行できない」に該当。fail とは別シグナル)
-#  2) build/link/toolchain(例: iOS MLImage arm64 sim link・Gradle task failed)
-#     → fail(app が起動せず・maho 裁定で iOS build block は fail 計上)
-#  3) それ以外(app は起動・assertion 赤 / timeout) → fail
+# flutter test 非ゼロ終了ログを分類し CLS_STATUS / CLS_DETAIL / CLS_EXECUTED を設定する。
+# ★下流文言(「Unable to start the app」は build/install 両方で出る)で判定せず、
+#   【specific な上流原因】で精密に切る(feedback_map_error_string_to_branch・redo R3/R4 で精度強化)。
+# ★CLS_EXECUTED: smoke が実際に【走ったか】(=1) / build/install/infra で走る前に死んだか(=0)。
+#   covered/uncovered の真の判定軸(redo R2: build-fail を covered に化けさせない)。
+#  分岐(precedence 順):
+#   1) genuinely-INFRA(storage 満杯/no space/device offline/adb daemon 不通)
+#      → blocked / executed=0。判定不能=要 device 復旧(契約 §3)。★INSTALL_FAILED 全般は infra にしない(R3)。
+#   2) 既知・変更非関連の standing toolchain debt(iOS MLImage arm64 iOS-sim link)= 狭 signature
+#      → blocked(known debt)/ executed=0。恒常 red の cry-wolf を回避(R4)。UNKNOWN build 失敗は下の fail へ。
+#   3) UNKNOWN build/link/install-code 失敗(Could not build/Linker/Gradle task failed/xcodebuild error/
+#      INSTALL_FAILED_*・MANIFEST・NO_MATCHING_ABIS・PARSE_FAILED 等の code/packaging 由来)
+#      → fail / executed=0。app 起動せず=新規回帰候補として赤で晒す(R3: code 回帰を infra に握り潰さない)。
+#   4) それ以外(app は起動・assertion 赤 / timeout)→ fail / executed=1。
 classify_outcome() {
   local f="$1" os="$2"
-  if grep -qiE 'INSUFFICIENT_STORAGE|INSTALL_FAILED|adb: failed to install|device .*offline|No devices? found|DELETE_FAILED' "$f" 2>/dev/null; then
-    CLS_STATUS="blocked"
-    CLS_DETAIL="${os} smoke could not execute: device/install infra failure (e.g. emulator storage full / device offline) — free device storage or re-provision and retry. NOT a smoke/code regression. see log artifact"
+  # 1) genuinely-infra のみ(install_failed 全般を含めない)
+  if grep -qiE 'INSUFFICIENT_STORAGE|No space left|device .*offline|error: device .*not found|cannot connect to daemon|daemon (not running|still not running)' "$f" 2>/dev/null; then
+    CLS_STATUS="blocked"; CLS_EXECUTED=0
+    CLS_DETAIL="${os} smoke could not execute: host/device INFRA failure (emulator storage full / device offline / adb daemon) — free space or re-provision device & retry. NOT a code regression. see log artifact"
     return
   fi
-  if grep -qiE 'Could not build the application|Failed to build|Linker command failed|xcodebuild.*[Ee]rror|Gradle task .* failed' "$f" 2>/dev/null; then
-    CLS_STATUS="fail"
-    CLS_DETAIL="${os} app BUILD failed (native toolchain/deps — app did not run; NOT a smoke assertion regression). see log artifact"
+  # 2) 既知 standing toolchain debt = 狭 signature(MLImage arm64 iOS-sim link)。過剰一致禁止。
+  if grep -qiE "MLImage(\.framework)?\[arm64\]|MLImage.* built for 'iOS'|MLImage.*iOS-simulator" "$f" 2>/dev/null; then
+    CLS_STATUS="blocked"; CLS_EXECUTED=0
+    CLS_DETAIL="${os} smoke could not execute: KNOWN standing toolchain debt (MLImage arm64 iOS-simulator link block — pre-existing & change-unrelated; backlog=docs/spike iOS-sim native). NOT a new regression. see log artifact"
     return
   fi
-  CLS_STATUS="fail"
-  CLS_DETAIL="${os} flutter test did not pass (assertion failure or timeout; app ran). see log artifact"
+  # 3) UNKNOWN build/link/install-code 失敗(app 起動せず・新規回帰候補)→ fail
+  if grep -qiE 'Could not build the application|Failed to build|Linker command failed|xcodebuild.*[Ee]rror|Gradle task .* failed|INSTALL_FAILED|INSTALL_PARSE_FAILED|NO_MATCHING_ABIS|MANIFEST|DUPLICATE_PERMISSION|adb: failed to install|Unable to start the app' "$f" 2>/dev/null; then
+    CLS_STATUS="fail"; CLS_EXECUTED=0
+    CLS_DETAIL="${os} app BUILD/INSTALL failed (app did not run — build/packaging/manifest/ABI). Investigate as code/config regression unless a known toolchain debt. see log artifact"
+    return
+  fi
+  # 4) app は起動・assertion 赤 / timeout
+  CLS_STATUS="fail"; CLS_EXECUTED=1
+  CLS_DETAIL="${os} flutter test ran but did not pass (assertion failure or timeout; app launched). see log artifact"
 }
 
 # flutter test 駆動(timeout 在れば wrap)。戻り値 = flutter の exit code。
@@ -189,8 +206,10 @@ checks:
     artifact: ""
 covered: []
 uncovered:
-  - "Android smoke (app launch / main navigation / deep-link return redirect / no-crash): blocked"
-  - "iOS smoke (app launch / main navigation / deep-link return redirect / no-crash): blocked"
+  - "Android smoke NOT executed (blocked): preflight failed — required tool/repo missing"
+  - "iOS smoke NOT executed (blocked): preflight failed — required tool/repo missing"
+  - "item C OS-delivery RECEIVE layer (manifest / FlutterFragmentActivity / AppLinks / _handleDeeplink): NOT exercised"
+  - "production deep-link error path / flash / PKCE success token-exchange: NOT exercised"
 blocked:
   - check_id: android_smoke
     reason: "required tool/repo missing (flutter/git/${TARGET_REPO}) — install flutter+git and ensure calsail-mobile checked out, then retry"
@@ -262,7 +281,11 @@ find_android_serial_by_avd() {
 }
 
 # Android emulator(Pixel_8_Pro)を起動 → boot_completed 待ち → serial 解決
-# ★既に該当 AVD が起動済なら reuse(BOOTED_ANDROID は立てない=teardown 対象外。他者が起動した台を殺さない)。
+# ★ownership-safe(redo R5): teardown するのは【この harness が自分で launch した serial】だけ。
+#   - 既に該当 AVD が起動済(他 agent の台かもしれない)なら reuse し、BOOTED_ANDROID は立てない(=teardown 対象外)。
+#   - launch する場合は、launch 前の emulator serial を snapshot し、launch 後に【新規出現した serial】のみを
+#     所有とみなして ANDROID_SERIAL/BOOTED_ANDROID を確定する(serial 解決前に BOOTED を立てない)。
+#   ＝D006 の精神(他 process/agent へ波及不可)を device lifecycle にも適用。他者の同名 AVD を絶対 kill しない。
 boot_android() {
   adb start-server >/dev/null 2>&1 || true
   local existing bc
@@ -271,24 +294,31 @@ boot_android() {
     bc="$(adb -s "$existing" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
     if [[ "$bc" == "1" ]]; then
       ANDROID_SERIAL="$existing"
-      echo "[smoke] android: reuse already-running ${ANDROID_AVD} (${ANDROID_SERIAL}) — teardown 対象外"
+      echo "[smoke] android: reuse already-running ${ANDROID_AVD} (${ANDROID_SERIAL}) — NOT owned (teardown 対象外)"
       return 0
     fi
   fi
-  # 未起動 → launch(このとき初めて BOOTED_ANDROID=1 = teardown 対象)
+  # launch 前の emulator serial を snapshot(これらは「自分の台ではない」=teardown 対象外)
+  local before_serials
+  before_serials=" $(adb devices 2>/dev/null | awk '/^emulator-/{print $1}' | sort | tr '\n' ' ') "
+  echo "[smoke] android: launch ${ANDROID_AVD} (pre-existing serials snapshotted for ownership)"
   flutter emulators --launch "${ANDROID_AVD}" >/dev/null 2>&1 || \
     ( emulator -avd "${ANDROID_AVD}" -no-snapshot -no-boot-anim >/dev/null 2>&1 & )
-  BOOTED_ANDROID=1
-  local waited=0 serial=""
+  local waited=0 s name
   while [[ $waited -lt $ANDROID_BOOT_TIMEOUT ]]; do
-    serial="$(find_android_serial_by_avd)"
-    if [[ -n "$serial" ]]; then
-      bc="$(adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
+    for s in $(adb devices 2>/dev/null | awk '/^emulator-/{print $1}'); do
+      # snapshot に在った serial(=他者/既存の台)は所有しない
+      case "$before_serials" in *" $s "*) continue ;; esac
+      name="$(adb -s "$s" emu avd name 2>/dev/null | head -1 | tr -d '\r')"
+      [[ "$name" == "${ANDROID_AVD}" ]] || continue
+      bc="$(adb -s "$s" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
       if [[ "$bc" == "1" ]]; then
-        ANDROID_SERIAL="$serial"
+        ANDROID_SERIAL="$s"
+        BOOTED_ANDROID=1   # ★所有確定後にのみ立てる(=この serial だけ teardown 対象)
+        echo "[smoke] android: launched & owned new serial ${ANDROID_SERIAL} (teardown 対象)"
         return 0
       fi
-    fi
+    done
     sleep 3
     waited=$((waited + 3))
   done
@@ -321,27 +351,35 @@ boot_ios() {
 }
 
 # ────────────────────────────────────────────────────────────
+# ★smoke が【実際に exercise する】領域(honest・redo R1 で item C 受信層の over-claim を是正)。
+#   aki ST-B(app_smoke_test.dart)の genuinely-covered と揃える。受信層/flash/PKCE は SMOKE_NEVER_COVERS で uncovered。
+# ────────────────────────────────────────────────────────────
+SMOKE_COVERS_DESC="boot crash-free→/login; login UI render (Google/Apple); gotrue callback-URL parse (error-fragment, crash-free surface, /login retained); router redirect machinery (session→/, signOut→/login)"
+
+# ────────────────────────────────────────────────────────────
 # check A: android_smoke
+#   android_executed: smoke が実走したか(=1 covered 軸 / =0 build/install/infra で走る前に死亡=uncovered・R2)
 # ────────────────────────────────────────────────────────────
 android_status="pass"
 android_detail=""
+android_executed=0
 t0=$(start_time)
 
 if [[ "$seam_ready" -eq 0 ]]; then
-  android_status="blocked"
+  android_status="blocked"; android_executed=0
   android_detail="seam not ready: ${SMOKE_TEST_REL} absent (aki ${AKI_BRANCH} 未 checkout)"
   set_status "blocked"
   echo "[smoke] check A android_smoke: blocked (seam absent)"
 elif [[ "$android_ready" -eq 0 ]]; then
-  android_status="blocked"
+  android_status="blocked"; android_executed=0
   android_detail="preflight blocked: ${android_block_reason}"
   set_status "blocked"
   echo "[smoke] check A android_smoke: blocked (${android_block_reason})"
 else
   echo "[smoke] check A android_smoke: boot ${ANDROID_AVD} ..."
   if ! boot_android; then
-    android_status="blocked"
-    android_detail="Android emulator '${ANDROID_AVD}' did not reach boot_completed within ${ANDROID_BOOT_TIMEOUT}s"
+    android_status="blocked"; android_executed=0
+    android_detail="Android emulator '${ANDROID_AVD}' did not reach boot_completed within ${ANDROID_BOOT_TIMEOUT}s (host/device infra)"
     set_status "blocked"
     echo "[smoke] check A android_smoke: blocked (boot timeout)"
   else
@@ -350,15 +388,17 @@ else
       classify_outcome "${ANDROID_LOG}" Android
       android_status="$CLS_STATUS"
       android_detail="$CLS_DETAIL"
+      android_executed="$CLS_EXECUTED"
       set_status "$android_status"
     else
       skip_n="$(detect_skip_count "${ANDROID_LOG}")"
       if [[ "${skip_n:-0}" -gt 0 ]]; then
-        android_status="fail"
-        android_detail="Android smoke: ${skip_n} test(s) skipped (SKIP=FAIL rule)"
+        android_status="fail"; android_executed=1
+        android_detail="Android smoke EXECUTED but ${skip_n} test(s) skipped (SKIP=FAIL rule)"
         set_status "fail"
       else
-        android_detail="Android smoke passed (app launch / main nav / deep-link return / no-crash)"
+        android_status="pass"; android_executed=1
+        android_detail="Android smoke EXECUTED & passed: ${SMOKE_COVERS_DESC}"
       fi
     fi
     # スクショ(best-effort・失敗しても check を落とさない)
@@ -367,30 +407,31 @@ else
   fi
 fi
 android_dur=$(elapsed "$t0")
-echo "[smoke] check A done: ${android_status} (${android_dur}s)"
+echo "[smoke] check A done: ${android_status} executed=${android_executed} (${android_dur}s)"
 
 # ────────────────────────────────────────────────────────────
 # check B: ios_smoke
 # ────────────────────────────────────────────────────────────
 ios_status="pass"
 ios_detail=""
+ios_executed=0
 t0=$(start_time)
 
 if [[ "$seam_ready" -eq 0 ]]; then
-  ios_status="blocked"
+  ios_status="blocked"; ios_executed=0
   ios_detail="seam not ready: ${SMOKE_TEST_REL} absent (aki ${AKI_BRANCH} 未 checkout)"
   set_status "blocked"
   echo "[smoke] check B ios_smoke: blocked (seam absent)"
 elif [[ "$ios_ready" -eq 0 ]]; then
-  ios_status="blocked"
+  ios_status="blocked"; ios_executed=0
   ios_detail="preflight blocked: ${ios_block_reason}"
   set_status "blocked"
   echo "[smoke] check B ios_smoke: blocked (${ios_block_reason})"
 else
   echo "[smoke] check B ios_smoke: boot ${IOS_DEVICE_NAME} ..."
   if ! boot_ios; then
-    ios_status="blocked"
-    ios_detail="iOS simulator '${IOS_DEVICE_NAME}' could not be resolved/booted"
+    ios_status="blocked"; ios_executed=0
+    ios_detail="iOS simulator '${IOS_DEVICE_NAME}' could not be resolved/booted (host/device infra)"
     set_status "blocked"
     echo "[smoke] check B ios_smoke: blocked (boot failed)"
   else
@@ -399,15 +440,17 @@ else
       classify_outcome "${IOS_LOG}" iOS
       ios_status="$CLS_STATUS"
       ios_detail="$CLS_DETAIL"
+      ios_executed="$CLS_EXECUTED"
       set_status "$ios_status"
     else
       skip_n="$(detect_skip_count "${IOS_LOG}")"
       if [[ "${skip_n:-0}" -gt 0 ]]; then
-        ios_status="fail"
-        ios_detail="iOS smoke: ${skip_n} test(s) skipped (SKIP=FAIL rule)"
+        ios_status="fail"; ios_executed=1
+        ios_detail="iOS smoke EXECUTED but ${skip_n} test(s) skipped (SKIP=FAIL rule)"
         set_status "fail"
       else
-        ios_detail="iOS smoke passed (app launch / main nav / deep-link return / no-crash)"
+        ios_status="pass"; ios_executed=1
+        ios_detail="iOS smoke EXECUTED & passed: ${SMOKE_COVERS_DESC}"
       fi
     fi
     # スクショ(best-effort)
@@ -416,32 +459,49 @@ else
   fi
 fi
 ios_dur=$(elapsed "$t0")
-echo "[smoke] check B done: ${ios_status} (${ios_dur}s)"
+echo "[smoke] check B done: ${ios_status} executed=${ios_executed} (${ios_dur}s)"
 
 # ────────────────────────────────────────────────────────────
-# covered / uncovered 集計(契約§2: ran(pass|fail)→covered / blocked→uncovered)
+# covered / uncovered 集計（redo R2: 真の軸は executed = smoke が実走したか）
+#   - executed=1（pass / assertion-fail）→ covered（実際に exercise した）
+#   - executed=0（build/install/infra/known-debt で走る前に死亡）→ uncovered（理由付・covered に化けさせない）
+#   - status==blocked（infra / known toolchain debt）→ blocked[] にも理由を記載
+# ★契約§2「executed-but-failed=covered」の "executed" を厳密化（build 前に死んだら未 executed）。
 # ────────────────────────────────────────────────────────────
 covered=()
 uncovered=()
 blocked_entries=""
 
+# Android
+if [[ "$android_executed" == "1" ]]; then
+  covered+=("Android smoke EXECUTED (${android_status}): ${SMOKE_COVERS_DESC}")
+else
+  uncovered+=("Android smoke NOT executed (${android_status}): ${android_detail}")
+fi
 if [[ "$android_status" == "blocked" ]]; then
-  uncovered+=("Android smoke (app launch / main navigation / deep-link return redirect / no-crash): blocked")
   blocked_entries+="  - check_id: android_smoke
     reason: \"${android_detail}\"
 "
-else
-  covered+=("Android smoke (app launch / main navigation / deep-link return redirect / no-crash)")
 fi
 
+# iOS
+if [[ "$ios_executed" == "1" ]]; then
+  covered+=("iOS smoke EXECUTED (${ios_status}): ${SMOKE_COVERS_DESC}")
+else
+  uncovered+=("iOS smoke NOT executed (${ios_status}): ${ios_detail}")
+fi
 if [[ "$ios_status" == "blocked" ]]; then
-  uncovered+=("iOS smoke (app launch / main navigation / deep-link return redirect / no-crash): blocked")
   blocked_entries+="  - check_id: ios_smoke
     reason: \"${ios_detail}\"
 "
-else
-  covered+=("iOS smoke (app launch / main navigation / deep-link return redirect / no-crash)")
 fi
+
+# ★smoke が【本質的に exercise しない】領域（実走の成否に依らず常に uncovered・redo R1 honesty）。
+#   auth Wave が現に住んでいた item C 受信層を「covered」と読ませない。aki ST-B header の uncovered と揃える。
+uncovered+=("item C OS-delivery RECEIVE layer (manifest intent-filter / FlutterFragmentActivity / SDK AppLinks subscription / _handleDeeplink / _isAuthCallbackDeeplink gate): Phase3 が getSessionFromUrl を直呼びゆえ受信経路は NOT exercised")
+uncovered+=("production deep-link error path (_handleDeeplink→notifyException stream-error・raw throw でない): NOT exercised")
+uncovered+=("flash (削除後 settings 一瞬露出 UX): NOT exercised")
+uncovered+=("PKCE success token-exchange: NOT exercised")
 
 # YAML フィールド生成(key 込み): 空 = 「key: []」(同一行・valid flow seq) / 非空 = block list。
 # ★empty を別行 "[]" にすると "key:\n[]" となり YAML パース不能(P3 run_gate が機械可読に読めない)ため key を同梱する。
