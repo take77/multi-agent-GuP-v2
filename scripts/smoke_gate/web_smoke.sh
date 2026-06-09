@@ -64,7 +64,7 @@ if [[ "$preflight_fail" -ne 0 ]]; then
 schema_version: 1
 gate: web
 status: blocked
-generated_at: "$(date -u +%Y-%m-%dT%H:%M:%S)"
+generated_at: "$(date +%Y-%m-%dT%H:%M:%S)"
 target:
   repo: calsail-web
   path: ${TARGET_REPO}
@@ -239,17 +239,25 @@ covered=()
 uncovered=()
 blocked_entries=""
 
-[[ "$build_status" == "pass" ]]   && covered+=("tsc 型チェック (npm run build)")   || uncovered+=("tsc 型チェック (npm run build): ${build_status}")
-[[ "$public_status" == "pass" ]]  && covered+=("public e2e flows (contact-form + happy-path)") || uncovered+=("public e2e flows: ${public_status}")
+# ran (pass or fail) → covered / blocked → uncovered（契約§2 更新版）
+if [[ "$build_status" == "blocked" ]]; then
+  uncovered+=("tsc 型チェック (npm run build): blocked")
+else
+  covered+=("tsc 型チェック (npm run build)")
+fi
 
-if [[ "$authed_status" == "pass" ]]; then
-  covered+=("authed e2e flows (csv-button / login / mobile-menu / receipts / yearly-filter)")
-elif [[ "$authed_status" == "blocked" ]]; then
+if [[ "$public_status" == "blocked" ]]; then
+  uncovered+=("public e2e flows (contact-form + happy-path): blocked")
+else
+  covered+=("public e2e flows (contact-form + happy-path)")
+fi
+
+if [[ "$authed_status" == "blocked" ]]; then
   uncovered+=("authed e2e flows: blocked (env absent)")
   blocked_entries="  - check_id: playwright_authed
     reason: \"${authed_blocked_reason}\""
 else
-  uncovered+=("authed e2e flows: ${authed_status}")
+  covered+=("authed e2e flows (csv-button / login / mobile-menu / receipts / yearly-filter)")
 fi
 
 # YAML リスト生成
@@ -286,7 +294,7 @@ cat > "${REPORT_FILE}" <<YAML
 schema_version: 1
 gate: web
 status: ${overall_status}
-generated_at: "$(date -u +%Y-%m-%dT%H:%M:%S)"
+generated_at: "$(date +%Y-%m-%dT%H:%M:%S)"
 target:
   repo: calsail-web
   path: ${TARGET_REPO}
