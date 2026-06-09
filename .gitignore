@@ -142,6 +142,13 @@ scripts/monitor/node_modules/
 !scripts/validate_task_ready.sh
 !scripts/compaction_lock.sh
 
+# A1 統合スモークゲート harness (cmd_a1_smoke_gate_tooling)
+!scripts/smoke_gate/
+!scripts/smoke_gate/web_smoke.sh
+!scripts/smoke_gate/mobile_smoke.sh
+!scripts/smoke_gate/run_gate.sh
+!scripts/smoke_gate/lib/
+
 # SayTask (sample template only, not actual data)
 !saytask/
 !saytask/streaks.yaml.sample
