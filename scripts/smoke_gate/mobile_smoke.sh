@@ -1,0 +1,459 @@
+#!/usr/bin/env bash
+# A1 統合スモークゲート Phase2 — Mobile harness (ST-A)
+# 契約: docs/plans/a1_smoke_gate_harness_contract.md §2/§3/§4 逐語準拠
+# 雛形: scripts/smoke_gate/web_smoke.sh (P1・kay 隊・同一スキーマ/同構造)
+# seam: ST-B(aki) = `flutter test integration_test/app_smoke_test.dart -d <device_id>`
+#       (calsail-mobile feat/integration-smoke-test に新設・単一テストが
+#        アプリ起動 / 主要画面遷移 / deep-link 戻り redirect / crash 無し を exercise)
+# 成果物: queue/reports/smoke_gate/mobile_<ts>.yaml + artifacts/
+# exit 0=pass / 1=fail / 2=blocked
+#
+# ★設計メモ — checks=2 本(android_smoke / ios_smoke):
+#   seam は OS あたり【単一テストファイル 1 invocation】ゆえ、OS ごとに 1 pass/fail しか得られない。
+#   deep-link 戻り redirect は aki テスト内の sub-scenario であり【独立に invoke できない】ため、
+#   独立 check 化せず covered[] に明記する(「未実行」と取り違えない誠実な 2-check 分解)。
+#   契約 §2 例の "deep_link 等" の "等" に従い、機械可読 id は android_smoke / ios_smoke の 2 本とする。
+
+set -uo pipefail
+
+# ────────────────────────────────────────────────────────────
+# 設定
+# ────────────────────────────────────────────────────────────
+HARNESS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+TARGET_REPO="${TARGET_REPO:-/Users/take77.mac-mini/Developments/calsail/calsail-mobile}"
+ARTIFACTS_DIR="${HARNESS_ROOT}/queue/reports/smoke_gate/artifacts"
+REPORT_DIR="${HARNESS_ROOT}/queue/reports/smoke_gate"
+
+# seam 契約(固定)
+SMOKE_TEST_REL="integration_test/app_smoke_test.dart"
+AKI_BRANCH="feat/integration-smoke-test"
+ANDROID_AVD="${ANDROID_AVD:-Pixel_8_Pro}"
+IOS_DEVICE_NAME="${IOS_DEVICE_NAME:-iPhone 16 Pro}"
+
+# 実走チューニング(値非露出の運用ノブのみ)
+FLUTTER_TEST_TIMEOUT="${FLUTTER_TEST_TIMEOUT:-600}"   # flutter test 1 回あたり秒
+ANDROID_BOOT_TIMEOUT="${ANDROID_BOOT_TIMEOUT:-240}"   # emulator boot 待ち秒
+
+TS="$(date +%Y%m%dT%H%M%S)"
+ANDROID_LOG="${ARTIFACTS_DIR}/mobile_android_${TS}.log"
+IOS_LOG="${ARTIFACTS_DIR}/mobile_ios_${TS}.log"
+ANDROID_SHOT="${ARTIFACTS_DIR}/mobile_android_${TS}.png"
+IOS_SHOT="${ARTIFACTS_DIR}/mobile_ios_${TS}.png"
+REPORT_FILE="${REPORT_DIR}/mobile_${TS}.yaml"
+
+mkdir -p "${ARTIFACTS_DIR}"
+
+# 実行時に確定する device 識別子(teardown 対象判定に使用)
+ANDROID_SERIAL=""
+IOS_UDID=""
+BOOTED_ANDROID=0   # この harness が boot した場合のみ 1(=teardown 対象)
+BOOTED_IOS=0
+
+# timeout バイナリ解決(macOS 既定は無し → 在れば flutter test を wrap)
+TIMEOUT_BIN=""
+if command -v timeout &>/dev/null; then
+  TIMEOUT_BIN="timeout"
+elif command -v gtimeout &>/dev/null; then
+  TIMEOUT_BIN="gtimeout"
+fi
+
+# ────────────────────────────────────────────────────────────
+# ヘルパ
+# ────────────────────────────────────────────────────────────
+overall_status="pass"  # worst-of: fail > blocked > pass
+
+set_status() {
+  local s="$1"
+  case "$s" in
+    fail)    overall_status="fail" ;;
+    blocked) [[ "$overall_status" != "fail" ]] && overall_status="blocked" ;;
+  esac
+}
+
+start_time() { date +%s; }
+elapsed() { echo $(( $(date +%s) - $1 )); }
+
+# flutter test 出力から SKIP(>0) を検出(SKIP=FAIL ルール)
+# compact reporter の集計行 "+N ~M -K" の ~M を拾う。fallback で "skipped" キーワード。
+detect_skip_count() {
+  local f="$1" n
+  [[ -f "$f" ]] || { echo 0; return; }
+  n=$(grep -oE '~[0-9]+' "$f" 2>/dev/null | tail -1 | tr -d '~')
+  if [[ -n "${n:-}" && "${n}" -gt 0 ]]; then echo "$n"; return; fi
+  if grep -qiE '[1-9][0-9]* skipped' "$f" 2>/dev/null; then
+    grep -oiE '[0-9]+ skipped' "$f" | grep -oE '[0-9]+' | head -1
+    return
+  fi
+  echo 0
+}
+
+# flutter test 駆動(timeout 在れば wrap)。戻り値 = flutter の exit code。
+run_device_smoke() {
+  local dev="$1" log="$2"
+  if [[ -n "$TIMEOUT_BIN" ]]; then
+    ( cd "${TARGET_REPO}" && "$TIMEOUT_BIN" "$FLUTTER_TEST_TIMEOUT" \
+        flutter test "${SMOKE_TEST_REL}" -d "$dev" > "$log" 2>&1 )
+  else
+    ( cd "${TARGET_REPO}" && \
+        flutter test "${SMOKE_TEST_REL}" -d "$dev" > "$log" 2>&1 )
+  fi
+}
+
+# ────────────────────────────────────────────────────────────
+# teardown(trap): 【自分が boot した device のみ】安全停止
+#   iOS  = xcrun simctl shutdown  (kill 系でない・明確に安全)
+#   Android = adb -s <serial> emu kill (emulator console コマンド = device-scoped。
+#             shell の kill/killall/pkill = D006 とは別物・他 process/agent に波及不可)
+#   MOBILE_SMOKE_NO_TEARDOWN を set すると後始末を skip(device を残したい運用向け)。
+# ────────────────────────────────────────────────────────────
+teardown() {
+  if [[ -n "${MOBILE_SMOKE_NO_TEARDOWN:-}" ]]; then
+    echo "[smoke] teardown skipped (MOBILE_SMOKE_NO_TEARDOWN set)"
+    return
+  fi
+  if [[ "${BOOTED_IOS}" == "1" && -n "${IOS_UDID}" ]]; then
+    echo "[smoke] teardown: shutdown iOS simulator"
+    xcrun simctl shutdown "${IOS_UDID}" >/dev/null 2>&1 || true
+  fi
+  if [[ "${BOOTED_ANDROID}" == "1" && -n "${ANDROID_SERIAL}" ]]; then
+    echo "[smoke] teardown: stop Android emulator (${ANDROID_SERIAL})"
+    adb -s "${ANDROID_SERIAL}" emu kill >/dev/null 2>&1 || true
+  fi
+}
+trap teardown EXIT
+
+# ────────────────────────────────────────────────────────────
+# §4 Preflight — hard 前提(欠如 = 全 check blocked + exit 2)
+# ────────────────────────────────────────────────────────────
+preflight_fail=0
+
+for cmd in flutter git; do
+  if ! command -v "$cmd" &>/dev/null; then
+    echo "[preflight] MISSING tool: $cmd" >&2
+    preflight_fail=1
+  fi
+done
+
+if [[ ! -d "${TARGET_REPO}" ]]; then
+  echo "[preflight] MISSING target repo: ${TARGET_REPO}" >&2
+  preflight_fail=1
+fi
+
+if [[ "$preflight_fail" -ne 0 ]]; then
+  cat > "${REPORT_FILE}" <<YAML
+schema_version: 1
+gate: mobile
+status: blocked
+generated_at: "$(date +%Y-%m-%dT%H:%M:%S)"
+target:
+  repo: calsail-mobile
+  path: ${TARGET_REPO}
+  branch: unknown
+  ref: unknown
+checks:
+  - id: android_smoke
+    name: "Android smoke (flutter test integration_test/app_smoke_test.dart -d Pixel_8_Pro)"
+    status: blocked
+    duration_s: 0
+    detail: "preflight failed: required tool/repo missing (flutter/git/target repo)"
+    artifact: ""
+  - id: ios_smoke
+    name: "iOS smoke (flutter test integration_test/app_smoke_test.dart -d iPhone 16 Pro)"
+    status: blocked
+    duration_s: 0
+    detail: "preflight failed: required tool/repo missing (flutter/git/target repo)"
+    artifact: ""
+covered: []
+uncovered:
+  - "Android smoke (app launch / main navigation / deep-link return redirect / no-crash): blocked"
+  - "iOS smoke (app launch / main navigation / deep-link return redirect / no-crash): blocked"
+blocked:
+  - check_id: android_smoke
+    reason: "required tool/repo missing (flutter/git/${TARGET_REPO}) — install flutter+git and ensure calsail-mobile checked out, then retry"
+  - check_id: ios_smoke
+    reason: "required tool/repo missing (flutter/git/${TARGET_REPO}) — install flutter+git and ensure calsail-mobile checked out, then retry"
+summary: "preflight failed: required tool/repo missing"
+YAML
+  echo "[smoke] report: ${REPORT_FILE}"
+  exit 2
+fi
+
+# target repo の branch/ref 取得
+TARGET_BRANCH="$(git -C "${TARGET_REPO}" branch --show-current 2>/dev/null || echo unknown)"
+TARGET_REF="$(git -C "${TARGET_REPO}" rev-parse HEAD 2>/dev/null || echo unknown)"
+
+# ────────────────────────────────────────────────────────────
+# §4 Preflight — per-check soft 前提(不成立 = 該当 check blocked・silent skip 禁止)
+#   ★名前ベース確認のみ(値・UDID を露出しない)
+# ────────────────────────────────────────────────────────────
+
+# seam: aki のテストファイルが working-tree に在るか(= aki branch checkout 済)
+seam_ready=0
+if [[ -f "${TARGET_REPO}/${SMOKE_TEST_REL}" ]]; then
+  seam_ready=1
+fi
+
+# Android AVD(Pixel_8_Pro)が available か + adb/emulator 在
+android_ready=0
+android_block_reason=""
+if ! command -v adb &>/dev/null || ! command -v emulator &>/dev/null; then
+  android_block_reason="adb/emulator not on PATH — install Android SDK platform-tools+emulator and retry"
+elif ! emulator -list-avds 2>/dev/null | grep -qx "${ANDROID_AVD}"; then
+  android_block_reason="AVD '${ANDROID_AVD}' not found — create it via avdmanager (name-based check) and retry"
+else
+  android_ready=1
+fi
+
+# iOS simulator(iPhone 16 Pro)が available か + xcrun 在
+ios_ready=0
+ios_block_reason=""
+if ! command -v xcrun &>/dev/null; then
+  ios_block_reason="xcrun not on PATH — install Xcode command line tools and retry"
+elif ! xcrun simctl list devices available 2>/dev/null | grep -qE "${IOS_DEVICE_NAME} \("; then
+  ios_block_reason="simulator '${IOS_DEVICE_NAME}' not available — create it in Xcode (name-based check) and retry"
+else
+  ios_ready=1
+fi
+
+# seam 未 ready は両 OS check を blocked(device は boot しない)
+if [[ "$seam_ready" -ne 0 ]]; then
+  echo "[smoke] seam ready: ${SMOKE_TEST_REL} present"
+else
+  echo "[smoke] seam NOT ready: ${SMOKE_TEST_REL} absent (aki ST-B / ${AKI_BRANCH} 未 checkout)"
+fi
+
+# ────────────────────────────────────────────────────────────
+# boot ヘルパ
+# ────────────────────────────────────────────────────────────
+
+# Android emulator(Pixel_8_Pro)を起動 → boot_completed 待ち → serial 解決
+boot_android() {
+  adb start-server >/dev/null 2>&1 || true
+  # 既に該当 AVD が起動済かは serial では判別しづらいため、launch を試みる
+  flutter emulators --launch "${ANDROID_AVD}" >/dev/null 2>&1 || \
+    ( emulator -avd "${ANDROID_AVD}" -no-snapshot -no-boot-anim >/dev/null 2>&1 & )
+  BOOTED_ANDROID=1
+  local waited=0 serial="" bc=""
+  while [[ $waited -lt $ANDROID_BOOT_TIMEOUT ]]; do
+    serial="$(adb devices 2>/dev/null | awk '/^emulator-/{print $1; exit}')"
+    if [[ -n "$serial" ]]; then
+      bc="$(adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
+      if [[ "$bc" == "1" ]]; then
+        ANDROID_SERIAL="$serial"
+        return 0
+      fi
+    fi
+    sleep 3
+    waited=$((waited + 3))
+  done
+  return 1
+}
+
+# iOS simulator(iPhone 16 Pro)の UDID を name から解決 → boot → bootstatus 待ち
+boot_ios() {
+  local line state
+  line="$(xcrun simctl list devices available 2>/dev/null | grep -E "${IOS_DEVICE_NAME} \(" | head -1)"
+  IOS_UDID="$(echo "$line" | grep -oE '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}' | head -1)"
+  [[ -z "$IOS_UDID" ]] && return 1
+  state="$(xcrun simctl list devices 2>/dev/null | grep "$IOS_UDID" | grep -oE '\((Booted|Shutdown|Booting)\)' | tr -d '()' | head -1)"
+  if [[ "$state" != "Booted" ]]; then
+    xcrun simctl boot "$IOS_UDID" >/dev/null 2>&1 && BOOTED_IOS=1
+  fi
+  # boot 完了まで待機(自己バウンド)
+  xcrun simctl bootstatus "$IOS_UDID" -b >/dev/null 2>&1 || true
+  return 0
+}
+
+# ────────────────────────────────────────────────────────────
+# check A: android_smoke
+# ────────────────────────────────────────────────────────────
+android_status="pass"
+android_detail=""
+t0=$(start_time)
+
+if [[ "$seam_ready" -eq 0 ]]; then
+  android_status="blocked"
+  android_detail="seam not ready: ${SMOKE_TEST_REL} absent (aki ${AKI_BRANCH} 未 checkout)"
+  set_status "blocked"
+  echo "[smoke] check A android_smoke: blocked (seam absent)"
+elif [[ "$android_ready" -eq 0 ]]; then
+  android_status="blocked"
+  android_detail="preflight blocked: ${android_block_reason}"
+  set_status "blocked"
+  echo "[smoke] check A android_smoke: blocked (${android_block_reason})"
+else
+  echo "[smoke] check A android_smoke: boot ${ANDROID_AVD} ..."
+  if ! boot_android; then
+    android_status="blocked"
+    android_detail="Android emulator '${ANDROID_AVD}' did not reach boot_completed within ${ANDROID_BOOT_TIMEOUT}s"
+    set_status "blocked"
+    echo "[smoke] check A android_smoke: blocked (boot timeout)"
+  else
+    echo "[smoke] check A android_smoke: flutter test on ${ANDROID_SERIAL} ..."
+    if ! run_device_smoke "${ANDROID_SERIAL}" "${ANDROID_LOG}"; then
+      android_status="fail"
+      android_detail="flutter test failed (or timeout) on Android — see ${ANDROID_LOG}"
+      set_status "fail"
+    else
+      skip_n="$(detect_skip_count "${ANDROID_LOG}")"
+      if [[ "${skip_n:-0}" -gt 0 ]]; then
+        android_status="fail"
+        android_detail="Android smoke: ${skip_n} test(s) skipped (SKIP=FAIL rule)"
+        set_status "fail"
+      else
+        android_detail="Android smoke passed (app launch / main nav / deep-link return / no-crash)"
+      fi
+    fi
+    # スクショ(best-effort・失敗しても check を落とさない)
+    adb -s "${ANDROID_SERIAL}" exec-out screencap -p > "${ANDROID_SHOT}" 2>/dev/null || \
+      echo "[smoke] android screenshot skipped (best-effort)"
+  fi
+fi
+android_dur=$(elapsed "$t0")
+echo "[smoke] check A done: ${android_status} (${android_dur}s)"
+
+# ────────────────────────────────────────────────────────────
+# check B: ios_smoke
+# ────────────────────────────────────────────────────────────
+ios_status="pass"
+ios_detail=""
+t0=$(start_time)
+
+if [[ "$seam_ready" -eq 0 ]]; then
+  ios_status="blocked"
+  ios_detail="seam not ready: ${SMOKE_TEST_REL} absent (aki ${AKI_BRANCH} 未 checkout)"
+  set_status "blocked"
+  echo "[smoke] check B ios_smoke: blocked (seam absent)"
+elif [[ "$ios_ready" -eq 0 ]]; then
+  ios_status="blocked"
+  ios_detail="preflight blocked: ${ios_block_reason}"
+  set_status "blocked"
+  echo "[smoke] check B ios_smoke: blocked (${ios_block_reason})"
+else
+  echo "[smoke] check B ios_smoke: boot ${IOS_DEVICE_NAME} ..."
+  if ! boot_ios; then
+    ios_status="blocked"
+    ios_detail="iOS simulator '${IOS_DEVICE_NAME}' could not be resolved/booted"
+    set_status "blocked"
+    echo "[smoke] check B ios_smoke: blocked (boot failed)"
+  else
+    echo "[smoke] check B ios_smoke: flutter test on iOS simulator ..."
+    if ! run_device_smoke "${IOS_UDID}" "${IOS_LOG}"; then
+      ios_status="fail"
+      ios_detail="flutter test failed (or timeout) on iOS — see ${IOS_LOG}"
+      set_status "fail"
+    else
+      skip_n="$(detect_skip_count "${IOS_LOG}")"
+      if [[ "${skip_n:-0}" -gt 0 ]]; then
+        ios_status="fail"
+        ios_detail="iOS smoke: ${skip_n} test(s) skipped (SKIP=FAIL rule)"
+        set_status "fail"
+      else
+        ios_detail="iOS smoke passed (app launch / main nav / deep-link return / no-crash)"
+      fi
+    fi
+    # スクショ(best-effort)
+    xcrun simctl io "${IOS_UDID}" screenshot "${IOS_SHOT}" >/dev/null 2>&1 || \
+      echo "[smoke] ios screenshot skipped (best-effort)"
+  fi
+fi
+ios_dur=$(elapsed "$t0")
+echo "[smoke] check B done: ${ios_status} (${ios_dur}s)"
+
+# ────────────────────────────────────────────────────────────
+# covered / uncovered 集計(契約§2: ran(pass|fail)→covered / blocked→uncovered)
+# ────────────────────────────────────────────────────────────
+covered=()
+uncovered=()
+blocked_entries=""
+
+if [[ "$android_status" == "blocked" ]]; then
+  uncovered+=("Android smoke (app launch / main navigation / deep-link return redirect / no-crash): blocked")
+  blocked_entries+="  - check_id: android_smoke
+    reason: \"${android_detail}\"
+"
+else
+  covered+=("Android smoke (app launch / main navigation / deep-link return redirect / no-crash)")
+fi
+
+if [[ "$ios_status" == "blocked" ]]; then
+  uncovered+=("iOS smoke (app launch / main navigation / deep-link return redirect / no-crash): blocked")
+  blocked_entries+="  - check_id: ios_smoke
+    reason: \"${ios_detail}\"
+"
+else
+  covered+=("iOS smoke (app launch / main navigation / deep-link return redirect / no-crash)")
+fi
+
+# YAML フィールド生成(key 込み): 空 = 「key: []」(同一行・valid flow seq) / 非空 = block list。
+# ★empty を別行 "[]" にすると "key:\n[]" となり YAML パース不能(P3 run_gate が機械可読に読めない)ため key を同梱する。
+yaml_field() {
+  local key="$1"; shift
+  local arr=("$@")
+  if [[ ${#arr[@]} -eq 0 ]]; then
+    printf '%s: []' "$key"
+  else
+    printf '%s:' "$key"
+    local item
+    for item in "${arr[@]}"; do
+      printf '\n  - "%s"' "$item"
+    done
+  fi
+}
+
+covered_field="$(yaml_field covered "${covered[@]+"${covered[@]}"}")"
+uncovered_field="$(yaml_field uncovered "${uncovered[@]+"${uncovered[@]}"}")"
+
+if [[ -z "$blocked_entries" ]]; then
+  blocked_yaml="[]"
+else
+  # 末尾改行を保持しつつ heredoc 内へ
+  blocked_yaml=$'\n'"${blocked_entries%$'\n'}"
+fi
+
+summary="android:${android_status}; ios:${ios_status}"
+
+# ────────────────────────────────────────────────────────────
+# §2 report emit
+# ────────────────────────────────────────────────────────────
+cat > "${REPORT_FILE}" <<YAML
+schema_version: 1
+gate: mobile
+status: ${overall_status}
+generated_at: "$(date +%Y-%m-%dT%H:%M:%S)"
+target:
+  repo: calsail-mobile
+  path: ${TARGET_REPO}
+  branch: ${TARGET_BRANCH}
+  ref: "${TARGET_REF}"
+checks:
+  - id: android_smoke
+    name: "Android smoke (flutter test ${SMOKE_TEST_REL} -d ${ANDROID_AVD})"
+    status: ${android_status}
+    duration_s: ${android_dur}
+    detail: "${android_detail}"
+    artifact: "${ANDROID_LOG}"
+  - id: ios_smoke
+    name: "iOS smoke (flutter test ${SMOKE_TEST_REL} -d ${IOS_DEVICE_NAME})"
+    status: ${ios_status}
+    duration_s: ${ios_dur}
+    detail: "${ios_detail}"
+    artifact: "${IOS_LOG}"
+${covered_field}
+${uncovered_field}
+blocked: ${blocked_yaml}
+summary: "${summary}"
+YAML
+
+echo "[smoke] report emitted: ${REPORT_FILE}"
+echo "[smoke] overall: ${overall_status}"
+
+# ────────────────────────────────────────────────────────────
+# §3 exit code
+# ────────────────────────────────────────────────────────────
+case "$overall_status" in
+  pass)    exit 0 ;;
+  fail)    exit 1 ;;
+  blocked) exit 2 ;;
+  *)       exit 1 ;;
+esac
