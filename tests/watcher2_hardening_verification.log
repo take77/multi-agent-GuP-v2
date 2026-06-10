@@ -49,3 +49,27 @@ RESULT: pass=2 fail=0
   PASS: NEW: orphan fswatch frees lock -> respawn SUCCEEDS (fix)
 
 RESULT: pass=4 fail=0
+
+# ════════════════════════════════════════════════════════════════
+# L4 QC（2026年 6月10日 水曜日 17時44分49秒 JST）— Codex adversarial stall → Claude-only fallback
+# ════════════════════════════════════════════════════════════════
+# Codex review(agentId a52b74e517529cb4e) は CLI 検出経路を調査中に 16:14 で出力停止
+# （88min 無進捗・final verdict 無）→ CLAUDE.md「Codex rate limit/エラー時は Claude-only
+# QC 自動フォールバック」に従い Claude-only QC を実施。
+#
+# 7 論点 全 HOLDS（blocker 無）:
+#  1. B flock TOCTOU: 排他は subshell 内の critical section で維持・subshell exit で解放・
+#     liveness=pgrep。orphan respawn test 4/4 PASS。HOLDS。
+#  2. B redirect order '>> log 2>&1 9>&-': fd9 のみ close・stdout/stderr は log へ（lsof+log実測）。HOLDS。
+#  3. fail-toward-idle 非破壊: ASW_DISABLE_ESCALATION 既定=1。unread>0 で escalation-disabled
+#     分岐が send_wakeup(plain nudge)のみ実行し return 0（inbox_watcher.sh:708-716）。
+#     phase2/3 の Escape+C-c へ到達しない。false-idle の最大被害=plain nudge 1発。HOLDS。
+#  4. 永久 stall 無: startup touch（get_effective_cli_type で agent_is_busy と一致）+ stop-hook
+#     touch + fail-toward-idle で claude は常に nudgeable に収束。HOLDS。
+#  5. LAST_CLEAR_TS 永続: send_cli_command は here-string 'done <<< $specials'(inbox_watcher.sh:692)
+#     ＝current shell 実行・subshell 喪失なし。HOLDS。
+#  6. 非 claude 回帰無: agent_is_busy 非 claude 分岐=detect_agent_state 無改変。HOLDS。
+#  7. set -u 安全: LAST_CLEAR_TS/CLUSTER_ID/IDLE_FLAG_DIR は :- default・cooldown 算術は :-0 で gate。HOLDS。
+#
+# Codex が停止前に surface した 1 件（startup touch=CLI_TYPE vs agent_is_busy=get_effective_cli_type
+# の不整合）= follow-up commit で startup touch を get_effective_cli_type に揃えて解消（minor）。

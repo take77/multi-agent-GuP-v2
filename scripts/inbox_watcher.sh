@@ -774,7 +774,10 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
 # 永久スキップ（fresh agent は Stop hook が未発火＝flag を書かない）→ 配信デッドロック。
 # (re)start 時に flat flag を touch することで、stale な cluster-prefixed flag との
 # 不一致も解消する。非 claude は pane 走査ゆえ flag 不要。(shogun inbox_watcher.sh:54-59 準拠)
-if [[ "$CLI_TYPE" == "claude" ]]; then
+# ★判定は agent_is_busy と同一の get_effective_cli_type を使う（CLI_TYPE 生値ではなく）。
+#   「flag を touch する条件」と「flag を読む条件」を一致させ、CLI mislabel(arg≠pane @agent_cli)
+#   時の touch/read 不整合（flag 未作成で初回 nudge defer 等）を排除する。
+if [[ "$(get_effective_cli_type)" == "claude" ]]; then
     touch "$(idle_flag_path)" 2>/dev/null || true
     echo "[$(date)] Created initial idle flag for $AGENT_ID at $(idle_flag_path) (CLI starts idle)" >&2
 fi
