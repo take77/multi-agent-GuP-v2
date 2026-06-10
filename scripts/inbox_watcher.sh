@@ -339,6 +339,14 @@ send_cli_command() {
     local effective_cli
     effective_cli=$(get_effective_cli_type)
 
+    # /clear cooldown 起点を記録: 送信後 30s は agent_is_busy が busy 扱い（line 453-456）。
+    # flag-based 判定では flag が残るため、/clear の reload(10-30s)中も idle と見えて nudge が
+    # 走り、reload 完了前に inbox1 が届く race を生む。cooldown で reload 窓を busy に固定する
+    # （shogun inbox_watcher.sh:842-850 準拠）。/new(codex)・restart(copilot)も clear 等価。
+    if [[ "$cmd" == "/clear" ]]; then
+        LAST_CLEAR_TS=$(date +%s)
+    fi
+
     # CLI別コマンド変換
     local actual_cmd="$cmd"
     case "$effective_cli" in
@@ -425,11 +433,46 @@ agent_has_self_watch() {
     return 1  # No external self-watch found
 }
 
+# ─── Idle flag path ───
+# stop_hook_inbox.sh:49-55 と同一の解決ロジック（CLUSTER_ID 対応）。
+# 読み取り側（本 watcher）と書き込み側（Stop hook）が同じ path を指すことが不変条件。
+# 現行デプロイは CLUSTER_ID 未設定 → flat /tmp/gup_idle_${AGENT_ID}。
+idle_flag_path() {
+    if [ -n "${CLUSTER_ID:-}" ]; then
+        echo "${IDLE_FLAG_DIR:-/tmp}/gup_${CLUSTER_ID}_idle_${AGENT_ID}"
+    else
+        echo "${IDLE_FLAG_DIR:-/tmp}/gup_idle_${AGENT_ID}"
+    fi
+}
+
 # ─── Agent busy detection ───
-# lib/agent_status.sh の detect_agent_state を使い busy 判定を行う wrapper。
-# Returns 0 (true) if agent is busy, 1 if idle or not_found.
+# claude CLI: Stop hook 管理の idle flag ファイル方式（shogun inbox_watcher.sh:842-866 準拠）。
+#   flag なし=busy(return 0) / flag あり=idle(return 1)。
+#   書き込み側 = stop_hook_inbox.sh（idle 到達時 touch・通常運用で削除パス無し=fail-toward-idle）
+#   + 本 watcher 起動時 touch（CLI は welcome 画面=idle 起点）。
+#   ★flag は配信タイミング最適化であって安全装置ではない。安全層は (1) escalation 既定 OFF
+#     (2) 将来 per-CLI gate（claude へ Escape を永久に撃たない）。ゆえ false-idle の被害は
+#     plain nudge のみ＝非破壊・自己訂正（Stop hook が turn 終了時に未読を再配信）。
+#   設計根拠（flag ライフサイクル・fail-toward-idle 採用理由）: docs/design/watcher_idle_flag_lifecycle.md
+# 非 claude CLI（Codex 等）: 従来の pane 走査（detect_agent_state・061a9b0 の esc-to/(Ns hardening 温存）。
+# Returns 0 (true) if agent is busy, 1 if idle.
 agent_is_busy() {
-    [[ "$(detect_agent_state "${AGENT_ID:-}")" == "busy" ]]
+    # /clear cooldown: 送信後 30s は busy 扱い（CLAUDE.md reload 中の nudge race 防止・shogun 準拠）。
+    local now_busy
+    now_busy=$(date +%s)
+    if [ "${LAST_CLEAR_TS:-0}" -gt 0 ] && [ "$((now_busy - LAST_CLEAR_TS))" -lt 30 ]; then
+        return 0  # busy — /clear 処理中
+    fi
+
+    local effective_cli
+    effective_cli=$(get_effective_cli_type)
+    if [[ "$effective_cli" == "claude" ]]; then
+        # flag なし=busy(0) / flag あり=idle(1)
+        [ ! -f "$(idle_flag_path)" ]
+    else
+        # 非 claude: pane 走査 fallback（061a9b0 hardening の detect_agent_state）
+        [[ "$(detect_agent_state "${AGENT_ID:-}")" == "busy" ]]
+    fi
 }
 
 # ─── Hybrid mode bridge: signal relay to Battalion Commander ───
@@ -726,6 +769,16 @@ process_unread_once() {
 # ─── Startup & Main loop (skipped in testing mode) ───
 if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
 
+# ─── Initial idle flag (claude only) ───
+# CLI は welcome 画面=idle 起点。flag を作らないと「flag なし=busy」判定で nudge が
+# 永久スキップ（fresh agent は Stop hook が未発火＝flag を書かない）→ 配信デッドロック。
+# (re)start 時に flat flag を touch することで、stale な cluster-prefixed flag との
+# 不一致も解消する。非 claude は pane 走査ゆえ flag 不要。(shogun inbox_watcher.sh:54-59 準拠)
+if [[ "$CLI_TYPE" == "claude" ]]; then
+    touch "$(idle_flag_path)" 2>/dev/null || true
+    echo "[$(date)] Created initial idle flag for $AGENT_ID at $(idle_flag_path) (CLI starts idle)" >&2
+fi
+
 # ─── Startup: process any existing unread messages ───
 process_unread_once
 
@@ -740,8 +793,11 @@ if [ "$FILE_WATCHER" = "fswatch" ]; then
     # fswatch doesn't have native timeout, so we use a background process approach
     while true; do
         set +e
-        # Run fswatch in background, timeout after INOTIFY_TIMEOUT seconds
-        fswatch -1 --event Updated --event Renamed "$INBOX" &
+        # Run fswatch in background, timeout after INOTIFY_TIMEOUT seconds.
+        # 9>&-: supervisor の lock fd(9) を fswatch に継承させない defense-in-depth。
+        # supervisor 側の spawn 行(9>&-)で既に閉じているが、watcher を fd9 開いた状態で
+        # 直接起動された場合に orphan fswatch が lock を握る #2 罠を二重で防ぐ。
+        fswatch -1 --event Updated --event Renamed "$INBOX" 9>&- &
         FSWATCH_PID=$!
 
         # Wait for fswatch or timeout

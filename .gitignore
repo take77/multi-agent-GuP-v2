@@ -166,6 +166,8 @@ scripts/monitor/node_modules/
 !docs/retrospectives/*.md
 !docs/spike/
 !docs/spike/*.md
+!docs/design/
+!docs/design/*.md
 
 # Screenshots (masked — no secrets)
 !images/
