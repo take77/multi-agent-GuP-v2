@@ -153,7 +153,15 @@ ASW_NO_IDLE_FULL_READ=${ASW_NO_IDLE_FULL_READ:-1}
 # Optional safety toggles:
 # - ASW_DISABLE_ESCALATION=1: disable phase2/phase3 escalation actions
 # - ASW_PROCESS_TIMEOUT=0: do not process unread on timeout ticks (event-only)
-ASW_DISABLE_ESCALATION=${ASW_DISABLE_ESCALATION:-0}
+# 2026-06-10 #2 incident: 既定で escalation(Escape+C-c)を OFF にする。
+# tmux ペインスクレイプの busy 判定は本質的に脆く（生成スピナーが tail-5 の外・status bar
+# ヒントのローテーション・テーマ別スピナー文言・capture フレームのタイミング依存）、
+# busy を idle 誤判定すると Escape が生成中のターンを mid-turn で殺し、/clear でも復帰不能の
+# 連鎖 stall を起こした（miho 全停止）。→ 破壊的アクション(Escape/C-c)を既定 OFF にし、
+# 非破壊の gentle nudge(text+Enter=ターンを殺さない)だけ残す。真完了時のみ自前再集計で発火。
+# 真の stuck(modal 等)は phase3 の司令官 ntfy 通知＋手動介入で対応。
+# robust な busy 判定（経過時間カウンタ広域走査）実装後に再有効化を検討（#2 反省会）。
+ASW_DISABLE_ESCALATION=${ASW_DISABLE_ESCALATION:-1}
 ASW_PROCESS_TIMEOUT=${ASW_PROCESS_TIMEOUT:-1}
 
 # ─── Metrics hooks (FR-006 / NFR-003) ───
