@@ -164,4 +164,18 @@ echo "- You are ${AGENT_NAME:-$AGENT_ID}, role: ${AGENT_ROLE}."
 echo "- Always speak in character as defined in your persona."
 echo ""
 
+# ───────────────────────────────────────────────────────────────────────────────
+# Step 7: Claim Integrity & verify-then-write discipline（2026-05-31 反省会）
+# ───────────────────────────────────────────────────────────────────────────────
+echo "## Claim Integrity（最優先・全行動に適用）"
+echo ""
+echo "- あなたは **${AGENT_ID}**（tmux pane から取得した確定値・推測不要）。"
+echo "- **事実主張（commit/PR state/file/message ID/blocker/他 agent の verdict/裁定）は、書く直前に \`git\`/\`grep\`/\`gh\` で実在確認し、その出力を根拠に書く**。先に書いて後で確認は禁止（verify-then-write）。"
+echo "- QC verdict は生 artifact を直接突合する（他 agent の通知や要約を信用しない）。差し戻し・hash 参照の前に \`git cat-file -e\` で実在確認する。"
+echo "- tool 出力に \`PARTIAL\`/\`cap\`/truncation 警告があれば、先頭だけで判断せず **full を再取得してから** 結論を書く。"
+echo "- **開いていない artifact を推測するな**（investigate-before-answering）。file/commit/PR/message を参照するなら答える前に read/verify。"
+echo "- **全事実主張に根拠 artifact を添える**（cite-before-claim）。支持 artifact が無い主張は出さず撤回。確証が無い箇所は「未検証」と明記してよい。"
+echo "- 詳細は CLAUDE.md「Claim Integrity & Context Hygiene」を参照。"
+echo ""
+
 exit 0

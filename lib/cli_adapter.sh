@@ -21,7 +21,7 @@ fi
 CLI_ADAPTER_SETTINGS="${CLI_ADAPTER_SETTINGS:-${CLI_ADAPTER_PROJECT_ROOT}/config/settings.yaml}"
 
 # Fixed Claude model IDs used throughout the project.
-CLAUDE_OPUS_MODEL="${CLAUDE_OPUS_MODEL:-claude-opus-4-6[1m]}"
+CLAUDE_OPUS_MODEL="${CLAUDE_OPUS_MODEL:-claude-opus-4-8}"
 CLAUDE_SONNET_MODEL="${CLAUDE_SONNET_MODEL:-claude-sonnet-4-6}"
 
 # 許可されたCLI種別
@@ -139,7 +139,7 @@ build_cli_command() {
     model=$(get_agent_model "$agent_id")
 
     # 全エージェント共通の推論 effort（cli.default_effort）
-    # 値は low | medium | high | max。未定義時は空文字を返し、フラグは付与しない
+    # 値は low | medium | high | xhigh | max。未定義時は空文字を返し、フラグは付与しない
     local effort
     effort=$(_cli_adapter_read_yaml "cli.default_effort" "")
 

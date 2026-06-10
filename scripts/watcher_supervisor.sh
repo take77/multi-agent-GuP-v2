@@ -57,7 +57,11 @@ start_watcher_if_missing() {
         fi
     fi
 
-    # flock による排他制御: pgrep チェックと nohup 起動の TOCTOU 窓を閉じる
+    # flock による排他制御: pgrep チェックと nohup 起動の TOCTOU 窓を閉じる。
+    # ★fd9 は spawn 行で子に継承させない（9>&-）。継承させると watcher → fswatch 孫まで
+    #   fd9 を保持し、watcher 死後も orphan fswatch が lock を握って flock -n が恒久失敗
+    #   → supervisor respawn 不能（#2 incident・lsof 実証 2026-06-10）。lock は TOCTOU 起動
+    #   排他のみを守り、liveness は pgrep に純化する。
     (
         flock -n 9 || return 0  # ロック取得失敗 = 別プロセスが起動処理中 → skip
 
@@ -66,7 +70,7 @@ start_watcher_if_missing() {
         fi
 
         cli=$(tmux show-options -p -t "$pane" -v @agent_cli 2>/dev/null || echo "claude")
-        nohup bash scripts/inbox_watcher.sh "$agent" "$pane" "$cli" >> "$log_file" 2>&1 &
+        nohup bash scripts/inbox_watcher.sh "$agent" "$pane" "$cli" >> "$log_file" 2>&1 9>&- &
     ) 9>"$lock_file"
 }
 

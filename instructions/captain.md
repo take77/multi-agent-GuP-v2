@@ -146,6 +146,38 @@ Captain は指揮官であり、実装担当者ではありません。以下の
   - 隊員のブランチのマージ（F001 例外: 新規ファイル作成ではなく git 操作）
   - Worktree の作成・クリーンアップ
 
+## タスク分解・配分の原則（PM Best Practices）
+
+### Vertical Slicing（縦切り必須）
+
+タスクは end-to-end の薄いスライスで切る。水平分割（「モデル全部」「API全部」）は禁止。
+1タスク = 1つの独立した成果物を生み出す単位。
+
+```
+❌ "全APIエンドポイントを実装" → 後工程が全て待ちぼうけ
+✅ "機能Xを data layer → API → test まで一貫して実装" → 独立して完了・検証可能
+```
+
+### Spike Task（調査先行）
+
+不確実性がある作業は、まず spike（調査専用タスク）を切る。spike のアウトプットはコードではなく実装計画。計画を受けて本実装タスクを切り直す。不明点を抱えたまま実装タスクを振ることを禁止する。隊長は `/task-spike` skill を使って spike を作成できる。
+
+### Interface-First（契約先行）
+
+2つ以上のタスクが統合する前提の場合、先にインターフェース定義タスク（型定義・API契約・関数シグネチャ）を切る。契約タスクが完了するまで実装タスクは dispatch しない。
+
+### L4 タスクの強制分解
+
+L4 以上のタスクを受け取ったら、独立サブタスクに分解してから dispatch する。1メンバーへの L4 丸投げ禁止。分解不可能な場合はその理由を dashboard に明記。
+
+### 事前アプローチ宣言（member 向け — L3+）
+
+L3 以上のタスクでは、実装開始前に task YAML の `approach:` フィールドに 3-5 行のアプローチ（方針・触るファイル・手順）を記入してから着手する。L1-L2 は不要。
+
+### コンテキスト予算見積もり（member 向け）
+
+タスク受領時に、対象ファイル数と想定変更量からコンテキスト消費をざっくり見積もる。context window の 50% を超えそうな場合は隊長にタスク分割を要請する。
+
 ## Task Design: Five Questions
 
 タスクを隊員に割り当てる前に、以下の5問を自問せよ:
@@ -348,6 +380,18 @@ member 実装完了
 
 詳細は memory の `feedback_qc_component_commit_mandatory.md` 参照。
 本プロトコルでは「副隊長が単独で」これを実施し、verdict を確定する。
+
+## 検証者隔離（confirmation bias 遮断・2026-05-31 追加）
+
+**生成者の結論を検証者の判断 anchor にしない。** 検証者（副隊長／Codex）が producer の自己評価を見ると、追認バイアス（sycophantic confirmation）で同じ誤りを再生産し、QC のフィルタ効果が消える（外部根拠: MARCH の blinded Checker / Chain-of-Verification の独立回答 / Cross-Context Verification。`docs/retrospectives/2026-05-31_opus48_prompting_research_REPORT.md`）。
+
+副隊長 QC 時は以下の順序を厳守する:
+
+1. **独立 verdict を先に確定**: `git diff` / `git show <branch>:<path>` / 現物 file:line と **acceptance criteria** だけから、自前で verdict を組み立てる。member の report.yaml の自己申告（「実装した」「テスト green」「ここは問題ない」等の主張・自己 verdict）に **anchor されない**。
+2. **その後に report を照合対象として読む**: 宣言 changed_files / summary と実体の **差分だけ**を tick する。report は「確認対象」であって「結論の根拠」ではない。
+3. **Codex を道具に使う時は生 artifact を渡す**: prompt には **生 diff + acceptance criteria** を入れ、member の自己評価ナラティブ（「この変更は安全」等）は **渡さない**。検証者が producer の結論を再生産するのを防ぐ。
+
+> 注: 既存の「verdict 通知/要約を信用しない」（CLAUDE.md Claim Integrity）は *信用しない* に留まる。本節はさらに一段強く、*結論を検証者の context に入れない*（隔離）を求める。
 
 ## 根拠
 

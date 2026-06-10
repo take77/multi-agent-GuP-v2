@@ -132,6 +132,13 @@ inbox_write.sh を実行した後、必ず以下を確認すること:
 2. SUCCESS が確認できない場合、再実行すること
 3. 「報告済み」「送信済み」「配信済み」と記載する前に、必ず SUCCESS 確認を完了すること
 
+## メッセージ規律 — ポインタ + 差分 (C2)
+
+**長文 inbox を禁止する。** inbox メッセージは「ポインタ（doc / `file:line` / commit / PR への参照）＋ 差分（前回からの変化）」に圧縮する。詳細・全文は doc 化（`docs/` / `report.yaml`）し、inbox はその所在を指すだけにする。理由: 長文メッセージ1通が context を食い、inbox 肥大が truncation と idle stall を誘発する（2026-06-03 反省会 = miho inbox 24KB で約1時間 stall・件数ベース archive が no-op）。出典: `feedback_spec_doc_pointer_ops` / `ops_inbox_bloat_stall`。
+
+- 企画・仕様・調査結果は doc 化 → inbox はポインタ + 差分のみ（バッククォート不可 = `ops_inbox_write_no_backticks`）。
+- inbox は節目ごとに `scripts/inbox_archive.sh <agent> --keep-recent 5`（未読保持・冪等）。**件数だけでなく byte サイズでも archive を発動**する（C2-script で実装・15KB 警告だけ出て archive が no-op だった問題を解消）。
+
 ## Inbox Processing Protocol
 
 When you receive `inboxN`: Read inbox → process `read: false` entries → set `read: true` → resume.
@@ -150,18 +157,73 @@ NOT optional. 省略すると仕様変更の見逃しやスタックが発生す
 
 Captain writes new task YAML (`redo_of` field) → sends `clear_command` inbox → agent recovers via Session Start.
 
+## 司令官エスカレーション窓口 = anzu 一本化 (B1)
+
+**司令官への「決定要求・確認要求」は anzu（大隊長）に一本化する。** captain / member / miho（参謀長）は司令官へ直接上げず、anzu に集約し anzu が司令官へ取り次ぐ。司令官の認知負荷を下げ判断経路を単線化するため（出典: `feedback_commander_escalation_single_channel`・2026-06-03 反省会 = 複数窓口で認知負荷増の根本原因）。
+
+- **スコープ内自己判断を徹底**: タスクスコープ内の判断は自分で完結させ、司令官に上げない（出典: `feedback_self_judgment_within_task_scope`）。司令官判断が要るのは重大 Fail・スコープ外・方針分岐のみ。
+- **運用判断を prompt で強制しない**: agent /clear 等の運用判断は AskUserQuestion 等で強制せず、通常 status で surface し司令官の任意タイミングに委ねる（出典: `feedback_no_force_ops_decisions_via_prompt`）。
+
 ## Report Flow
+
+階層: 司令官 ↔ **anzu（大隊長）** ↔ **miho（参謀長 / CoS）** ↔ 隊長 ↔ 隊員。**司令官窓口は anzu 一本化（B1）— CoS→Commander 直の経路は廃止（B2）**。miho は anzu に上げ、anzu が司令官へ取り次ぐ。
 
 | Direction | Method |
 |-----------|--------|
 | Member → Captain | Report YAML + inbox_write |
-| Captain → Chief of Staff | done/failed: inbox_write, otherwise dashboard.md |
-| Chief of Staff → Commander | done/failed: inbox_write, otherwise dashboard.md |
+| Captain → Chief of Staff (miho) | done/failed: inbox_write, otherwise dashboard.md |
+| Chief of Staff (miho) → Battalion Commander (anzu) | done/failed: inbox_write, otherwise dashboard.md |
+| Battalion Commander (anzu) → Commander | done/failed: inbox_write（司令官窓口は anzu に一本化）|
 | Top → Down | YAML + inbox_write |
 
 ## File Operation Rule
 
 **Always Read before Write/Edit.** Codex CLI rejects Write/Edit on unread files.
+
+**集約ファイルは append-only（上書き禁止）.** 時系列で蓄積する集約ファイル（mistakes / lesson log・日報 / 週報・進捗ログ・dashboard 追記・`report.yaml`・inbox 等）への書き込みは、**full write（上書き）を禁止 — append または Edit による挿入のみ**。理由: full write は過去の蓄積を一掃する事故源（実例: `writeFileSync` で3日分のミス記録が消失）。Read-before-Write ＋ **append 一択**でログ完全性を担保する。出典: 外部 Tips post1 罠3 / `ops_inbox_archive_standing_rule` と整合。
+
+# Claim Integrity & Context Hygiene (all agents)
+
+**UNCONDITIONAL for all agents.** 2026-05-30/31 のアカウント削除 Wave で、confabulation（現物確認の**前**に結論を書く）が erika/kay/anzu/miho 横断で多発し、生 artifact 突合だけが全件を捕捉した。当時これらの規律は Memory にしか無く、新規 agent・/clear 後・compaction 後では確実に読まれなかった。**確実に読まれるよう Memory からここへ昇格する。**
+
+## Verify-then-write（順序が命）
+
+事実主張（commit/PR・MR state・file 内容・message ID・blocker・他 agent の verdict・裁定）は、**書く直前に `git`/`grep`/`gh` で実在確認 → その出力を根拠に書く**。先に書いて後で確認、は禁止。
+
+- QC/レビュー verdict は**生 artifact を直接突合**する（`codex_reviews.jsonl` の rev/timestamp・report・現物 file:line）。agent の verdict 通知や要約を信用しない。
+- 差し戻し・hash 参照の前に `git cat-file -e <hash>` で実在確認。存在しない hash をでっち上げて正しい報告を否定しない。
+- 現物突合は `git show <branch>:<path>` の branch-ref 直読で（共有 working-tree 直読は並列汚染で stale）。
+
+## Investigate-before-answering（Anthropic 公式パターンの一般化）
+
+**開いていない artifact について推測するな。** タスクが特定の file / commit / PR / message を参照するなら、**答える前に必ず read/verify する**。code・commit hash・message ID・PR/MR state・他 agent の verdict について、確証が無いまま主張を書くな — grounded で hallucination-free な答えだけを出す。（Anthropic 公式 `<investigate_before_answering>` スニペットを artifact 全般へ一般化）
+
+## Cite-before-claim（根拠提示 → 無ければ撤回）
+
+全ての事実主張に、それが依拠する `git`/`grep`/`gh` 出力を添えること。ドラフト後、各主張に支持 artifact を1つ探す。**見つからなければ、その主張は未確認のまま出さず削除（撤回）する**。「たぶん」「のはず」で穴を埋めるな。**確証が無い箇所は「未検証」と明記してよい**（穴埋め confab より遥かに良い・公式 allow-"I don't know"）。
+
+## Truncated 出力は full 再取得（最多事故原因の一つ）
+
+tool 出力が `PARTIAL` / `cap` / truncation 警告を伴うときは、**先頭だけで判断しない**。必ず full を再取得（offset 継続 read / ファイル保存して読む / grep で該当箇所特定）してから結論を書く。truncated を埋めて誤読するのが事故の最多原因の一つ。
+
+## Context hygiene（context 劣化対策）
+
+- confabulation が連発したら（phantom ID・誤読・誤差し戻し）、能力でなく **context 劣化の兆候**。escalate の前に**予防的 /clear** で primary YAML から再構築する。
+- inbox は節目ごとに `scripts/inbox_archive.sh <agent> --keep-recent 5`（未読は残る・冪等）。肥大は truncation と stall の温床。
+
+出典 Memory: `feedback_qc_verify_raw_artifact` / `feedback_no_dispatch_during_hold` / `feedback_branch_ref_read_pollution_proof` / `ops_inbox_archive_standing_rule` / `ops_inbox_bloat_stall`。
+Investigate-before-answering / Cite-before-claim の外部根拠: `docs/retrospectives/2026-05-31_opus48_prompting_research_REPORT.md`（Anthropic 公式 docs 優先・反証込みの cited 調査）。
+
+# 診断・仮説提示の規律 (Diagnosis & Hypothesis Presentation) — all agents
+
+原因切り分け・対処案の提示は、**作業の楽さ順でなく「仮説（想定原因）の確からしさ順」**で並べる。上官・ユーザが心当たりと照合して取捨選択できる形にするため（出典: 外部 Tips item3）。
+
+- **優先順位順**: 確からしさ（典型度・現物兆候との整合）が高い仮説を上に置く。実装 / 調査の楽さを順序基準にしない。
+- **想定原因を併記**: 各案は「対処案: 作業内容（想定する原因）」の形で書き、上官が心当たりと照合できるようにする。
+- **低確率は明示降格 / 省略**: 極低確率の仮説は「稀」「極稀」と明記して下位に置くか省略する。典型仮説と同列・同粒度で羅列しない。
+- **effort と網羅の混同禁止**: effort high/xhigh でも「網羅」＝「全候補を同粒度で羅列」ではない。深さは**上位仮説の検証**に使う（上位仮説を現物で潰す ＞ 下位を薄く広げる）。
+- **Systematic Debugging（4段・「とりあえず変えてみる」禁止）**: 再現 → 最小失敗テスト → 根本原因の絞り込み → 単一修正 → テスト検証。場当たり変更でなく仮説を1つずつ現物で潰す。
+- 接続: `feedback_map_error_string_to_branch`（観測文言→先に emit する code 分岐へ対応付けて root-cause）/ `feedback_root_cause_mandatory` / Cite-before-claim（確証なき下位仮説は「未検証」明記 or 省略）。
 
 # Context Layers
 
@@ -193,6 +255,18 @@ System manages ALL white-collar work. Project folders can be external. `projects
 2. **Preflight check**: 前提条件を確認。満たせないなら実行せず報告。
 3. **E2Eテストは隊長が担当**: 隊員はユニットテストのみ。
 4. **テスト計画レビュー**: 隊長が事前レビュー。
+5. **本番ビルド必須 (Next.js/TS)**: QC・完了条件に `npm run build`（本番 `tsc` 型チェック）必須。vitest/eslint は型チェックせず素通りする。出典: `feedback_nextjs_qc_run_build`（2026-06-03 PR#140 `useAccount.ts` TS2532 が vitest+eslint+Codex をすり抜け Cloudflare CI のみ捕捉）。
+6. **pre-merge 再点検 = CI green 必須 (A2)**: merge 前の再点検で `gh pr checks <PR>` が全 green であることを必須確認する。CI 失敗（`mergeStateStatus=UNSTABLE` 等）での force-merge は禁止（D003/D004 厳守）。green 未確認のまま「merge 可」と報告しない（verify-then-write）。
+
+## Integration Smoke Gate / 統合ブランチ実行スモークゲート (A1・承認前ゲート)
+
+**目的**: 静的 QC 4層（member / captain / Codex / miho）は全て静的で、誰もアプリを実行しない。型チェックすら走らない層に4失敗が落ちた（2026-06-03 auth Wave 反省会）。→ **統合ブランチに変更が一通り反映された時点で、承認前に1回、エージェントがアプリを実行するスモークを必須化**する。出典: `feedback_integration_branch_smoke_gate`。
+
+- **トリガ**: 統合ブランチ完成時に **1回**（per-commit ではない・コスト配慮）。承認 / マージ判断の **前**。
+- **Web**: `npm run build`（本番ビルド = 型チェック通過）＋ Playwright スモーク（主要フロー）。
+- **Mobile（★重点 — E2E 未運用）**: Android emulator ＋ iOS simulator で `flutter run` のスモーク起動。item C の manifest/CustomTab 起動・deep-link 戻り redirect のような runtime / 統合層の失敗を捕捉する。
+- **不能時**: emulator/simulator 等の前提が満たせなければ実行せず、その旨を明記して報告（Preflight check）。silent skip 禁止。
+- **tooling**: harness 実装（Playwright・emulator/simulator 自動化）は別 project backlog（A1-tooling）。手順 runbook: `docs/runbooks/integration_smoke_gate.md`。
 
 # Destructive Operation Safety (all agents)
 

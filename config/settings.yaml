@@ -30,7 +30,7 @@ agent_teams:
 
   lead:
     agent_id: anzu
-    model: "claude-opus-4-6[1m]"
+    model: "claude-opus-4-8"
     effort: high
     delegate_mode: true
     session: command
@@ -80,16 +80,26 @@ agent_teams:
 # cli_adapter.sh が参照する
 cli:
   default: claude  # 未指定エージェントのデフォルト
-  # 全エージェント共通の推論 effort（low | medium | high | max）
+  # 全エージェント共通の推論 effort（low | medium | high | xhigh | max）
   # Claude CLI: --effort フラグに渡される
   # Codex CLI: -c model_reasoning_effort=<value> に渡される
   # 未定義時は CLI のデフォルトを使用
-  default_effort: high
+  # 2026-05-28: high → xhigh に引き上げ（実装精度向上のため）
+  # Opus 4.8 は全5段階対応。微妙なら max に昇格
+  default_effort: xhigh
+  # --- C1: 1M context（2026-06-03 反省会フォローアップ・現物確認済・cite-before-claim）---
+  # Opus 4.8 は 1M トークン context window が Claude API で「既定」（beta header 不要）。
+  #   出典(逐語): platform.claude.com/docs whats-new-claude-4-8 =
+  #   "supports the 1M token context window by default on the Claude API, Amazon Bedrock, and Vertex AI"。
+  # → これを有効化する config / フラグは存在しない（cli_adapter.sh にも context window 設定なし）。
+  #   --betas は "API key users only" ゆえサブスク認証では使えず、いずれにせよ enable 対象が無い。
+  # ※「サブスク Claude Code セッションが実際に full 1M を使うか」は doc 未記載＝未確証（断定しない）。
+  #   いずれにせよ設定すべき config は無い → C1 は no-op（推測 config を書かない）。
   agents:
     anzu:
-      model: "claude-opus-4-6[1m]"
+      model: "claude-opus-4-8"
     miho:
-      model: "claude-opus-4-6[1m]"   # 参謀長は Opus（施策分配 + ブランチマージ判断 + 品質ゲート）
+      model: "claude-opus-4-8"   # 参謀長は Opus（施策分配 + ブランチマージ判断 + 品質ゲート）
     # 副隊長（QC専任）は Claude CLI で起動し、Codex Plugin (/codex:adversarial-review)
     # を Step 3.5 で呼び出す方針（cmd_164 で整備）。ここで type:codex を指定すると
     # プラグイン経由の adversarial-review が使えなくなるので指定しない。
@@ -109,13 +119,13 @@ bloom_routing:
       model: "claude-sonnet-4-6"
       description: "適用・定型実装タスク"
     L4:  # Analyze（分析）: 原因調査、コードレビュー、デバッグ
-      model: "claude-opus-4-6[1m]"
+      model: "claude-opus-4-8"
       description: "分析・調査タスク"
     L5:  # Evaluate（評価）: 設計評価、アーキテクチャレビュー
-      model: "claude-opus-4-6[1m]"
+      model: "claude-opus-4-8"
       description: "評価・比較タスク"
     L6:  # Create（創造）: 新規設計、要件定義、戦略立案
-      model: "claude-opus-4-6[1m]"
+      model: "claude-opus-4-8"
       description: "創造・設計タスク"
 
   # Sonnet/Opus 境界
@@ -125,7 +135,7 @@ bloom_routing:
   opus_min: L4
 
   # モデル切替コマンド（隊長が隊員に送信）
-  # bash scripts/inbox_write.sh ${member} "/model claude-opus-4-6[1m]" model_switch ${captain}
+  # bash scripts/inbox_write.sh ${member} "/model claude-opus-4-8" model_switch ${captain}
   switch_type: model_switch
 
 codex_plugin:

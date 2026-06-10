@@ -31,6 +31,9 @@ scripts/monitor/node_modules/
 !.claude/hooks/session_start.sh
 !.claude/agents/
 !.claude/agents/*.md
+!.claude/skills/
+!.claude/skills/*/
+!.claude/skills/*/SKILL.md
 
 # Persona files (character definitions — safe for OSS)
 !persona/
@@ -117,6 +120,8 @@ scripts/monitor/node_modules/
 !scripts/build_instructions.sh
 !scripts/check_inbox_on_stop.sh
 !scripts/stop_hook_inbox.sh
+!scripts/stop_hook_reflect_probe.sh
+!scripts/stop_hook_reflect.sh
 !scripts/watcher_supervisor.sh
 !scripts/bridge_relay.sh
 !scripts/fallback_to_tmux.sh
@@ -134,6 +139,15 @@ scripts/monitor/node_modules/
 !scripts/auto_merge_short_lived.sh
 !scripts/pre_deploy_verify.sh
 !scripts/ratelimit_check.sh
+!scripts/validate_task_ready.sh
+!scripts/compaction_lock.sh
+
+# A1 統合スモークゲート harness (cmd_a1_smoke_gate_tooling)
+!scripts/smoke_gate/
+!scripts/smoke_gate/web_smoke.sh
+!scripts/smoke_gate/mobile_smoke.sh
+!scripts/smoke_gate/run_gate.sh
+!scripts/smoke_gate/lib/
 
 # SayTask (sample template only, not actual data)
 !saytask/
@@ -148,6 +162,12 @@ scripts/monitor/node_modules/
 !docs/multi-cli-evaluation.md
 !docs/web-ui-summary.md
 !docs/skipped_branches_cmd163.yaml
+!docs/retrospectives/
+!docs/retrospectives/*.md
+!docs/spike/
+!docs/spike/*.md
+!docs/design/
+!docs/design/*.md
 
 # Screenshots (masked — no secrets)
 !images/

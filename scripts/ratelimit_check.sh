@@ -320,7 +320,7 @@ try:
     short = {}
     for k, v in target_tokens.items():
         name = k.replace('claude-', '')
-        for prefix in ('opus-4-7', 'opus-4-6', 'sonnet-4-6', 'sonnet-4-5', 'haiku-4-5'):
+        for prefix in ('opus-4-8', 'opus-4-7', 'opus-4-6', 'sonnet-4-6', 'sonnet-4-5', 'haiku-4-5'):
             if name.startswith(prefix):
                 name = prefix.split('-')[0]
                 break

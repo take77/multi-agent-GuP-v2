@@ -153,10 +153,26 @@ detect_agent_state() {
         return
     fi
 
-    # ── ステータスバーチェック（最終行のみ）──
-    local last_line
-    last_line=$(echo "$pane_tail" | grep -v '^[[:space:]]*$' | tail -1)
-    if echo "$last_line" | grep -qiF 'esc to'; then
+    # ── ステータスバーチェック（下5行を走査）──
+    # 'esc to interrupt' は生成中のみ表示される確実な busy シグナル。
+    # 2026-06-10 #2 修正: 旧実装は「最終行のみ」参照だったが、Claude Code の UI で
+    # status bar が最終行に無いレイアウト（例: 末尾が "Remote Control active"・
+    # status bar はその上）だと 'esc to' を取りこぼす。さらにテーマ別スピナー
+    # （「○○中…」等）はキーワード非一致 → 直後の idle 判定が生成中でも出る空入力ボックス
+    # "❯ " にマッチ → busy を idle 誤判定 → watcher が Escape で mid-turn 中断（miho stall）。
+    # → pane_tail（下5行・status bar を含む）全体を走査して取りこぼしを無くす。
+    if echo "$pane_tail" | grep -qiF 'esc to'; then
+        echo "busy"
+        return
+    fi
+
+    # ── 生成スピナーの経過時間カウンタ（最も確実な busy シグナル）──
+    # 2026-06-10 #2 robust 化: 「(Ns」（例 "(23s"）は生成中ほぼ毎フレーム表示される。
+    # 一方 'esc to' は status bar ヒントがローテーションして出ない瞬間があり取りこぼす
+    # ／テーマ別スピナー文言（「○○中…」）は下のキーワード検査に非一致
+    # ／生成中も空入力ボックス "❯ " が出て直後の idle 判定（^❯）に誤マッチする。
+    # → 経過時間カウンタで生成中を確実に busy 判定し、これら全ての取りこぼしを塞ぐ。
+    if echo "$pane_tail" | grep -qE '[(（][0-9]+s'; then
         echo "busy"
         return
     fi

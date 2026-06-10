@@ -534,13 +534,13 @@ load_adapter_with() {
 @test "get_agent_model: cliセクションなし captain → fixed opus model (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
     result=$(get_agent_model "captain")
-    [ "$result" = "claude-opus-4-6[1m]" ]
+    [ "$result" = "claude-opus-4-8" ]
 }
 
 @test "get_agent_model: cliセクションなし vice_captain → fixed opus model (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
     result=$(get_agent_model "vice_captain")
-    [ "$result" = "claude-opus-4-6[1m]" ]
+    [ "$result" = "claude-opus-4-8" ]
 }
 
 @test "get_agent_model: cliセクションなし member1 → fixed sonnet model (デフォルト)" {
@@ -552,7 +552,7 @@ load_adapter_with() {
 @test "get_agent_model: cliセクションなし member5 → fixed opus model (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
     result=$(get_agent_model "member5")
-    [ "$result" = "claude-opus-4-6[1m]" ]
+    [ "$result" = "claude-opus-4-8" ]
 }
 
 @test "get_agent_model: YAML指定 member1 → haiku (オーバーライド)" {

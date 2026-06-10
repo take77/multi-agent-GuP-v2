@@ -1,0 +1,75 @@
+# watcher #2 hardening (cmd_watcher2_hardening_ab) — verification log
+# generated 2026年 6月10日 水曜日 16時08分50秒 JST  branch=feat/retrospective-improvements  HEAD=061a9b0
+# files under test: scripts/inbox_watcher.sh, scripts/watcher_supervisor.sh
+
+## bash -n syntax
+inbox_watcher.sh SYNTAX_OK
+watcher_supervisor.sh SYNTAX_OK
+
+## A1: agent_is_busy flag logic (both directions + cooldown + non-claude fallback)
+== idle_flag_path resolution ==
+  PASS: flat path (CLUSTER_ID unset) (got=/var/folders/c1/_bgfnvx54xj83g32hlksynkh0000gn/T/tmp.AdxHLMmEOc/gup_idle_testbot)
+  PASS: cluster path (CLUSTER_ID=maho) (got=/var/folders/c1/_bgfnvx54xj83g32hlksynkh0000gn/T/tmp.AdxHLMmEOc/gup_maho_idle_testbot)
+== claude: flag ABSENT => busy (suppress nudge) ==
+  PASS: flag absent -> agent_is_busy=true (busy) (got=busy)
+== claude: flag PRESENT => idle (deliver nudge) ==
+  PASS: flag present -> agent_is_busy=false (idle) (got=idle)
+== /clear cooldown: forced busy within 30s even with flag present ==
+  PASS: within /clear cooldown -> busy (got=busy)
+  PASS: after cooldown -> idle (got=idle)
+== non-claude (codex): uses pane scan fallback, ignores flag ==
+  PASS: codex pane=busy -> busy (got=busy)
+  PASS: codex idle (flag absent ignored) (got=idle)
+
+RESULT: pass=8 fail=0
+
+## A2: send_wakeup end-to-end gating (busy=skip / idle=deliver inbox3)
+== BUSY (flag absent): SKIP ==
+  PASS: no nudge to busy agent
+  (log: deferring nudge)
+== IDLE (flag present): DELIVER inbox3 ==
+  PASS: nudge inbox3 delivered to idle agent
+  sent: SEND-KEYS -t fake:0.0 inbox3|SEND-KEYS -t fake:0.0 Enter|
+
+RESULT: pass=2 fail=0
+
+## B: fd9 inheritance — old(bug) vs new(fix) + orphan-fswatch respawn scenario
+== OLD pattern (no 9>&-): child+fswatch inherit fd9 ==
+  lsof OLD lock:
+    COMMAND PID FD
+    bash 35882 9w
+    fswatch 35889 9w
+  PASS: OLD: someone holds fd9
+== NEW pattern (9>&-): child+fswatch do NOT inherit fd9 ==
+  lsof NEW lock:
+  PASS: NEW: nobody holds fd9 after subshell exit
+== ORPHAN scenario: kill watcher, leave fswatch orphan, can supervisor respawn? ==
+  orphan fswatch OLD alive? yes / NEW alive? yes
+  PASS: OLD: orphan fswatch holds lock -> respawn BLOCKED (bug)
+  PASS: NEW: orphan fswatch frees lock -> respawn SUCCEEDS (fix)
+
+RESULT: pass=4 fail=0
+
+# ════════════════════════════════════════════════════════════════
+# L4 QC（2026年 6月10日 水曜日 17時44分49秒 JST）— Codex adversarial stall → Claude-only fallback
+# ════════════════════════════════════════════════════════════════
+# Codex review(agentId a52b74e517529cb4e) は CLI 検出経路を調査中に 16:14 で出力停止
+# （88min 無進捗・final verdict 無）→ CLAUDE.md「Codex rate limit/エラー時は Claude-only
+# QC 自動フォールバック」に従い Claude-only QC を実施。
+#
+# 7 論点 全 HOLDS（blocker 無）:
+#  1. B flock TOCTOU: 排他は subshell 内の critical section で維持・subshell exit で解放・
+#     liveness=pgrep。orphan respawn test 4/4 PASS。HOLDS。
+#  2. B redirect order '>> log 2>&1 9>&-': fd9 のみ close・stdout/stderr は log へ（lsof+log実測）。HOLDS。
+#  3. fail-toward-idle 非破壊: ASW_DISABLE_ESCALATION 既定=1。unread>0 で escalation-disabled
+#     分岐が send_wakeup(plain nudge)のみ実行し return 0（inbox_watcher.sh:708-716）。
+#     phase2/3 の Escape+C-c へ到達しない。false-idle の最大被害=plain nudge 1発。HOLDS。
+#  4. 永久 stall 無: startup touch（get_effective_cli_type で agent_is_busy と一致）+ stop-hook
+#     touch + fail-toward-idle で claude は常に nudgeable に収束。HOLDS。
+#  5. LAST_CLEAR_TS 永続: send_cli_command は here-string 'done <<< $specials'(inbox_watcher.sh:692)
+#     ＝current shell 実行・subshell 喪失なし。HOLDS。
+#  6. 非 claude 回帰無: agent_is_busy 非 claude 分岐=detect_agent_state 無改変。HOLDS。
+#  7. set -u 安全: LAST_CLEAR_TS/CLUSTER_ID/IDLE_FLAG_DIR は :- default・cooldown 算術は :-0 で gate。HOLDS。
+#
+# Codex が停止前に surface した 1 件（startup touch=CLI_TYPE vs agent_is_busy=get_effective_cli_type
+# の不整合）= follow-up commit で startup touch を get_effective_cli_type に揃えて解消（minor）。

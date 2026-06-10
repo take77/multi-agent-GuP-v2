@@ -55,6 +55,23 @@ case "$TYPE" in
         ;;
 esac
 
+# DoR バリデーション: task_assigned 時にタスク YAML の着手可能条件をチェック
+if [ "$TYPE" = "task_assigned" ] || [ "$TYPE" = "clear_command" ]; then
+    TASK_YAML="$SCRIPT_DIR/queue/tasks/${TARGET}.yaml"
+    if [ -f "$TASK_YAML" ]; then
+        bash "$SCRIPT_DIR/scripts/validate_task_ready.sh" "$TASK_YAML" 2>&1 || true
+    fi
+fi
+
+# inbox 過負荷ガード: ターゲットの inbox サイズをチェック
+if [ -f "$INBOX" ]; then
+    INBOX_SIZE=$(wc -c < "$INBOX" | tr -d ' ')
+    if [ "${INBOX_SIZE:-0}" -ge 15360 ]; then
+        echo "[inbox_write] WARNING: ${TARGET} の inbox が ${INBOX_SIZE} bytes（閾値 15KB）。コンテキスト飽和リスクあり。別メンバーへの配信を検討してください" >&2
+        echo "[$(date '+%Y-%m-%dT%H:%M:%S')] [WARN_OVERLOAD] ${FROM} → ${TARGET} (type=${TYPE}) inbox_size=${INBOX_SIZE}" >> "$DELIVERY_LOG"
+    fi
+fi
+
 # Initialize inbox if not exists
 if [ ! -f "$INBOX" ]; then
     mkdir -p "$(dirname "$INBOX")"
@@ -162,8 +179,9 @@ try:
 except:
     print(0)
 " 2>/dev/null || echo 0)
-        if [ "${MSG_COUNT:-0}" -ge 30 ]; then
-            nohup bash "$SCRIPT_DIR/scripts/inbox_archive.sh" --threshold 20 --keep-recent 10 "$TARGET" >/dev/null 2>&1 &
+        CUR_BYTES=$(wc -c < "$INBOX" 2>/dev/null | tr -d ' ')
+        if [ "${MSG_COUNT:-0}" -ge 30 ] || [ "${CUR_BYTES:-0}" -ge 15360 ]; then
+            nohup bash "$SCRIPT_DIR/scripts/inbox_archive.sh" --threshold 20 --keep-recent 10 --max-bytes 15360 "$TARGET" >/dev/null 2>&1 &
         fi
 
         exit 0
